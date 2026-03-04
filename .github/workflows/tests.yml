@@ -13,6 +13,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      GROQ_API_KEY: "ci_dummy_key"
     
     steps:
       - name: Checkout repository
