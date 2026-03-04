@@ -24,6 +24,9 @@ COPY requirements.txt ./
 # Instalar dependências Python
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Instalar navegador para Playwright
+RUN python -m playwright install --with-deps chromium
+
 # Inicializar Robot Framework Browser (baixar navegadores)
 RUN rfbrowser init --skip-browsers || echo "Browser init will be done on first run"
 

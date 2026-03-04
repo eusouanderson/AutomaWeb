@@ -13,30 +13,51 @@ from app.models.test_execution import TestExecution
 
 @pytest.mark.asyncio
 async def test_create_project_route(monkeypatch) -> None:
-    async def fake_create_project(self, session: AsyncSession, name: str, description: str | None = None, test_directory: str | None = None):
+    async def fake_create_project(
+        self,
+        session: AsyncSession,
+        name: str,
+        description: str | None = None,
+        url: str | None = None,
+        test_directory: str | None = None,
+    ):
         return Project(
             id=1,
             name=name,
             description=description,
+            url=url,
             test_directory=test_directory,
             created_at=datetime.utcnow(),
         )
 
     monkeypatch.setattr(routes.ProjectService, "create_project", fake_create_project)
-    payload = routes.ProjectCreate(name="Test", description="Desc", test_directory="/tmp/tests")
+    payload = routes.ProjectCreate(
+        name="Test",
+        description="Desc",
+        url="https://example.com",
+        test_directory="/tmp/tests",
+    )
     result = await routes.create_project(payload, session=None)
 
     assert result.id == 1
+    assert result.url == "https://example.com/"
     assert result.test_directory == "/tmp/tests"
 
 
 @pytest.mark.asyncio
 async def test_create_project_route_unique_error(monkeypatch) -> None:
-    async def fake_create_project(self, session: AsyncSession, name: str, description: str | None = None, test_directory: str | None = None):
+    async def fake_create_project(
+        self,
+        session: AsyncSession,
+        name: str,
+        description: str | None = None,
+        url: str | None = None,
+        test_directory: str | None = None,
+    ):
         raise Exception("UNIQUE constraint failed: projects.name")
 
     monkeypatch.setattr(routes.ProjectService, "create_project", fake_create_project)
-    payload = routes.ProjectCreate(name="Teste", description="Desc", test_directory="/tmp/tests")
+    payload = routes.ProjectCreate(name="Teste", description="Desc", url="https://example.com", test_directory="/tmp/tests")
 
     with pytest.raises(HTTPException) as exc:
         await routes.create_project(payload, session=None)
@@ -46,11 +67,18 @@ async def test_create_project_route_unique_error(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_create_project_route_generic_error(monkeypatch) -> None:
-    async def fake_create_project(self, session: AsyncSession, name: str, description: str | None = None, test_directory: str | None = None):
+    async def fake_create_project(
+        self,
+        session: AsyncSession,
+        name: str,
+        description: str | None = None,
+        url: str | None = None,
+        test_directory: str | None = None,
+    ):
         raise Exception("Boom")
 
     monkeypatch.setattr(routes.ProjectService, "create_project", fake_create_project)
-    payload = routes.ProjectCreate(name="Teste", description="Desc", test_directory="/tmp/tests")
+    payload = routes.ProjectCreate(name="Teste", description="Desc", url="https://example.com", test_directory="/tmp/tests")
 
     with pytest.raises(HTTPException) as exc:
         await routes.create_project(payload, session=None)
@@ -66,6 +94,7 @@ async def test_list_projects_route(monkeypatch) -> None:
                 id=1,
                 name="P1",
                 description=None,
+                url="https://example.com",
                 test_directory=None,
                 created_at=datetime.utcnow(),
             )

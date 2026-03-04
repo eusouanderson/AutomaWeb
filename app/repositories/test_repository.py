@@ -29,3 +29,27 @@ class TestRepository:
     async def get_generated_test(self, session: AsyncSession, test_id: int) -> GeneratedTest | None:
         result = await session.execute(select(GeneratedTest).where(GeneratedTest.id == test_id))
         return result.scalar_one_or_none()
+
+    async def list_generated_tests_by_project(self, session: AsyncSession, project_id: int) -> list[GeneratedTest]:
+        result = await session.execute(
+            select(GeneratedTest)
+            .join(TestRequest, GeneratedTest.test_request_id == TestRequest.id)
+            .where(TestRequest.project_id == project_id)
+            .order_by(GeneratedTest.created_at.desc())
+        )
+        return list(result.scalars().all())
+
+    async def list_generated_tests_by_ids_for_project(
+        self,
+        session: AsyncSession,
+        project_id: int,
+        test_ids: list[int],
+    ) -> list[GeneratedTest]:
+        if not test_ids:
+            return []
+        result = await session.execute(
+            select(GeneratedTest)
+            .join(TestRequest, GeneratedTest.test_request_id == TestRequest.id)
+            .where(TestRequest.project_id == project_id, GeneratedTest.id.in_(test_ids))
+        )
+        return list(result.scalars().all())

@@ -47,3 +47,21 @@ async def test_get_nonexistent_project(session: AsyncSession) -> None:
     service = ProjectService()
     found = await service.get_project(session, 9999)
     assert found is None
+
+
+async def test_delete_project_removes_project_directory(session: AsyncSession, tmp_path) -> None:
+    service = ProjectService()
+    project = await service.create_project(
+        session,
+        name="Delete Project",
+        test_directory=str(tmp_path),
+    )
+
+    project_dir = tmp_path / "🧪_Delete_Project"
+    project_dir.mkdir(parents=True, exist_ok=True)
+    (project_dir / "generated_test_1.robot").write_text("*** Test Cases ***\nExample\n")
+
+    deleted = await service.delete_project(session, project.id)
+
+    assert deleted is True
+    assert not project_dir.exists()

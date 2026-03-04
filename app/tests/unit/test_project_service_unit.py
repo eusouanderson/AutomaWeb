@@ -8,6 +8,14 @@ from app.services.project_service import ProjectService
 class DummyRepository:
     def __init__(self, result: bool):
         self._result = result
+        self._project = (
+            type("FakeProject", (), {"id": 1, "name": "Projeto", "test_directory": "/tmp"})()
+            if result
+            else None
+        )
+
+    async def get(self, session: AsyncSession, project_id: int):
+        return self._project
 
     async def delete(self, session: AsyncSession, project_id: int) -> bool:
         return self._result

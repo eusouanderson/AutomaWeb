@@ -13,6 +13,7 @@ async def init_db(db_engine: AsyncEngine | None = None) -> None:
     async with target_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await conn.run_sync(_ensure_project_test_directory_column)
+        await conn.run_sync(_ensure_project_url_column)
         await conn.run_sync(_ensure_test_execution_columns)
 
 
@@ -40,3 +41,14 @@ def _ensure_test_execution_columns(sync_conn) -> None:
         sync_conn.execute(
             text("ALTER TABLE test_executions ADD COLUMN mkdocs_index VARCHAR(500)")
         )
+
+
+def _ensure_project_url_column(sync_conn) -> None:
+    inspector = inspect(sync_conn)
+    columns = {col["name"] for col in inspector.get_columns("projects")}
+    if "url" in columns:
+        return
+
+    sync_conn.execute(
+        text("ALTER TABLE projects ADD COLUMN url VARCHAR(1000)")
+    )

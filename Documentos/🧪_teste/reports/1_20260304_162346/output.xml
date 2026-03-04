@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot generator="Robot 7.4.2 (Python 3.12.3 on linux)" generated="2026-03-04T16:24:21.266184" rpa="false" schemaversion="5">
+<suite id="s1" name="Generated Test 1" source="/home/eusouanderson/treino/AutomaWeb/Documentos/🧪_teste/generated_test_1.robot">
+<test id="s1-t1" name="Pesquisar no Google" line="11">
+<kw name="Open Browser" owner="Browser">
+<msg time="2026-03-04T16:24:21.370224" level="FAIL">ValueError: Argument 'browser' got value 'chrome' that cannot be converted to SupportedBrowsers: SupportedBrowsers does not have member 'chrome'. Available: 'chromium', 'firefox' and 'webkit'</msg>
+<arg>${url_google}</arg>
+<arg>chrome</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Opens a new browser instance. Use this keyword for quick experiments or debugging sessions.</doc>
+<status status="FAIL" start="2026-03-04T16:24:21.369535" elapsed="0.001523">ValueError: Argument 'browser' got value 'chrome' that cannot be converted to SupportedBrowsers: SupportedBrowsers does not have member 'chrome'. Available: 'chromium', 'firefox' and 'webkit'</status>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<arg>css selector:input[name="q"]</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="NOT RUN" start="2026-03-04T16:24:21.371277" elapsed="0.000084"/>
+</kw>
+<kw name="Type Text" owner="Browser">
+<arg>css selector:input[name="q"]</arg>
+<arg>${pesquisa_1}</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Types the given ``txt`` into the text field found by ``selector``.</doc>
+<status status="NOT RUN" start="2026-03-04T16:24:21.371447" elapsed="0.000041"/>
+</kw>
+<kw name="Press Keys" owner="Browser">
+<arg>css selector:input[name="q"]</arg>
+<arg>ENTER</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Types the given key combination into element found by ``selector``.</doc>
+<status status="NOT RUN" start="2026-03-04T16:24:21.371557" elapsed="0.000067"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<arg>css selector:div[id="rso"]</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="NOT RUN" start="2026-03-04T16:24:21.371712" elapsed="0.000037"/>
+</kw>
+<kw name="Type Text" owner="Browser">
+<arg>css selector:input[name="q"]</arg>
+<arg>${pesquisa_2}</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Types the given ``txt`` into the text field found by ``selector``.</doc>
+<status status="NOT RUN" start="2026-03-04T16:24:21.371838" elapsed="0.000036"/>
+</kw>
+<kw name="Press Keys" owner="Browser">
+<arg>css selector:input[name="q"]</arg>
+<arg>ENTER</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Types the given key combination into element found by ``selector``.</doc>
+<status status="NOT RUN" start="2026-03-04T16:24:21.371951" elapsed="0.000030"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<arg>css selector:div[id="rso"]</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="NOT RUN" start="2026-03-04T16:24:21.372042" elapsed="0.000029"/>
+</kw>
+<kw name="Type Text" owner="Browser">
+<arg>css selector:input[name="q"]</arg>
+<arg>${pesquisa_3}</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Types the given ``txt`` into the text field found by ``selector``.</doc>
+<status status="NOT RUN" start="2026-03-04T16:24:21.372128" elapsed="0.000028"/>
+</kw>
+<kw name="Press Keys" owner="Browser">
+<arg>css selector:input[name="q"]</arg>
+<arg>ENTER</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Types the given key combination into element found by ``selector``.</doc>
+<status status="NOT RUN" start="2026-03-04T16:24:21.372210" elapsed="0.000032"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<arg>css selector:div[id="rso"]</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="NOT RUN" start="2026-03-04T16:24:21.372298" elapsed="0.000028"/>
+</kw>
+<msg time="2026-03-04T16:24:21.377238" level="INFO">Starting Browser process /home/eusouanderson/.cache/pypoetry/virtualenvs/automaweb-s9FmxQLL-py3.12/lib/python3.12/site-packages/Browser/wrapper/index.js using at 127.0.0.1:59121</msg>
+<status status="FAIL" start="2026-03-04T16:24:21.368830" elapsed="0.003624">ValueError: Argument 'browser' got value 'chrome' that cannot be converted to SupportedBrowsers: SupportedBrowsers does not have member 'chrome'. Available: 'chromium', 'firefox' and 'webkit'</status>
+</test>
+<status status="FAIL" start="2026-03-04T16:24:21.266932" elapsed="0.545286"/>
+</suite>
+<statistics>
+<total>
+<stat pass="0" fail="1" skip="0">All Tests</stat>
+</total>
+<tag>
+</tag>
+<suite>
+<stat name="Generated Test 1" id="s1" pass="0" fail="1" skip="0">Generated Test 1</stat>
+</suite>
+</statistics>
+<errors>
+</errors>
+</robot>

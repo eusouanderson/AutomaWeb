@@ -9,6 +9,8 @@ services:
       - ./app:/app/app
       - ./frontend:/app/frontend
       - ./dev.py:/app/dev.py
+      # Certificados corporativos (opcional)
+      - ./certs:/app/certs:ro
       # Persistir dados e relatórios
       - ./app.db:/app/app.db
       - ./app/static/reports:/app/app/static/reports
@@ -19,6 +21,8 @@ services:
       - GROQ_MODEL=llama-3.3-70b-versatile
       - GROQ_TIMEOUT_SECONDS=30
       - GROQ_MAX_RETRIES=3
+      - GROQ_CA_BUNDLE=${GROQ_CA_BUNDLE:-}
+      - GROQ_INSECURE_SKIP_VERIFY=${GROQ_INSECURE_SKIP_VERIFY:-false}
       - CACHE_TTL_SECONDS=300
       - STATIC_DIR=app/static
     env_file:

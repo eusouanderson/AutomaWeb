@@ -11,7 +11,12 @@ from app.services.test_service import TestService
 
 
 class DummyGroqClient:
-    def generate_robot_test(self, prompt: str, context: str | None = None) -> str:
+    def generate_robot_test(
+        self,
+        prompt: str,
+        context: str | None = None,
+        page_structure: dict | None = None,
+    ) -> str:
         return "*** Settings ***\nLibrary    Browser\n\n*** Test Cases ***\nExample\n    Log    Hello"
 
 
@@ -95,6 +100,28 @@ async def test_generate_test_nonexistent_project(session: AsyncSession) -> None:
             json={"project_id": 9999, "prompt": "Gerar"},
         )
         assert resp.status_code == 404
+
+
+async def test_list_project_tests_endpoint(session: AsyncSession) -> None:
+    from httpx import ASGITransport
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        project_resp = await client.post("/projects", json={"name": "ListTestsProject", "description": "Desc"})
+        assert project_resp.status_code == 200
+        project_id = project_resp.json()["id"]
+
+        gen_resp = await client.post(
+            "/tests/generate",
+            json={"project_id": project_id, "prompt": "Gerar", "context": "Ctx"},
+        )
+        assert gen_resp.status_code == 200
+
+        list_resp = await client.get(f"/projects/{project_id}/tests")
+        assert list_resp.status_code == 200
+        data = list_resp.json()
+        assert len(data) >= 1
+        assert "id" in data[0]
+        assert "file_path" in data[0]
 
 
 async def test_get_test_endpoint(session: AsyncSession) -> None:

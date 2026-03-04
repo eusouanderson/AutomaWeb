@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from tenacity import RetryError
 
 from app.core.config import settings
 from app.llm.groq_client import GroqClient
@@ -10,8 +11,17 @@ from app.models.generated_test import GeneratedTest
 from app.models.test_request import TestRequest
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.test_repository import TestRepository
+from app.services.element_scanner import ElementScannerError, ElementScannerService
 
 logger = logging.getLogger(__name__)
+
+
+class LLMServiceUnavailableError(Exception):
+    """Raised when LLM provider is unavailable."""
+
+
+class ScanUnavailableError(Exception):
+    """Raised when element scan fails during test generation."""
 
 
 class TestService:
@@ -22,10 +32,12 @@ class TestService:
         test_repository: TestRepository | None = None,
         project_repository: ProjectRepository | None = None,
         groq_client: GroqClient | None = None,
+        element_scanner: ElementScannerService | None = None,
     ) -> None:
         self._test_repository = test_repository or TestRepository()
         self._project_repository = project_repository or ProjectRepository()
         self._groq_client = groq_client or GroqClient()
+        self._element_scanner = element_scanner or ElementScannerService()
 
     async def generate_test(
         self,
@@ -41,7 +53,37 @@ class TestService:
         test_request = TestRequest(project_id=project_id, prompt=prompt, context=context, status="processing")
         test_request = await self._test_repository.create_test_request(session, test_request)
 
-        content = self._groq_client.generate_robot_test(prompt=prompt, context=context)
+        page_structure: dict | None = None
+        if project.url:
+            try:
+                scan_result = await self._element_scanner.scan_url(str(project.url))
+            except ElementScannerError as exc:
+                test_request.status = "failed"
+                await self._test_repository.update_test_request(session, test_request)
+                logger.error("Failed to scan project URL before generating test: %s", exc)
+                raise ScanUnavailableError(str(exc)) from exc
+            page_structure = scan_result.model_dump()
+
+        try:
+            content = self._groq_client.generate_robot_test(
+                prompt=prompt,
+                context=context,
+                page_structure=page_structure,
+            )
+        except RetryError as exc:
+            test_request.status = "failed"
+            await self._test_repository.update_test_request(session, test_request)
+            logger.error("Failed to generate test: LLM connection retries exhausted")
+            raise LLMServiceUnavailableError("LLM provider connection failed") from exc
+        except Exception as exc:
+            error_name = exc.__class__.__name__
+            if "APIConnectionError" in error_name or "APITimeoutError" in error_name:
+                test_request.status = "failed"
+                await self._test_repository.update_test_request(session, test_request)
+                logger.error("Failed to generate test due to LLM connectivity issue: %s", error_name)
+                raise LLMServiceUnavailableError("LLM provider connection failed") from exc
+            raise
+
         content = self._sanitize_robot_output(content)
         test_request.status = "completed"
         await self._test_repository.update_test_request(session, test_request)
@@ -54,8 +96,15 @@ class TestService:
         )
         return await self._test_repository.create_generated_test(session, generated_test)
 
+
     async def get_generated_test(self, session: AsyncSession, test_id: int) -> GeneratedTest | None:
         return await self._test_repository.get_generated_test(session, test_id)
+
+    async def list_generated_tests_by_project(self, session: AsyncSession, project_id: int) -> list[GeneratedTest]:
+        project = await self._project_repository.get(session, project_id)
+        if not project:
+            raise ValueError("Project not found")
+        return await self._test_repository.list_generated_tests_by_project(session, project_id)
 
     def _write_robot_file(
         self,

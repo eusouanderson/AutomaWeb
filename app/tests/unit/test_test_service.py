@@ -9,7 +9,12 @@ from app.services.test_service import TestService
 
 
 class DummyGroqClient:
-    def generate_robot_test(self, prompt: str, context: str | None = None) -> str:
+    def generate_robot_test(
+        self,
+        prompt: str,
+        context: str | None = None,
+        page_structure: dict | None = None,
+    ) -> str:
         return "*** Settings ***\nLibrary    Browser\n\n*** Test Cases ***\nExample\n    Log    Hello"
 
 

@@ -1,153 +1,191 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AutomaWeb - Gerador de Testes Robot Framework</title>
+    <link rel="stylesheet" href="/static/frontend/styles.css" />
+    <link rel="stylesheet" href="/static/frontend/node_modules/toastify-js/src/toastify.css" />
+  </head>
 
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AutomaWeb - Gerador de Testes Robot Framework</title>
-  <link rel="stylesheet" href="/static/frontend/styles.css">
-  <link rel="stylesheet" href="/static/frontend/node_modules/toastify-js/src/toastify.css">
-</head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>🤖 AutomaWeb</h1>
+        <p>Gerador de Testes Robot Framework com IA</p>
+      </header>
 
-<body>
-  <div class="container">
-    <header>
-      <h1>🤖 AutomaWeb</h1>
-      <p>Gerador de Testes Robot Framework com IA</p>
-    </header>
-
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="projects">Projetos</button>
-      <button class="tab-btn" data-tab="generate">Gerar Teste</button>
-      <button class="tab-btn" data-tab="tests">Testes Gerados</button>
-      <button class="tab-btn" data-tab="execute">Executar Testes</button>
-    </div>
-
-    <!-- Tab: Projetos -->
-    <div id="projects-tab" class="tab-content active">
-      <div class="section">
-        <h2>Criar Projeto</h2>
-        <form id="create-project-form">
-          <div class="form-group">
-            <label for="project-name">Nome do Projeto</label>
-            <input type="text" id="project-name" required minlength="2">
-          </div>
-          <div class="form-group">
-            <label for="project-description">Descrição</label>
-            <textarea id="project-description" rows="3"></textarea>
-          </div>
-          <div class="form-group">
-            <label for="project-test-dir">Diretório de Testes</label>
-            <input type="text" id="project-test-dir" placeholder="/caminho/para/testes" required>
-            <small>Caminho onde os testes serão salvos e executados</small>
-          </div>
-          <button type="submit" class="btn btn-primary">Criar Projeto</button>
-        </form>
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="projects">Projetos</button>
+        <button class="tab-btn" data-tab="generate">Gerar Teste</button>
+        <button class="tab-btn" data-tab="execute">Executar Testes</button>
+        <button class="tab-btn" data-tab="tests">Testes Gerados</button>
       </div>
 
-      <div class="section">
-        <h2>Projetos Existentes</h2>
-        <div id="projects-list" class="list"></div>
-      </div>
-    </div>
-
-    <!-- Tab: Gerar Teste -->
-    <div id="generate-tab" class="tab-content">
-      <div class="section">
-        <h2>Gerar Teste Robot Framework</h2>
-        <form id="generate-test-form">
-          <div class="form-group">
-            <label for="test-project">Projeto</label>
-            <select id="test-project" required>
-              <option value="">Selecione um projeto</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="test-prompt">Prompt (o que deseja testar)</label>
-            <textarea id="test-prompt" rows="4" required minlength="5"
-              placeholder="Ex: Testar login no sistema com usuário válido e inválido"></textarea>
-          </div>
-          <div class="form-group">
-            <label for="test-context">Contexto Adicional (opcional)</label>
-            <textarea id="test-context" rows="3"
-              placeholder="Ex: URL: https://example.com, Seletores específicos, etc."></textarea>
-          </div>
-          <button type="submit" class="btn btn-primary">Gerar Teste</button>
-        </form>
-      </div>
-
-      <div id="generated-result" class="section hidden">
-        <h2>Teste Gerado</h2>
-        <div class="result-actions">
-          <button id="copy-test-btn" class="btn btn-secondary">Copiar Código</button>
-          <button id="download-test-btn" class="btn btn-secondary">Download .robot</button>
+      <!-- Tab: Projetos -->
+      <div id="projects-tab" class="tab-content active">
+        <div class="section">
+          <h2>Criar Projeto</h2>
+          <form id="create-project-form">
+            <div class="form-group">
+              <label for="project-name">Nome do Projeto</label>
+              <input type="text" id="project-name" required minlength="2" />
+            </div>
+            <div class="form-group">
+              <label for="project-description">Descrição</label>
+              <textarea id="project-description" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+              <label for="project-url">URL do Projeto</label>
+              <input type="url" id="project-url" placeholder="https://exemplo.com" required />
+              <small>URL base da aplicação para escaneamento inteligente</small>
+            </div>
+            <div class="form-group">
+              <label for="project-test-dir">Diretório de Testes</label>
+              <input
+                type="text"
+                id="project-test-dir"
+                placeholder="/caminho/para/testes"
+                required
+              />
+              <small>Caminho onde os testes serão salvos e executados</small>
+            </div>
+            <button type="submit" class="btn btn-primary">Criar Projeto</button>
+          </form>
         </div>
-        <pre><code id="test-code"></code></pre>
-      </div>
-    </div>
 
-    <!-- Tab: Testes Gerados -->
-    <div id="tests-tab" class="tab-content">
-      <div class="section">
-        <h2>Histórico de Testes</h2>
-        <div id="tests-list" class="list"></div>
-      </div>
-    </div>
-
-    <!-- Tab: Executar Testes -->
-    <div id="execute-tab" class="tab-content">
-      <div class="section">
-        <h2>Executar Testes Robot Framework</h2>
-        <form id="execute-tests-form">
-          <div class="form-group">
-            <label for="execute-project">Projeto</label>
-            <select id="execute-project" required>
-              <option value="">Selecione um projeto...</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>
-              <input type="checkbox" id="execute-all-tests" checked>
-              Executar todos os testes do projeto
-            </label>
-          </div>
-          <button type="submit" class="btn btn-primary">▶️ Executar Testes</button>
-        </form>
-      </div>
-
-      <div id="execution-result" class="section" style="display: none;">
-        <h2>Resultado da Execução</h2>
-        <div id="execution-error" class="alert" style="display: none;"></div>
-        <div class="test-stats">
-          <div class="stat-item">
-            <span class="stat-label">Total:</span>
-            <span id="stat-total">0</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">✅ Passou:</span>
-            <span id="stat-passed">0</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">❌ Falhou:</span>
-            <span id="stat-failed">0</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">⏭️ Pulado:</span>
-            <span id="stat-skipped">0</span>
-          </div>
-        </div>
-        <div class="result-actions">
-          <button id="view-report-btn" class="btn btn-primary">📊 Ver Relatório MkDocs</button>
-          <button id="view-robot-report-btn" class="btn btn-secondary">🤖 Relatório Robot</button>
-          <button id="view-log-btn" class="btn btn-secondary">📝 Ver Log</button>
+        <div class="section">
+          <h2>Projetos Existentes</h2>
+          <div id="projects-list" class="list"></div>
         </div>
       </div>
+
+      <!-- Tab: Gerar Teste -->
+      <div id="generate-tab" class="tab-content">
+        <div class="section">
+          <h2>Gerar Teste Robot Framework</h2>
+          <form id="generate-test-form">
+            <div class="form-group">
+              <label for="test-project">Projeto</label>
+              <select id="test-project" required>
+                <option value="">Selecione um projeto</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <button type="button" id="scan-page-btn" class="btn btn-secondary">
+                Escanear Página
+              </button>
+            </div>
+            <div id="scan-panel" class="scan-panel hidden">
+              <h3>Scanner de Elementos</h3>
+              <div id="scan-live-status" class="scan-live-status hidden" aria-live="polite">
+                <span id="scan-live-text">Escaneando</span>
+                <span class="scan-dots" aria-hidden="true">
+                  <span>.</span><span>.</span><span>.</span>
+                </span>
+              </div>
+              <div id="scan-progress" class="scan-progress"></div>
+              <div id="scan-ready-message" class="scan-ready hidden">
+                Página pronta para o prompt.
+              </div>
+              <div id="scan-summary" class="scan-summary hidden">
+                <p><strong>Título:</strong> <span id="scan-title">-</span></p>
+                <p><strong>Total de Elementos:</strong> <span id="scan-total">0</span></p>
+                <p><strong>Resumo:</strong> <span id="scan-types">-</span></p>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="test-prompt">Prompt (o que deseja testar)</label>
+              <textarea
+                id="test-prompt"
+                rows="4"
+                required
+                minlength="5"
+                placeholder="Ex: Testar login no sistema com usuário válido e inválido"
+              ></textarea>
+            </div>
+            <div class="form-group">
+              <label for="test-context">Contexto Adicional (opcional)</label>
+              <textarea
+                id="test-context"
+                rows="3"
+                placeholder="Ex: URL: https://example.com, Seletores específicos, etc."
+              ></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Gerar Teste</button>
+          </form>
+        </div>
+
+        <div id="generated-result" class="section hidden">
+          <h2>Teste Gerado</h2>
+          <div class="result-actions">
+            <button id="copy-test-btn" class="btn btn-secondary">Copiar Código</button>
+            <button id="download-test-btn" class="btn btn-secondary">Download .robot</button>
+          </div>
+          <pre><code id="test-code"></code></pre>
+        </div>
+      </div>
+
+      <!-- Tab: Testes Gerados -->
+      <div id="tests-tab" class="tab-content">
+        <div class="section">
+          <h2>Histórico de Testes</h2>
+          <div id="tests-list" class="list"></div>
+        </div>
+      </div>
+
+      <!-- Tab: Executar Testes -->
+      <div id="execute-tab" class="tab-content">
+        <div class="section">
+          <h2>Executar Testes Robot Framework</h2>
+          <form id="execute-tests-form">
+            <div class="form-group">
+              <label for="execute-project">Projeto</label>
+              <select id="execute-project" required>
+                <option value="">Selecione um projeto...</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-primary">▶️ Executar Testes</button>
+          </form>
+
+          <div id="execution-loading" class="execution-loading hidden" aria-live="polite">
+            <span class="spinner" aria-hidden="true"></span>
+            <span>Executando testes... aguarde.</span>
+          </div>
+        </div>
+
+        <div id="execution-result" class="section" style="display: none">
+          <h2>Resultado da Execução</h2>
+          <div id="execution-error" class="alert" style="display: none"></div>
+          <div class="test-stats">
+            <div class="stat-item">
+              <span class="stat-label">Total:</span>
+              <span id="stat-total">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">✅ Passou:</span>
+              <span id="stat-passed">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">❌ Falhou:</span>
+              <span id="stat-failed">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">⏭️ Pulado:</span>
+              <span id="stat-skipped">0</span>
+            </div>
+          </div>
+          <div class="result-actions">
+            <button id="view-report-btn" class="btn btn-primary">📊 Ver Relatório MkDocs</button>
+            <button id="view-robot-report-btn" class="btn btn-secondary">🤖 Relatório Robot</button>
+            <button id="view-log-btn" class="btn btn-secondary">📝 Ver Log</button>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
 
-  <script src="/static/frontend/node_modules/axios/dist/axios.min.js"></script>
-  <script src="/static/frontend/node_modules/toastify-js/src/toastify.js"></script>
-  <script src="/static/frontend/app.js"></script>
-</body>
-
+    <script src="/static/frontend/node_modules/axios/dist/axios.min.js"></script>
+    <script src="/static/frontend/node_modules/toastify-js/src/toastify.js"></script>
+    <script src="/static/frontend/app.js"></script>
+  </body>
 </html>

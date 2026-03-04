@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
     GROQ_TIMEOUT_SECONDS: int = 30
     GROQ_MAX_RETRIES: int = 3
+    GROQ_CA_BUNDLE: str | None = None
+    GROQ_INSECURE_SKIP_VERIFY: bool = False
     CACHE_TTL_SECONDS: int = 300
     STATIC_DIR: str = "app/static"
 

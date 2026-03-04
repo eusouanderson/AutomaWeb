@@ -61,6 +61,9 @@ http://localhost:8888
 # 1. Instale as dependências
 poetry install
 
+# 1.1 (obrigatório para o Smart Element Scanner)
+poetry run playwright install chromium
+
 # 2. Configure as variáveis de ambiente
 cp .env.example .env
 # Edite .env e adicione sua GROQ_API_KEY
@@ -73,6 +76,18 @@ poetry run python dev.py
 
 # 5. Acesse a aplicação
 http://localhost:8888
+```
+
+Atalho via Makefile:
+
+```bash
+make setup
+```
+
+Para garantir que rode em outro PC, versione também o arquivo de lock:
+
+```bash
+git add pyproject.toml poetry.lock requirements.txt Dockerfile Makefile
 ```
 
 ## Uso
@@ -136,8 +151,27 @@ DATABASE_URL=sqlite+aiosqlite:///./app.db
 GROQ_MODEL=llama-3.3-70b-versatile
 GROQ_TIMEOUT_SECONDS=30
 GROQ_MAX_RETRIES=3
+GROQ_CA_BUNDLE=
+GROQ_INSECURE_SKIP_VERIFY=false
 CACHE_TTL_SECONDS=300
 STATIC_DIR=app/static
+```
+
+Se houver proxy corporativo com certificado próprio, configure `GROQ_CA_BUNDLE` com o caminho do arquivo `.crt` dentro do container.
+Use `GROQ_INSECURE_SKIP_VERIFY=true` apenas para diagnóstico temporário.
+
+Exemplo com Docker Compose:
+
+```bash
+# 1) Copie o certificado da empresa para ./certs
+cp /caminho/empresa-ca.crt ./certs/empresa-ca.crt
+
+# 2) No .env
+GROQ_CA_BUNDLE=/app/certs/empresa-ca.crt
+GROQ_INSECURE_SKIP_VERIFY=false
+
+# 3) Reinicie
+docker compose up -d --build
 ```
 
 ## API Endpoints

@@ -1,6 +1,7 @@
 """Service for executing Robot Framework tests and generating reports"""
 import logging
 import os
+import shutil
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -51,28 +52,32 @@ class TestExecutionService:
         project_dir = base_dir / safe_name
         
         if test_ids:
-            test_files = []
-            for test_id in test_ids:
-                generated = await self._test_repository.get_generated_test(session, test_id)
-                if generated:
-                    test_files.append(generated.file_path)
+            selected_tests = await self._test_repository.list_generated_tests_by_ids_for_project(
+                session=session,
+                project_id=project_id,
+                test_ids=test_ids,
+            )
+            test_files = [test.file_path for test in selected_tests]
         else:
             # Get all .robot files from project folder
-            test_files = list(project_dir.glob("*.robot")) if project_dir.exists() else []
+            test_files = [str(path) for path in project_dir.glob("*.robot")] if project_dir.exists() else []
 
         if not test_files:
             raise ValueError(f"No test files found in {project_dir}")
 
-        # Robot will execute files directly from project folder
-        test_dir = project_dir
+        run_id = f"{project_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-        # Create output directory for reports under STATIC_DIR for browser access
-        reports_root = Path(settings.STATIC_DIR) / "reports"
-        output_dir = reports_root / datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Store execution artifacts inside project folder
+        project_reports_root = project_dir / "reports"
+        output_dir = project_reports_root / run_id
         output_dir.mkdir(parents=True, exist_ok=True)
 
+        # Public mirror for frontend access
+        public_reports_root = Path(settings.STATIC_DIR) / "reports"
+        public_output_dir = public_reports_root / run_id
+
         # URL paths for frontend access
-        url_base = f"/static/reports/{output_dir.name}"
+        url_base = f"/static/reports/{run_id}"
         mkdocs_index_url = f"{url_base}/mkdocs/site/index.html"
 
         # Create execution record
@@ -97,7 +102,7 @@ class TestExecutionService:
                     "--log", "log.html",
                     "--report", "report.html",
                     "--output", "output.xml",
-                    str(test_dir),
+                    *test_files,
                 ],
                 capture_output=True,
                 text=True,
@@ -120,6 +125,7 @@ class TestExecutionService:
 
             # Generate MkDocs documentation
             await self._generate_mkdocs_report(project, output_dir, stats)
+            self._sync_reports_for_static(output_dir, public_output_dir)
             execution.mkdocs_index = mkdocs_index_url
 
         except subprocess.TimeoutExpired:
@@ -127,12 +133,14 @@ class TestExecutionService:
             execution.error_output = "Test execution timed out"
             execution.completed_at = datetime.utcnow()
             self._ensure_report_files(output_dir, execution.error_output)
+            self._sync_reports_for_static(output_dir, public_output_dir)
             logger.error("Test execution timed out")
         except Exception as e:
             execution.status = "failed"
             execution.error_output = str(e)
             execution.completed_at = datetime.utcnow()
             self._ensure_report_files(output_dir, execution.error_output)
+            self._sync_reports_for_static(output_dir, public_output_dir)
             logger.error(f"Test execution failed: {e}")
 
         # Save execution record to database (you'll need to create a repository for this)
@@ -172,6 +180,15 @@ class TestExecutionService:
                 self._error_html("Robot Report", error_output),
                 encoding="utf-8",
             )
+
+    def _sync_reports_for_static(self, source_dir: Path, target_dir: Path) -> None:
+        """Mirror project report files to STATIC_DIR for browser access."""
+        try:
+            if target_dir.exists():
+                shutil.rmtree(target_dir)
+            shutil.copytree(source_dir, target_dir)
+        except Exception as exc:
+            logger.error("Failed to mirror reports to static dir: %s", exc)
 
     def _error_html(self, title: str, error_output: str | None) -> str:
         message = error_output or "No report generated."
