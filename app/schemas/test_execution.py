@@ -1,0 +1,28 @@
+"""Schema for test execution results"""
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict
+
+
+class TestExecutionRequest(BaseModel):
+    project_id: int
+    test_ids: list[int] | None = None  # Se None, executa todos os testes do projeto
+
+
+class TestExecutionResult(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int | None = None
+    project_id: int
+    total_tests: int
+    passed: int
+    failed: int
+    skipped: int
+    log_file: str
+    report_file: str
+    output_file: str
+    status: str  # running, completed, failed
+    created_at: datetime | None = None
+    completed_at: datetime | None = None
+    error_output: str | None = None
+    mkdocs_index: str | None = None

@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot generator="Robot 7.4.2 (Python 3.12.4 on linux)" generated="2026-03-03T22:26:31.576281" rpa="false" schemaversion="5">
+<suite id="s1" name="Documents" source="/home/bob/AutomaWeb/Documents">
+<suite id="s1-s1" name="Generated Test 1" source="/home/bob/AutomaWeb/Documents/generated_test_1.robot">
+<test id="s1-s1-t1" name="Abrir Chrome e Acessar Google" line="6">
+<kw name="Launch Browser">
+<msg time="2026-03-03T22:26:31.609754" level="FAIL">No keyword with name 'Launch Browser' found.</msg>
+<var>${chrome}</var>
+<arg>chromium</arg>
+<status status="FAIL" start="2026-03-03T22:26:31.609698" elapsed="0.000104">No keyword with name 'Launch Browser' found.</status>
+</kw>
+<kw name="Create Context And Page">
+<var>${page}</var>
+<arg>${chrome}</arg>
+<status status="NOT RUN" start="2026-03-03T22:26:31.609922" elapsed="0.000026"/>
+</kw>
+<kw name="Go To">
+<arg>https://www.google.com</arg>
+<status status="NOT RUN" start="2026-03-03T22:26:31.610032" elapsed="0.000018"/>
+</kw>
+<kw name="Close Browser">
+<arg>${chrome}</arg>
+<status status="NOT RUN" start="2026-03-03T22:26:31.610122" elapsed="0.000016"/>
+</kw>
+<status status="FAIL" start="2026-03-03T22:26:31.608607" elapsed="0.001649">No keyword with name 'Launch Browser' found.</status>
+</test>
+<test id="s1-s1-t2" name="```" line="11">
+<status status="FAIL" start="2026-03-03T22:26:31.610434" elapsed="0.000260">Test cannot be empty.</status>
+</test>
+<status status="FAIL" start="2026-03-03T22:26:31.607201" elapsed="0.003735"/>
+</suite>
+<suite id="s1-s2" name="Generated Test 2" source="/home/bob/AutomaWeb/Documents/generated_test_2.robot">
+<test id="s1-s2-t1" name="Testar Botão" line="6">
+<kw name="Criar Navegador">
+<msg time="2026-03-03T22:26:31.613465" level="FAIL">No keyword with name 'Criar Navegador' found.</msg>
+<arg>-headed</arg>
+<status status="FAIL" start="2026-03-03T22:26:31.613439" elapsed="0.000060">No keyword with name 'Criar Navegador' found.</status>
+</kw>
+<kw name="Novo Contexto">
+<status status="NOT RUN" start="2026-03-03T22:26:31.613587" elapsed="0.000017"/>
+</kw>
+<kw name="Nova Guia">
+<arg>http://localhost:8000</arg>
+<status status="NOT RUN" start="2026-03-03T22:26:31.613724" elapsed="0.000031"/>
+</kw>
+<kw name="Clicar">
+<arg>id:botao</arg>
+<status status="NOT RUN" start="2026-03-03T22:26:31.613822" elapsed="0.000016"/>
+</kw>
+<kw name="Fechar Navegador">
+<status status="NOT RUN" start="2026-03-03T22:26:31.613902" elapsed="0.000016"/>
+</kw>
+<status status="FAIL" start="2026-03-03T22:26:31.612619" elapsed="0.001389">No keyword with name 'Criar Navegador' found.</status>
+</test>
+<test id="s1-s2-t2" name="```" line="12">
+<status status="FAIL" start="2026-03-03T22:26:31.614167" elapsed="0.000213">Test cannot be empty.</status>
+</test>
+<status status="FAIL" start="2026-03-03T22:26:31.611278" elapsed="0.003303"/>
+</suite>
+<suite id="s1-s3" name="Generated Test 3" source="/home/bob/AutomaWeb/Documents/generated_test_3.robot">
+<test id="s1-s3-t1" name="Abrir Google" line="6">
+<kw name="New Browser" owner="Browser">
+<msg time="2026-03-03T22:26:31.725806" level="INFO">{"browser": "chromium", "headless": true, "chromiumSandbox": false, "devtools": false, "handleSIGHUP": true, "handleSIGINT": true, "handleSIGTERM": true, "slowMo": 0.0, "timeout": 30000.0, "tracesDir": "/home/bob/AutomaWeb/app/static/reports/20260303_222554/browser/traces/temp/930eb60a-1a1d-404d-983c-fc00a7fe2f49"}</msg>
+<msg time="2026-03-03T22:26:31.741031" level="INFO">Starting Browser process /home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper/index.js using at 127.0.0.1:34529</msg>
+<msg time="2026-03-03T22:26:32.581402" level="INFO">Successfully created browser with options: {"browser":"chromium","headless":true,"chromiumSandbox":false,"devtools":false,"handleSIGHUP":true,"handleSIGINT":true,"handleSIGTERM":true,"slowMo":0,"timeout":30000,"tracesDir":"/home/bob/AutomaWeb/app/static/reports/20260303_222554/browser/traces/temp/930eb60a-1a1d-404d-983c-fc00a7fe2f49"}</msg>
+<arg>chromium</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Create a new playwright Browser with specified options.</doc>
+<status status="PASS" start="2026-03-03T22:26:31.725230" elapsed="0.856334"/>
+</kw>
+<kw name="New Page" owner="Browser">
+<msg time="2026-03-03T22:26:33.297242" level="INFO">Successfully initialized new page object and opened url: https://google.com</msg>
+<msg time="2026-03-03T22:26:33.297328" level="INFO">No context was open. New context was automatically opened when this page is created.</msg>
+<arg>https://google.com</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Open a new Page.</doc>
+<status status="PASS" start="2026-03-03T22:26:32.581752" elapsed="0.715727"/>
+</kw>
+<kw name="Close Browser" owner="Browser">
+<msg time="2026-03-03T22:26:33.334613" level="INFO">Closed browser</msg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Closes the current browser.</doc>
+<status status="PASS" start="2026-03-03T22:26:33.297658" elapsed="0.037101"/>
+</kw>
+<status status="PASS" start="2026-03-03T22:26:31.724767" elapsed="1.610143"/>
+</test>
+<test id="s1-s3-t2" name="```" line="10">
+<status status="FAIL" start="2026-03-03T22:26:33.342305" elapsed="0.002211">Test cannot be empty.</status>
+</test>
+<status status="FAIL" start="2026-03-03T22:26:31.614975" elapsed="1.733820"/>
+</suite>
+<status status="FAIL" start="2026-03-03T22:26:31.576994" elapsed="1.776372"/>
+</suite>
+<statistics>
+<total>
+<stat pass="1" fail="5" skip="0">All Tests</stat>
+</total>
+<tag>
+</tag>
+<suite>
+<stat name="Documents" id="s1" pass="1" fail="5" skip="0">Documents</stat>
+<stat name="Generated Test 1" id="s1-s1" pass="0" fail="2" skip="0">Documents.Generated Test 1</stat>
+<stat name="Generated Test 2" id="s1-s2" pass="0" fail="2" skip="0">Documents.Generated Test 2</stat>
+<stat name="Generated Test 3" id="s1-s3" pass="1" fail="1" skip="0">Documents.Generated Test 3</stat>
+</suite>
+</statistics>
+<errors>
+<msg time="2026-03-03T22:26:31.573169" level="ERROR">Error in file '/home/bob/AutomaWeb/Documents/generated_test_2.robot' on line 14: Unrecognized section header '**Observação:** substitua `id:botao` pelo seletor correto do botão que você deseja testar. Para fazer isso, você precisa saber o id, name, classe, etc. do elemento HTML do botão. Caso não saiba o seletor, você pode inspecionar o elemento no navegador para encontrar o seletor correto.'. Valid sections: 'Settings', 'Variables', 'Test Cases', 'Tasks', 'Keywords' and 'Comments'.</msg>
+<msg time="2026-03-03T22:26:31.608265" level="ERROR">Error in file '/home/bob/AutomaWeb/Documents/generated_test_1.robot' on line 3: Importing library 'Playwright' failed: ModuleNotFoundError: No module named 'Playwright'
+Traceback (most recent call last):
+  None
+PYTHONPATH:
+  /home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/bin
+  /home/bob/.pyenv/versions/3.12.4/lib/python312.zip
+  /home/bob/.pyenv/versions/3.12.4/lib/python3.12
+  /home/bob/.pyenv/versions/3.12.4/lib/python3.12/lib-dynload
+  /home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages</msg>
+<msg time="2026-03-03T22:26:31.612307" level="ERROR">Error in file '/home/bob/AutomaWeb/Documents/generated_test_2.robot' on line 3: Importing library 'PlaywrightLibrary' failed: ModuleNotFoundError: No module named 'PlaywrightLibrary'
+Traceback (most recent call last):
+  None
+PYTHONPATH:
+  /home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/bin
+  /home/bob/.pyenv/versions/3.12.4/lib/python312.zip
+  /home/bob/.pyenv/versions/3.12.4/lib/python3.12
+  /home/bob/.pyenv/versions/3.12.4/lib/python3.12/lib-dynload
+  /home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages</msg>
+</errors>
+</robot>

@@ -20,3 +20,11 @@ class ProjectRepository:
     async def get(self, session: AsyncSession, project_id: int) -> Project | None:
         result = await session.execute(select(Project).where(Project.id == project_id))
         return result.scalar_one_or_none()
+
+    async def delete(self, session: AsyncSession, project_id: int) -> bool:
+        project = await self.get(session, project_id)
+        if not project:
+            return False
+        await session.delete(project)
+        await session.commit()
+        return True

@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot generator="Robot 7.4.2 (Python 3.12.4 on linux)" generated="2026-03-03T22:23:33.430431" rpa="false" schemaversion="5">
+<suite id="s1" name="Documents" source="/home/bob/AutomaWeb/Documents">
+<suite id="s1-s1" name="Generated Test 1" source="/home/bob/AutomaWeb/Documents/generated_test_1.robot">
+<test id="s1-s1-t1" name="Abrir Chrome e Acessar Google" line="6">
+<kw name="Launch Browser">
+<msg time="2026-03-03T22:23:33.462359" level="FAIL">No keyword with name 'Launch Browser' found.</msg>
+<var>${chrome}</var>
+<arg>chromium</arg>
+<status status="FAIL" start="2026-03-03T22:23:33.462319" elapsed="0.000087">No keyword with name 'Launch Browser' found.</status>
+</kw>
+<kw name="Create Context And Page">
+<var>${page}</var>
+<arg>${chrome}</arg>
+<status status="NOT RUN" start="2026-03-03T22:23:33.462527" elapsed="0.000027"/>
+</kw>
+<kw name="Go To">
+<arg>https://www.google.com</arg>
+<status status="NOT RUN" start="2026-03-03T22:23:33.462658" elapsed="0.000020"/>
+</kw>
+<kw name="Close Browser">
+<arg>${chrome}</arg>
+<status status="NOT RUN" start="2026-03-03T22:23:33.462752" elapsed="0.000016"/>
+</kw>
+<status status="FAIL" start="2026-03-03T22:23:33.461322" elapsed="0.001595">No keyword with name 'Launch Browser' found.</status>
+</test>
+<test id="s1-s1-t2" name="```" line="11">
+<status status="FAIL" start="2026-03-03T22:23:33.463105" elapsed="0.000230">Test cannot be empty.</status>
+</test>
+<status status="FAIL" start="2026-03-03T22:23:33.459947" elapsed="0.003649"/>
+</suite>
+<suite id="s1-s2" name="Generated Test 2" source="/home/bob/AutomaWeb/Documents/generated_test_2.robot">
+<test id="s1-s2-t1" name="Testar Botão" line="6">
+<kw name="Criar Navegador">
+<msg time="2026-03-03T22:23:33.466089" level="FAIL">No keyword with name 'Criar Navegador' found.</msg>
+<arg>-headed</arg>
+<status status="FAIL" start="2026-03-03T22:23:33.466061" elapsed="0.000062">No keyword with name 'Criar Navegador' found.</status>
+</kw>
+<kw name="Novo Contexto">
+<status status="NOT RUN" start="2026-03-03T22:23:33.466222" elapsed="0.000020"/>
+</kw>
+<kw name="Nova Guia">
+<arg>http://localhost:8000</arg>
+<status status="NOT RUN" start="2026-03-03T22:23:33.466315" elapsed="0.000017"/>
+</kw>
+<kw name="Clicar">
+<arg>id:botao</arg>
+<status status="NOT RUN" start="2026-03-03T22:23:33.466402" elapsed="0.000016"/>
+</kw>
+<kw name="Fechar Navegador">
+<status status="NOT RUN" start="2026-03-03T22:23:33.466485" elapsed="0.000030"/>
+</kw>
+<status status="FAIL" start="2026-03-03T22:23:33.465252" elapsed="0.001365">No keyword with name 'Criar Navegador' found.</status>
+</test>
+<test id="s1-s2-t2" name="```" line="12">
+<status status="FAIL" start="2026-03-03T22:23:33.466779" elapsed="0.000209">Test cannot be empty.</status>
+</test>
+<status status="FAIL" start="2026-03-03T22:23:33.463954" elapsed="0.003255"/>
+</suite>
+<suite id="s1-s3" name="Generated Test 3" source="/home/bob/AutomaWeb/Documents/generated_test_3.robot">
+<test id="s1-s3-t1" name="Abrir Google" line="6">
+<kw name="New Browser" owner="Browser">
+<msg time="2026-03-03T22:23:33.582681" level="INFO">{"browser": "chromium", "headless": true, "chromiumSandbox": false, "devtools": false, "handleSIGHUP": true, "handleSIGINT": true, "handleSIGTERM": true, "slowMo": 0.0, "timeout": 30000.0, "tracesDir": "/home/bob/AutomaWeb/app/static/reports/20260303_222333/browser/traces/temp/b47c993d-a162-491f-a293-1866dfa350f7"}</msg>
+<msg time="2026-03-03T22:23:33.599571" level="FAIL">
+#############################################################
+#                                                           #
+#  RF-Browser dependencies not found in installation path!  #
+#           Run `rfbrowser init` to install.                #
+#                                                           #
+#############################################################
+Installation path: /home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper</msg>
+<arg>chromium</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Create a new playwright Browser with specified options.</doc>
+<status status="FAIL" start="2026-03-03T22:23:33.582062" elapsed="0.018944">
+#############################################################
+#                                                           #
+#  RF-Browser dependencies not found in installation path!  #
+#           Run `rfbrowser init` to install.                #
+#                                                           #
+#############################################################
+Installation path: /home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper</status>
+</kw>
+<kw name="New Page" owner="Browser">
+<arg>https://google.com</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Open a new Page.</doc>
+<status status="NOT RUN" start="2026-03-03T22:23:33.601178" elapsed="0.000078"/>
+</kw>
+<kw name="Close Browser" owner="Browser">
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Closes the current browser.</doc>
+<status status="NOT RUN" start="2026-03-03T22:23:33.601363" elapsed="0.000055"/>
+</kw>
+<status status="FAIL" start="2026-03-03T22:23:33.581556" elapsed="0.020000">
+#############################################################
+#                                                           #
+#  RF-Browser dependencies not found in installation path!  #
+#           Run `rfbrowser init` to install.                #
+#                                                           #
+#############################################################
+Installation path: /home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper</status>
+</test>
+<test id="s1-s3-t2" name="```" line="10">
+<status status="FAIL" start="2026-03-03T22:23:33.618881" elapsed="0.000359">Test cannot be empty.</status>
+</test>
+<status status="FAIL" start="2026-03-03T22:23:33.467557" elapsed="0.169339"/>
+</suite>
+<status status="FAIL" start="2026-03-03T22:23:33.431153" elapsed="0.222147"/>
+</suite>
+<statistics>
+<total>
+<stat pass="0" fail="6" skip="0">All Tests</stat>
+</total>
+<tag>
+</tag>
+<suite>
+<stat name="Documents" id="s1" pass="0" fail="6" skip="0">Documents</stat>
+<stat name="Generated Test 1" id="s1-s1" pass="0" fail="2" skip="0">Documents.Generated Test 1</stat>
+<stat name="Generated Test 2" id="s1-s2" pass="0" fail="2" skip="0">Documents.Generated Test 2</stat>
+<stat name="Generated Test 3" id="s1-s3" pass="0" fail="2" skip="0">Documents.Generated Test 3</stat>
+</suite>
+</statistics>
+<errors>
+<msg time="2026-03-03T22:23:33.427104" level="ERROR">Error in file '/home/bob/AutomaWeb/Documents/generated_test_2.robot' on line 14: Unrecognized section header '**Observação:** substitua `id:botao` pelo seletor correto do botão que você deseja testar. Para fazer isso, você precisa saber o id, name, classe, etc. do elemento HTML do botão. Caso não saiba o seletor, você pode inspecionar o elemento no navegador para encontrar o seletor correto.'. Valid sections: 'Settings', 'Variables', 'Test Cases', 'Tasks', 'Keywords' and 'Comments'.</msg>
+<msg time="2026-03-03T22:23:33.460971" level="ERROR">Error in file '/home/bob/AutomaWeb/Documents/generated_test_1.robot' on line 3: Importing library 'Playwright' failed: ModuleNotFoundError: No module named 'Playwright'
+Traceback (most recent call last):
+  None
+PYTHONPATH:
+  /home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/bin
+  /home/bob/.pyenv/versions/3.12.4/lib/python312.zip
+  /home/bob/.pyenv/versions/3.12.4/lib/python3.12
+  /home/bob/.pyenv/versions/3.12.4/lib/python3.12/lib-dynload
+  /home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages</msg>
+<msg time="2026-03-03T22:23:33.464936" level="ERROR">Error in file '/home/bob/AutomaWeb/Documents/generated_test_2.robot' on line 3: Importing library 'PlaywrightLibrary' failed: ModuleNotFoundError: No module named 'PlaywrightLibrary'
+Traceback (most recent call last):
+  None
+PYTHONPATH:
+  /home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/bin
+  /home/bob/.pyenv/versions/3.12.4/lib/python312.zip
+  /home/bob/.pyenv/versions/3.12.4/lib/python3.12
+  /home/bob/.pyenv/versions/3.12.4/lib/python3.12/lib-dynload
+  /home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages</msg>
+<msg time="2026-03-03T22:23:33.618533" level="ERROR">Calling method '_end_test' of listener 'Browser' failed: 
+#############################################################
+#                                                           #
+#  RF-Browser dependencies not found in installation path!  #
+#           Run `rfbrowser init` to install.                #
+#                                                           #
+#############################################################
+Installation path: /home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper</msg>
+<msg time="2026-03-03T22:23:33.636513" level="ERROR">Calling method '_end_test' of listener 'Browser' failed: 
+#############################################################
+#                                                           #
+#  RF-Browser dependencies not found in installation path!  #
+#           Run `rfbrowser init` to install.                #
+#                                                           #
+#############################################################
+Installation path: /home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper</msg>
+<msg time="2026-03-03T22:23:33.652810" level="ERROR">Calling method '_end_suite' of listener 'Browser' failed: 
+#############################################################
+#                                                           #
+#  RF-Browser dependencies not found in installation path!  #
+#           Run `rfbrowser init` to install.                #
+#                                                           #
+#############################################################
+Installation path: /home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper</msg>
+</errors>
+</robot>

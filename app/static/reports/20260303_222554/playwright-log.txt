@@ -1,0 +1,64 @@
+{"level":30,"time":"2026-03-04T01:26:32.348Z","pid":31539,"hostname":"USU-8O59AN2D8U3","msg":"Listening on 127.0.0.1:34529"}
+{"level":30,"time":"2026-03-04T01:26:32.434Z","pid":31539,"hostname":"USU-8O59AN2D8U3","msg":"Start of node method newBrowser"}
+{"level":30,"time":"2026-03-04T01:26:32.579Z","pid":31539,"hostname":"USU-8O59AN2D8U3","msg":"Adding browser to stack: chromium, version: 145.0.7632.6"}
+{"level":30,"time":"2026-03-04T01:26:32.580Z","pid":31539,"hostname":"USU-8O59AN2D8U3","msg":"Adding 0 contexts to browser"}
+{"level":30,"time":"2026-03-04T01:26:32.580Z","pid":31539,"hostname":"USU-8O59AN2D8U3","msg":"End of node method newBrowser"}
+{"level":30,"time":"2026-03-04T01:26:32.584Z","pid":31539,"hostname":"USU-8O59AN2D8U3","msg":"Start of node method newPage"}
+{"level":30,"time":"2026-03-04T01:26:32.585Z","pid":31539,"hostname":"USU-8O59AN2D8U3","msg":"currentBrowser: {\"name\":\"chromium\",\"browser\":{\"_type\":\"Browser\",\"_guid\":\"browser@8d28b89086f246826096efa4a9d49ef6\"},\"headless\":true,\"_contextStack\":[],\"id\":\"browser=29135800-af04-4cb7-9558-c8a8e3c24dba\"}"}
+{"level":30,"time":"2026-03-04T01:26:32.593Z","pid":31539,"hostname":"USU-8O59AN2D8U3","msg":"Setting default timeout for context context=ce0b65e4-f221-4bb6-8b3c-82143c394a23 to 10000"}
+{"level":30,"time":"2026-03-04T01:26:32.593Z","pid":31539,"hostname":"USU-8O59AN2D8U3","msg":"Changed active context: context=ce0b65e4-f221-4bb6-8b3c-82143c394a23"}
+{"level":30,"time":"2026-03-04T01:26:32.616Z","pid":31539,"hostname":"USU-8O59AN2D8U3","msg":"Video path: undefined"}
+{"level":30,"time":"2026-03-04T01:26:32.616Z","pid":31539,"hostname":"USU-8O59AN2D8U3","msg":"Changed active page"}
+{"level":30,"time":"2026-03-04T01:26:33.295Z","pid":31539,"hostname":"USU-8O59AN2D8U3","msg":"End of node method newPage"}
+{"level":30,"time":"2026-03-04T01:26:33.299Z","pid":31539,"hostname":"USU-8O59AN2D8U3","msg":"Start of node method closeBrowser"}
+{"level":30,"time":"2026-03-04T01:26:33.303Z","pid":31539,"hostname":"USU-8O59AN2D8U3","msg":"Removed page=accb0d9c-e4d8-45a2-ac43-ed48ea71eb1d from context=ce0b65e4-f221-4bb6-8b3c-82143c394a23 page stack"}
+{"level":30,"time":"2026-03-04T01:26:33.333Z","pid":31539,"hostname":"USU-8O59AN2D8U3","msg":"End of node method closeBrowser"}
+================= Original suppressed error =================
+Error: Browser has been closed.
+    at PlaywrightState.getActiveBrowser (/home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper/index.js:12672:15)
+    at PlaywrightServer.getActiveBrowser (/home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper/index.js:13622:59)
+    at PlaywrightServer.setTimeout (/home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper/index.js:13873:57)
+    at Object.onReceiveHalfClose (/home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper/node_modules/@grpc/grpc-js/build/src/server.js:1464:25)
+    at BaseServerInterceptingCall.maybePushNextMessage (/home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper/node_modules/@grpc/grpc-js/build/src/server-interceptors.js:595:31)
+    at BaseServerInterceptingCall.handleEndEvent (/home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper/node_modules/@grpc/grpc-js/build/src/server-interceptors.js:635:14)
+    at ServerHttp2Stream.<anonymous> (/home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper/node_modules/@grpc/grpc-js/build/src/server-interceptors.js:394:18)
+    at ServerHttp2Stream.emit (node:events:536:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:82:21)
+=============================================================
+{"level":30,"time":"2026-03-04T01:26:33.340Z","pid":31539,"hostname":"USU-8O59AN2D8U3","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-03-04T01:26:33.341Z","pid":31539,"hostname":"USU-8O59AN2D8U3","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-03-04T01:26:33.343Z","pid":31539,"hostname":"USU-8O59AN2D8U3","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-03-04T01:26:33.343Z","pid":31539,"hostname":"USU-8O59AN2D8U3","msg":"End of node method getBrowserCatalog"}
+================= Original suppressed error =================
+Error: Browser has been closed.
+    at PlaywrightState.getActiveBrowser (/home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper/index.js:12672:15)
+    at PlaywrightServer.getActiveBrowser (/home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper/index.js:13622:59)
+    at PlaywrightServer.setTimeout (/home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper/index.js:13873:57)
+    at Object.onReceiveHalfClose (/home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper/node_modules/@grpc/grpc-js/build/src/server.js:1464:25)
+    at BaseServerInterceptingCall.maybePushNextMessage (/home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper/node_modules/@grpc/grpc-js/build/src/server-interceptors.js:595:31)
+    at BaseServerInterceptingCall.handleEndEvent (/home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper/node_modules/@grpc/grpc-js/build/src/server-interceptors.js:635:14)
+    at ServerHttp2Stream.<anonymous> (/home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper/node_modules/@grpc/grpc-js/build/src/server-interceptors.js:394:18)
+    at ServerHttp2Stream.emit (node:events:536:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:82:21)
+=============================================================
+{"level":30,"time":"2026-03-04T01:26:33.347Z","pid":31539,"hostname":"USU-8O59AN2D8U3","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-03-04T01:26:33.347Z","pid":31539,"hostname":"USU-8O59AN2D8U3","msg":"End of node method getBrowserCatalog"}
+================= Original suppressed error =================
+Error: Browser has been closed.
+    at PlaywrightState.getActiveBrowser (/home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper/index.js:12672:15)
+    at PlaywrightServer.getActiveBrowser (/home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper/index.js:13622:59)
+    at PlaywrightServer.setTimeout (/home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper/index.js:13873:57)
+    at Object.onReceiveHalfClose (/home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper/node_modules/@grpc/grpc-js/build/src/server.js:1464:25)
+    at BaseServerInterceptingCall.maybePushNextMessage (/home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper/node_modules/@grpc/grpc-js/build/src/server-interceptors.js:595:31)
+    at BaseServerInterceptingCall.handleEndEvent (/home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper/node_modules/@grpc/grpc-js/build/src/server-interceptors.js:635:14)
+    at ServerHttp2Stream.<anonymous> (/home/bob/.cache/pypoetry/virtualenvs/automaweb-NHAJiYyk-py3.12/lib/python3.12/site-packages/Browser/wrapper/node_modules/@grpc/grpc-js/build/src/server-interceptors.js:394:18)
+    at ServerHttp2Stream.emit (node:events:536:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:82:21)
+=============================================================
+{"level":30,"time":"2026-03-04T01:26:33.352Z","pid":31539,"hostname":"USU-8O59AN2D8U3","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-03-04T01:26:33.352Z","pid":31539,"hostname":"USU-8O59AN2D8U3","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-03-04T01:26:33.370Z","pid":31539,"hostname":"USU-8O59AN2D8U3","msg":"Start of node method closeAllBrowsers"}
+{"level":30,"time":"2026-03-04T01:26:33.370Z","pid":31539,"hostname":"USU-8O59AN2D8U3","msg":"End of node method closeAllBrowsers"}

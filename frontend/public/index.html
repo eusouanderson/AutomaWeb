@@ -20,6 +20,7 @@
       <button class="tab-btn active" data-tab="projects">Projetos</button>
       <button class="tab-btn" data-tab="generate">Gerar Teste</button>
       <button class="tab-btn" data-tab="tests">Testes Gerados</button>
+      <button class="tab-btn" data-tab="execute">Executar Testes</button>
     </div>
 
     <!-- Tab: Projetos -->
@@ -34,6 +35,11 @@
           <div class="form-group">
             <label for="project-description">Descrição</label>
             <textarea id="project-description" rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="project-test-dir">Diretório de Testes</label>
+            <input type="text" id="project-test-dir" placeholder="/caminho/para/testes" required>
+            <small>Caminho onde os testes serão salvos e executados</small>
           </div>
           <button type="submit" class="btn btn-primary">Criar Projeto</button>
         </form>
@@ -85,6 +91,56 @@
       <div class="section">
         <h2>Histórico de Testes</h2>
         <div id="tests-list" class="list"></div>
+      </div>
+    </div>
+
+    <!-- Tab: Executar Testes -->
+    <div id="execute-tab" class="tab-content">
+      <div class="section">
+        <h2>Executar Testes Robot Framework</h2>
+        <form id="execute-tests-form">
+          <div class="form-group">
+            <label for="execute-project">Projeto</label>
+            <select id="execute-project" required>
+              <option value="">Selecione um projeto...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>
+              <input type="checkbox" id="execute-all-tests" checked>
+              Executar todos os testes do projeto
+            </label>
+          </div>
+          <button type="submit" class="btn btn-primary">▶️ Executar Testes</button>
+        </form>
+      </div>
+
+      <div id="execution-result" class="section" style="display: none;">
+        <h2>Resultado da Execução</h2>
+        <div id="execution-error" class="alert" style="display: none;"></div>
+        <div class="test-stats">
+          <div class="stat-item">
+            <span class="stat-label">Total:</span>
+            <span id="stat-total">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">✅ Passou:</span>
+            <span id="stat-passed">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">❌ Falhou:</span>
+            <span id="stat-failed">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">⏭️ Pulado:</span>
+            <span id="stat-skipped">0</span>
+          </div>
+        </div>
+        <div class="result-actions">
+          <button id="view-report-btn" class="btn btn-primary">📊 Ver Relatório MkDocs</button>
+          <button id="view-robot-report-btn" class="btn btn-secondary">🤖 Relatório Robot</button>
+          <button id="view-log-btn" class="btn btn-secondary">📝 Ver Log</button>
+        </div>
       </div>
     </div>
   </div>

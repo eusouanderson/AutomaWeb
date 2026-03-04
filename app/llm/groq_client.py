@@ -56,8 +56,11 @@ class GroqClient:
             return cached
 
         system_prompt = (
-            "Você é um gerador de testes web em Robot Framework com Playwright. "
-            "Gere apenas o código do teste, sem explicações."
+            "Você é um gerador de testes web em Robot Framework usando a biblioteca Browser. "
+            "Responda SOMENTE com código Robot Framework válido. "
+            "Não inclua explicações, observações, markdown, nem texto fora das seções do Robot. "
+            "Use apenas as seções: *** Settings ***, *** Variables ***, *** Test Cases ***, *** Keywords ***. "
+            "Use 'Library    Browser' e NÃO use Playwright/PlaywrightLibrary."
         )
         user_content = prompt
         if context:
