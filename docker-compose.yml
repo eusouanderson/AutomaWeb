@@ -1,11 +1,9 @@
-version: '3.8'
-
 services:
   automaweb:
     build: .
     container_name: automaweb
     ports:
-      - "8000:8000"
+      - '8888:8888'
     volumes:
       # Montar código para desenvolvimento com hot-reload
       - ./app:/app/app
@@ -27,7 +25,13 @@ services:
       - .env
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/docs')"]
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request; urllib.request.urlopen('http://localhost:8888/docs')"
+        ]
       interval: 30s
       timeout: 10s
       retries: 3

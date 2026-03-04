@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
 
 # Instalar Node.js (necessário para rfbrowser)
 RUN wget -qO- https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get update \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
@@ -33,7 +34,7 @@ COPY . .
 RUN mkdir -p app/static/reports app/static/projects
 
 # Expor porta da aplicação
-EXPOSE 8000
+EXPOSE 8888
 
 # Comando para rodar a aplicação
 CMD ["python", "dev.py"]

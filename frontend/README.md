@@ -18,7 +18,7 @@ cd ..
 poetry run python dev.py
 ```
 
-Acesse: http://localhost:8000
+Acesse: http://localhost:8888
 
 ## Bibliotecas Utilizadas
 

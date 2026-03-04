@@ -31,14 +31,14 @@ docker pull ghcr.io/OWNER/automaweb:latest
 
 # 2. Executar o container
 docker run -d \
-  -p 8000:8000 \
+  -p 8888:8888 \
   -e GROQ_API_KEY=sua_chave_aqui \
   -v $(pwd)/app.db:/app/app.db \
   -v $(pwd)/reports:/app/app/static/reports \
   ghcr.io/OWNER/automaweb:latest
 
 # 3. Acesse a aplicação
-http://localhost:8000
+http://localhost:8888
 ```
 
 ### Docker Compose (Desenvolvimento)
@@ -52,7 +52,7 @@ cp .env.example .env
 docker-compose up -d
 
 # 3. Acesse a aplicação
-http://localhost:8000
+http://localhost:8888
 ```
 
 ### Local (com Poetry)
@@ -72,7 +72,7 @@ poetry run rfbrowser init
 poetry run python dev.py
 
 # 5. Acesse a aplicação
-http://localhost:8000
+http://localhost:8888
 ```
 
 ## Uso
@@ -155,12 +155,15 @@ STATIC_DIR=app/static
 MIT
 
 ## Banco de Dados
+
 Por padrão usa SQLite. Para PostgreSQL, ajuste `DATABASE_URL` no `.env`:
+
 ```
 DATABASE_URL=postgresql+asyncpg://automaweb:automaweb@localhost:5432/automaweb
 ```
 
 ## Docker (opcional)
+
 ```bash
 docker-compose up -d
 ```
