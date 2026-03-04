@@ -2,6 +2,9 @@
 
 Sistema de geração e execução automática de testes Robot Framework usando IA.
 
+[![Docker Build](https://github.com/eusouanderson/AutomaWeb/actions/workflows/docker-build.yml/badge.svg)](https://github.com/eusouanderson/AutomaWeb/actions/workflows/docker-build.yml)
+[![Tests](https://github.com/eusouanderson/AutomaWeb/actions/workflows/tests.yml/badge.svg)](https://github.com/eusouanderson/AutomaWeb/actions/workflows/tests.yml)
+
 ## Características
 
 - 🤖 Geração de testes Robot Framework com IA (Groq/LLama)
