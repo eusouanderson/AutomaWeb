@@ -30,6 +30,10 @@ class TestRepository:
         result = await session.execute(select(GeneratedTest).where(GeneratedTest.id == test_id))
         return result.scalar_one_or_none()
 
+    async def delete_generated_test(self, session: AsyncSession, generated_test: GeneratedTest) -> None:
+        await session.delete(generated_test)
+        await session.commit()
+
     async def list_generated_tests_by_project(self, session: AsyncSession, project_id: int) -> list[GeneratedTest]:
         result = await session.execute(
             select(GeneratedTest)

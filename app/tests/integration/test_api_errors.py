@@ -82,35 +82,28 @@ async def test_generate_with_context(session: AsyncSession) -> None:
         assert gen_resp.json()["content"] is not None
 
 
-async def test_generate_returns_503_when_llm_unavailable(session: AsyncSession) -> None:
-    class FailingGroqClient:
-        def generate_robot_test(
-            self,
-            prompt: str,
-            context: str | None = None,
-            page_structure: dict | None = None,
-        ) -> str:
-            api_error = type("APIConnectionError", (Exception,), {})
-            raise api_error("connection failed")
+async def test_generate_returns_503_when_llm_unavailable(
+    session: AsyncSession,
+    monkeypatch,
+) -> None:
+    def failing_generate_robot_test(
+        self,
+        prompt: str,
+        context: str | None = None,
+        page_structure: dict | None = None,
+    ) -> str:
+        api_error = type("APIConnectionError", (Exception,), {})
+        raise api_error("connection failed")
 
-    original_init = TestService.__init__
+    monkeypatch.setattr(DummyGroqClient, "generate_robot_test", failing_generate_robot_test)
 
-    def patched_init(self, *args, **kwargs):
-        kwargs["groq_client"] = FailingGroqClient()
-        original_init(self, *args, **kwargs)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        project_resp = await client.post("/projects", json={"name": "P2"})
+        project_id = project_resp.json()["id"]
 
-    TestService.__init__ = patched_init
-
-    try:
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            project_resp = await client.post("/projects", json={"name": "P2"})
-            project_id = project_resp.json()["id"]
-
-            gen_resp = await client.post(
-                "/tests/generate",
-                json={"project_id": project_id, "prompt": "Test login", "context": "Use Chrome browser"},
-            )
-            assert gen_resp.status_code == 503
-            assert "Groq" in gen_resp.json()["detail"]
-    finally:
-        TestService.__init__ = original_init
+        gen_resp = await client.post(
+            "/tests/generate",
+            json={"project_id": project_id, "prompt": "Test login", "context": "Use Chrome browser"},
+        )
+        assert gen_resp.status_code == 503
+        assert "Groq" in gen_resp.json()["detail"]

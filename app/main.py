@@ -10,7 +10,6 @@ from app.core.logging import setup_logging
 from app.db.init_db import init_db
 from app.services.element_scanner import ElementScannerService
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logging()

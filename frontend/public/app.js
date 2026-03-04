@@ -3,6 +3,61 @@ const API_URL = '';
 let lastScanByProject = new Map();
 let isScanning = false;
 
+function buildExecutionFeedback(data) {
+  let lines = [
+    'A execução dos testes apresentou falhas. Recrie o teste Robot Framework corrigindo os problemas abaixo.',
+    '',
+    `Resumo: total=${data.total_tests}, passed=${data.passed}, failed=${data.failed}, skipped=${data.skipped}`
+  ];
+
+  if (data.error_output) {
+    lines = lines.concat(['', 'Saída de erro da execução:', data.error_output]);
+  }
+
+  lines = lines.concat([
+    '',
+    'Objetivo: manter o cenário original e ajustar seletores, esperas e fluxo para evitar falhas.'
+  ]);
+  return lines.join('\n').slice(0, 6000);
+}
+
+function setRecreatePanel(data, projectId) {
+  const panel = document.getElementById('recreate-panel');
+  const feedback = document.getElementById('execution-feedback');
+  const recreateBtn = document.getElementById('recreate-test-btn');
+
+  const hasFailure = Number(data.failed || 0) > 0 || Boolean(data.error_output);
+  if (!hasFailure) {
+    panel.classList.add('hidden');
+    feedback.value = '';
+    recreateBtn.dataset.projectId = '';
+    return;
+  }
+
+  panel.classList.remove('hidden');
+  feedback.value = buildExecutionFeedback(data);
+  recreateBtn.dataset.projectId = String(projectId);
+}
+
+async function generateTestWithFeedback(projectId, feedbackText) {
+  const resultSection = document.getElementById('generated-result');
+  const codeElement = document.getElementById('test-code');
+
+  const prompt =
+    'Recrie o teste Robot Framework com base nos erros de execução e gere uma versão corrigida.';
+  const context = feedbackText?.trim() || null;
+
+  const { data } = await axios.post(`${API_URL}/tests/generate`, {
+    project_id: projectId,
+    prompt,
+    context
+  });
+
+  codeElement.textContent = data.content;
+  resultSection.classList.remove('hidden');
+  document.getElementById('download-test-btn').dataset.testId = data.id;
+}
+
 // Utility: Show Toast
 function showToast(message, type = 'success') {
   Toastify({
@@ -102,6 +157,89 @@ async function loadProjectsDropdown() {
         .join('');
   } catch (error) {
     showToast('Erro ao carregar projetos', 'error');
+  }
+}
+
+async function loadTestsProjects() {
+  const select = document.getElementById('tests-project');
+  const list = document.getElementById('tests-list');
+  if (!select || !list) return;
+
+  list.innerHTML = '<div class="loading">Carregando projetos...</div>';
+
+  try {
+    const { data } = await axios.get(`${API_URL}/projects`);
+    select.innerHTML =
+      '<option value="">Selecione um projeto...</option>' +
+      data.map((project) => `<option value="${project.id}">${project.name}</option>`).join('');
+
+    if (!data.length) {
+      list.innerHTML = '<div class="empty">Nenhum projeto criado ainda</div>';
+      return;
+    }
+
+    const selectedId = Number.parseInt(select.value, 10);
+    const projectId = selectedId || data[0].id;
+    select.value = String(projectId);
+    await loadGeneratedTests(projectId);
+  } catch (error) {
+    list.innerHTML = '<div class="empty">Erro ao carregar projetos</div>';
+    showToast(error.response?.data?.detail || 'Erro ao carregar projetos', 'error');
+  }
+}
+
+async function loadGeneratedTests(projectId) {
+  const list = document.getElementById('tests-list');
+  if (!list) return;
+
+  if (!projectId) {
+    list.innerHTML = '<div class="empty">Selecione um projeto</div>';
+    return;
+  }
+
+  list.innerHTML = '<div class="loading">Carregando testes...</div>';
+
+  try {
+    const { data } = await axios.get(`${API_URL}/projects/${projectId}/tests`);
+
+    if (!data.length) {
+      list.innerHTML = '<div class="empty">Nenhum teste gerado para este projeto</div>';
+      return;
+    }
+
+    list.innerHTML = data
+      .map(
+        (test) => `
+          <div class="list-item">
+            <div>
+              <h3>${test.file_path}</h3>
+              <small>ID do teste: ${test.id} | Criado em: ${formatDate(test.created_at)}</small>
+            </div>
+            <div>
+              <button class="btn btn-secondary" onclick="window.open('${API_URL}/tests/${test.id}/download', '_blank')">⬇️ Download</button>
+              <button class="btn btn-danger" onclick="deleteGeneratedTest(${test.id}, ${projectId})">🗑️ Excluir</button>
+            </div>
+          </div>
+        `
+      )
+      .join('');
+  } catch (error) {
+    list.innerHTML = '<div class="empty">Erro ao carregar testes</div>';
+    showToast(error.response?.data?.detail || 'Erro ao carregar testes', 'error');
+  }
+}
+
+async function deleteGeneratedTest(testId, projectId) {
+  if (!confirm('Tem certeza que deseja excluir este teste gerado?')) {
+    return;
+  }
+
+  try {
+    await axios.delete(`${API_URL}/tests/${testId}`);
+    showToast('Teste excluído com sucesso!');
+    await loadGeneratedTests(projectId);
+  } catch (error) {
+    showToast(error.response?.data?.detail || 'Erro ao excluir teste', 'error');
   }
 }
 
@@ -254,6 +392,11 @@ document.getElementById('test-project').addEventListener('change', () => {
   resetScanPanel();
 });
 
+document.getElementById('tests-project')?.addEventListener('change', async (e) => {
+  const projectId = Number.parseInt(e.target.value, 10);
+  await loadGeneratedTests(projectId);
+});
+
 // Generate Test
 document.getElementById('generate-test-form').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -263,7 +406,6 @@ document.getElementById('generate-test-form').addEventListener('submit', async (
   const context = document.getElementById('test-context').value;
 
   const resultSection = document.getElementById('generated-result');
-  const codeElement = document.getElementById('test-code');
 
   resultSection.classList.add('hidden');
 
@@ -275,17 +417,12 @@ document.getElementById('generate-test-form').addEventListener('submit', async (
   try {
     showToast('Gerando teste... Aguarde.', 'success');
 
-    const { data } = await axios.post(`${API_URL}/tests/generate`, {
-      project_id: projectId,
-      prompt,
-      context: context || null
-    });
-
-    codeElement.textContent = data.content;
-    resultSection.classList.remove('hidden');
-
-    // Store test ID for download
-    document.getElementById('download-test-btn').dataset.testId = data.id;
+    await generateTestWithFeedback(
+      projectId,
+      [`Prompt original: ${prompt}`, context ? `Contexto adicional: ${context}` : '']
+        .filter(Boolean)
+        .join('\n\n')
+    );
 
     showToast('Teste gerado com sucesso!');
   } catch (error) {
@@ -348,6 +485,8 @@ document.getElementById('execute-tests-form').addEventListener('submit', async (
     document.getElementById('view-robot-report-btn').dataset.reportPath = data.report_file;
     document.getElementById('view-log-btn').dataset.logPath = data.log_file;
 
+    setRecreatePanel(data, projectId);
+
     showToast('Testes executados com sucesso!');
   } catch (error) {
     showToast(error.response?.data?.detail || 'Erro ao executar testes', 'error');
@@ -355,6 +494,54 @@ document.getElementById('execute-tests-form').addEventListener('submit', async (
     submitButton.disabled = false;
     submitButton.textContent = originalButtonLabel;
     loadingBox.classList.add('hidden');
+  }
+});
+
+document.getElementById('recreate-test-btn')?.addEventListener('click', async () => {
+  const projectId = Number.parseInt(
+    document.getElementById('recreate-test-btn').dataset.projectId,
+    10
+  );
+  const feedback = document.getElementById('execution-feedback').value;
+
+  if (!projectId) {
+    showToast('Não foi possível identificar o projeto da execução.', 'error');
+    return;
+  }
+
+  if (!feedback.trim()) {
+    showToast('Adicione um feedback para enviar à IA.', 'error');
+    return;
+  }
+
+  const recreateBtn = document.getElementById('recreate-test-btn');
+  const originalLabel = recreateBtn.textContent;
+
+  try {
+    recreateBtn.disabled = true;
+    recreateBtn.textContent = 'Recriando...';
+    showToast('Enviando feedback da execução para a IA...', 'success');
+
+    await generateTestWithFeedback(projectId, feedback);
+
+    // Navigate to generated test tab and keep form aligned with execution project
+    const generateTabBtn = document.querySelector('.tab-btn[data-tab="generate"]');
+    if (generateTabBtn) {
+      generateTabBtn.click();
+    }
+    await loadProjectsDropdown();
+    const projectSelect = document.getElementById('test-project');
+    projectSelect.value = String(projectId);
+    document.getElementById('test-prompt').value =
+      'Recriar teste com base no feedback da execução (falhas/erros).';
+    document.getElementById('test-context').value = feedback;
+
+    showToast('Novo teste gerado com base no feedback da execução!');
+  } catch (error) {
+    showToast(error.response?.data?.detail || 'Erro ao recriar teste com IA', 'error');
+  } finally {
+    recreateBtn.disabled = false;
+    recreateBtn.textContent = originalLabel;
   }
 });
 
@@ -412,6 +599,7 @@ document.querySelectorAll('.tab-btn').forEach((btn) => {
     if (tabName === 'projects') loadProjects();
     if (tabName === 'generate') loadProjectsDropdown();
     if (tabName === 'execute') loadExecuteProjects();
+    if (tabName === 'tests') loadTestsProjects();
   });
 });
 

@@ -194,3 +194,42 @@ async def test_download_nonexistent_test(session: AsyncSession) -> None:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.get("/tests/9999/download")
         assert resp.status_code == 404
+
+
+async def test_delete_generated_test_endpoint(session: AsyncSession, tmp_path) -> None:
+    from app.models.generated_test import GeneratedTest
+    from app.models.test_request import TestRequest
+    from app.repositories.project_repository import ProjectRepository
+    from app.repositories.test_repository import TestRepository
+
+    test_file = tmp_path / "test_delete.robot"
+    test_file.write_text("*** Settings ***\nLibrary    Browser")
+
+    project_repo = ProjectRepository()
+    test_repo = TestRepository()
+
+    project = await project_repo.create(session, Project(name="DeleteGeneratedProject"))
+    test_request = await test_repo.create_test_request(
+        session, TestRequest(project_id=project.id, prompt="Delete me", status="completed")
+    )
+    generated = await test_repo.create_generated_test(
+        session,
+        GeneratedTest(
+            test_request_id=test_request.id,
+            content="*** Test Cases ***\nExample\n    Log    Hi",
+            file_path=str(test_file),
+        ),
+    )
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        delete_resp = await client.delete(f"/tests/{generated.id}")
+        assert delete_resp.status_code == 200
+
+        get_resp = await client.get(f"/tests/{generated.id}")
+        assert get_resp.status_code == 404
+
+
+async def test_delete_nonexistent_generated_test_endpoint(session: AsyncSession) -> None:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        delete_resp = await client.delete("/tests/9999")
+        assert delete_resp.status_code == 404

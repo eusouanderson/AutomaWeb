@@ -106,6 +106,21 @@ class TestService:
             raise ValueError("Project not found")
         return await self._test_repository.list_generated_tests_by_project(session, project_id)
 
+    async def delete_generated_test(self, session: AsyncSession, test_id: int) -> bool:
+        generated = await self._test_repository.get_generated_test(session, test_id)
+        if not generated:
+            return False
+
+        file_path = Path(generated.file_path)
+        if file_path.exists():
+            try:
+                file_path.unlink()
+            except OSError:
+                logger.warning("Could not remove generated test file: %s", file_path)
+
+        await self._test_repository.delete_generated_test(session, generated)
+        return True
+
     def _write_robot_file(
         self,
         test_request_id: int,

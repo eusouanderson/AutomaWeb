@@ -204,6 +204,30 @@ async def test_download_test_route_not_found(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_delete_test_route_success(monkeypatch) -> None:
+    async def fake_delete_generated_test(self, session: AsyncSession, test_id: int) -> bool:
+        return True
+
+    monkeypatch.setattr(routes.TestService, "delete_generated_test", fake_delete_generated_test)
+    result = await routes.delete_test(1, session=None)
+
+    assert result["message"] == "Teste deletado com sucesso"
+
+
+@pytest.mark.asyncio
+async def test_delete_test_route_not_found(monkeypatch) -> None:
+    async def fake_delete_generated_test(self, session: AsyncSession, test_id: int) -> bool:
+        return False
+
+    monkeypatch.setattr(routes.TestService, "delete_generated_test", fake_delete_generated_test)
+
+    with pytest.raises(HTTPException) as exc:
+        await routes.delete_test(999, session=None)
+
+    assert exc.value.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_get_execution_report_not_implemented() -> None:
     with pytest.raises(HTTPException) as exc:
         await routes.get_execution_report(1)

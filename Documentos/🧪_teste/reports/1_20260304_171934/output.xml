@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot generator="Robot 7.4.2 (Python 3.12.3 on linux)" generated="2026-03-04T17:20:11.462486" rpa="false" schemaversion="5">
+<suite id="s1" name="Generated Test 1" source="/home/eusouanderson/treino/AutomaWeb/Documentos/🧪_teste/generated_test_1.robot">
+<test id="s1-t1" name="Abrir Navegador" line="8">
+<kw name="Open Browser" owner="Browser">
+<msg time="2026-03-04T17:20:11.576906" level="WARN">Open Browser is for quick experimentation and debugging only. Use New Page for production.</msg>
+<msg time="2026-03-04T17:20:11.577185" level="INFO">{"browser": "chromium", "headless": false, "chromiumSandbox": false, "devtools": false, "handleSIGHUP": true, "handleSIGINT": true, "handleSIGTERM": true, "slowMo": 0.0, "timeout": 30000.0, "tracesDir": "/home/eusouanderson/treino/AutomaWeb/Documentos/\ud83e\uddea_teste/reports/1_20260304_171934/browser/traces/temp/08d9b17a-7f62-443d-b3b9-d574f39adc03"}</msg>
+<msg time="2026-03-04T17:20:11.581035" level="INFO">Starting Browser process /home/eusouanderson/.cache/pypoetry/virtualenvs/automaweb-s9FmxQLL-py3.12/lib/python3.12/site-packages/Browser/wrapper/index.js using at 127.0.0.1:38689</msg>
+<msg time="2026-03-04T17:20:12.345940" level="INFO">Successfully created browser with options: {"browser":"chromium","headless":false,"chromiumSandbox":false,"devtools":false,"handleSIGHUP":true,"handleSIGINT":true,"handleSIGTERM":true,"slowMo":0,"timeout":30000,"tracesDir":"/home/eusouanderson/treino/AutomaWeb/Documentos/🧪_teste/reports/1_20260304_171934/browser/traces/temp/08d9b17a-7f62-443d-b3b9-d574f39adc03"}</msg>
+<msg time="2026-03-04T17:20:12.346820" level="INFO">{
+  "acceptDownloads": true,
+  "bypassCSP": true,
+  "forcedColors": "none",
+  "ignoreHTTPSErrors": false,
+  "javaScriptEnabled": true,
+  "offline": false,
+  "reducedMotion": "no-preference",
+  "serviceWorkers": "allow",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  }
+}</msg>
+<msg time="2026-03-04T17:20:12.367473" level="INFO">Successfully created context. </msg>
+<msg time="2026-03-04T17:20:12.367569" level="INFO">{'acceptDownloads': True, 'bypassCSP': True, 'forcedColors': 'none', 'ignoreHTTPSErrors': False, 'javaScriptEnabled': True, 'offline': False, 'reducedMotion': 'no-preference', 'serviceWorkers': 'allow', 'viewport': {'width': 1280, 'height': 720}}</msg>
+<msg time="2026-03-04T17:20:12.943869" level="INFO">Successfully initialized new page object and opened url: https://example.com/</msg>
+<arg>${URL}</arg>
+<arg>browser=chromium</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Opens a new browser instance. Use this keyword for quick experiments or debugging sessions.</doc>
+<status status="PASS" start="2026-03-04T17:20:11.576205" elapsed="1.368003"/>
+</kw>
+<kw name="Sleep" owner="BuiltIn">
+<msg time="2026-03-04T17:20:18.245456" level="INFO">Slept 5 seconds.</msg>
+<arg>5 seconds</arg>
+<doc>Pauses the test executed for the given time.</doc>
+<status status="PASS" start="2026-03-04T17:20:12.944469" elapsed="5.301179"/>
+</kw>
+<msg time="2026-03-04T17:20:18.283465" level="INFO">Switching context to context=53d120ad-88b6-46a8-ad19-aa69f0a349bf in CURRENT</msg>
+<msg time="2026-03-04T17:20:18.308825" level="INFO">Successfully changed active context: context=53d120ad-88b6-46a8-ad19-aa69f0a349bf</msg>
+<msg time="2026-03-04T17:20:18.321813" level="INFO">Successfully closed Context</msg>
+<status status="PASS" start="2026-03-04T17:20:11.575416" elapsed="6.670614"/>
+</test>
+<status status="PASS" start="2026-03-04T17:20:11.463708" elapsed="6.858936"/>
+</suite>
+<statistics>
+<total>
+<stat pass="1" fail="0" skip="0">All Tests</stat>
+</total>
+<tag>
+</tag>
+<suite>
+<stat name="Generated Test 1" id="s1" pass="1" fail="0" skip="0">Generated Test 1</stat>
+</suite>
+</statistics>
+<errors>
+<msg time="2026-03-04T17:20:11.576906" level="WARN">Open Browser is for quick experimentation and debugging only. Use New Page for production.</msg>
+</errors>
+</robot>

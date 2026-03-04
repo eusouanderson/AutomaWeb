@@ -1,0 +1,350 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot generator="Robot 7.4.2 (Python 3.12.3 on linux)" generated="2026-03-04T17:49:29.084558" rpa="false" schemaversion="5">
+<suite id="s1" name="Generated Test 9 &amp; Generated Test 4 &amp; Generated Test 5 &amp; Generated Test 6">
+<suite id="s1-s1" name="Generated Test 9" source="/home/eusouanderson/treino/AutomaWeb/Documentos/🧪_Login_Page/generated_test_9.robot">
+<test id="s1-s1-t1" name="Login com usuário válido" line="10">
+<kw name="New Browser" owner="Browser">
+<msg time="2026-03-04T17:49:29.215133" level="INFO">{"browser": "chromium", "headless": false, "chromiumSandbox": false, "devtools": false, "handleSIGHUP": true, "handleSIGINT": true, "handleSIGTERM": true, "slowMo": 0.0, "timeout": 30000.0, "tracesDir": "/home/eusouanderson/treino/AutomaWeb/Documentos/\ud83e\uddea_Login_Page/reports/3_20260304_174854/browser/traces/temp/651f6321-a36c-4bc9-b6d1-00e6df6415dd"}</msg>
+<msg time="2026-03-04T17:49:29.218929" level="INFO">Starting Browser process /home/eusouanderson/.cache/pypoetry/virtualenvs/automaweb-s9FmxQLL-py3.12/lib/python3.12/site-packages/Browser/wrapper/index.js using at 127.0.0.1:41319</msg>
+<msg time="2026-03-04T17:49:29.940162" level="INFO">Successfully created browser with options: {"browser":"chromium","headless":false,"chromiumSandbox":false,"devtools":false,"handleSIGHUP":true,"handleSIGINT":true,"handleSIGTERM":true,"slowMo":0,"timeout":30000,"tracesDir":"/home/eusouanderson/treino/AutomaWeb/Documentos/🧪_Login_Page/reports/3_20260304_174854/browser/traces/temp/651f6321-a36c-4bc9-b6d1-00e6df6415dd"}</msg>
+<arg>headless=False</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Create a new playwright Browser with specified options.</doc>
+<status status="PASS" start="2026-03-04T17:49:29.214468" elapsed="0.725934"/>
+</kw>
+<kw name="New Page" owner="Browser">
+<msg time="2026-03-04T17:49:33.847111" level="INFO">Successfully initialized new page object and opened url: https://the-internet.herokuapp.com/login</msg>
+<msg time="2026-03-04T17:49:33.847288" level="INFO">No context was open. New context was automatically opened when this page is created.</msg>
+<arg>${URL}</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Open a new Page.</doc>
+<status status="PASS" start="2026-03-04T17:49:29.940693" elapsed="3.907021"/>
+</kw>
+<kw name="Fill Text" owner="Browser">
+<msg time="2026-03-04T17:49:33.849447" level="INFO">Fills the text 'tomsmith' in the given field.</msg>
+<msg time="2026-03-04T17:49:33.982779" level="INFO" html="true">&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td colspan="3"&gt;&lt;a href="browser/screenshot/fail-screenshot-1.png" target="_blank"&gt;&lt;img src="browser/screenshot/fail-screenshot-1.png" width="800px"/&gt;&lt;/a&gt;</msg>
+<msg time="2026-03-04T17:49:33.983000" level="INFO">See also file:///home/eusouanderson/treino/AutomaWeb/Documentos/%F0%9F%A7%AA_Login_Page/reports/3_20260304_174854/playwright-log.txt for additional details.</msg>
+<msg time="2026-03-04T17:49:33.983621" level="FAIL">Error: locator.fill: SyntaxError: Failed to execute 'querySelectorAll' on 'Document': 'id:username' is not a valid selector.
+    at query (&lt;anonymous&gt;:5288:41)
+    at &lt;anonymous&gt;:5298:7
+    at SelectorEvaluatorImpl._cached (&lt;anonymous&gt;:5075:20)
+    at SelectorEvaluatorImpl._queryCSS (&lt;anonymous&gt;:5285:17)
+    at SelectorEvaluatorImpl._querySimple (&lt;anonymous&gt;:5165:19)
+    at &lt;anonymous&gt;:5113:29
+    at SelectorEvaluatorImpl._cached (&lt;anonymous&gt;:5075:20)
+    at SelectorEvaluatorImpl.query (&lt;anonymous&gt;:5106:19)
+    at Object.query (&lt;anonymous&gt;:5320:44)
+    at &lt;anonymous&gt;:5278:21
+Call log:
+  - waiting for locator('id:username')
+</msg>
+<arg>id:username</arg>
+<arg>${USERNAME}</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Clears and fills the given ``txt`` into the text field found by ``selector``.</doc>
+<status status="FAIL" start="2026-03-04T17:49:33.848172" elapsed="0.140432">Error: locator.fill: SyntaxError: Failed to execute 'querySelectorAll' on 'Document': 'id:username' is not a valid selector.
+    at query (&lt;anonymous&gt;:5288:41)
+    at &lt;anonymous&gt;:5298:7
+    at SelectorEvaluatorImpl._cached (&lt;anonymous&gt;:5075:20)
+    at SelectorEvaluatorImpl._queryCSS (&lt;anonymous&gt;:5285:17)
+    at SelectorEvaluatorImpl._querySimple (&lt;anonymous&gt;:5165:19)
+    at &lt;anonymous&gt;:5113:29
+    at SelectorEvaluatorImpl._cached (&lt;anonymous&gt;:5075:20)
+    at SelectorEvaluatorImpl.query (&lt;anonymous&gt;:5106:19)
+    at Object.query (&lt;anonymous&gt;:5320:44)
+    at &lt;anonymous&gt;:5278:21
+Call log:
+  - waiting for locator('id:username')
+</status>
+</kw>
+<kw name="Fill Text" owner="Browser">
+<arg>id:password</arg>
+<arg>${PASSWORD}</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Clears and fills the given ``txt`` into the text field found by ``selector``.</doc>
+<status status="NOT RUN" start="2026-03-04T17:49:33.989054" elapsed="0.000160"/>
+</kw>
+<kw name="Click" owner="Browser">
+<arg>text=Login</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Simulates mouse click on the element found by ``selector``.</doc>
+<status status="NOT RUN" start="2026-03-04T17:49:33.989352" elapsed="0.000062"/>
+</kw>
+<kw name="Get Title" owner="Browser">
+<arg>==</arg>
+<arg>The Internet</arg>
+<tag>Assertion</tag>
+<tag>Getter</tag>
+<tag>PageContent</tag>
+<doc>Returns the title of the current page.</doc>
+<status status="NOT RUN" start="2026-03-04T17:49:33.989559" elapsed="0.000063"/>
+</kw>
+<kw name="Close Browser" owner="Browser">
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Closes the current browser.</doc>
+<status status="NOT RUN" start="2026-03-04T17:49:33.989757" elapsed="0.000069"/>
+</kw>
+<msg time="2026-03-04T17:49:34.011349" level="INFO">Switching context to context=6899aea1-ac9d-4f5f-8c08-467433627110 in CURRENT</msg>
+<msg time="2026-03-04T17:49:34.021888" level="INFO">Successfully changed active context: context=6899aea1-ac9d-4f5f-8c08-467433627110</msg>
+<msg time="2026-03-04T17:49:34.035075" level="INFO">Successfully closed Context</msg>
+<status status="FAIL" start="2026-03-04T17:49:29.213655" elapsed="4.776380">Error: locator.fill: SyntaxError: Failed to execute 'querySelectorAll' on 'Document': 'id:username' is not a valid selector.
+    at query (&lt;anonymous&gt;:5288:41)
+    at &lt;anonymous&gt;:5298:7
+    at SelectorEvaluatorImpl._cached (&lt;anonymous&gt;:5075:20)
+    at SelectorEvaluatorImpl._queryCSS (&lt;anonymous&gt;:5285:17)
+    at SelectorEvaluatorImpl._querySimple (&lt;anonymous&gt;:5165:19)
+    at &lt;anonymous&gt;:5113:29
+    at SelectorEvaluatorImpl._cached (&lt;anonymous&gt;:5075:20)
+    at SelectorEvaluatorImpl.query (&lt;anonymous&gt;:5106:19)
+    at Object.query (&lt;anonymous&gt;:5320:44)
+    at &lt;anonymous&gt;:5278:21
+Call log:
+  - waiting for locator('id:username')
+</status>
+</test>
+<status status="FAIL" start="2026-03-04T17:49:29.112710" elapsed="4.923082"/>
+</suite>
+<suite id="s1-s2" name="Generated Test 4" source="/home/eusouanderson/treino/AutomaWeb/Documentos/🧪_Login_Page/generated_test_4.robot">
+<test id="s1-s2-t1" name="Testar Login" line="11">
+<kw name="Acessar Pagina De Login">
+<kw name="New Browser" owner="Browser">
+<msg time="2026-03-04T17:49:34.053600" level="INFO">Switching browser to browser=a71db090-efea-40d4-bf9d-08adf05627a1</msg>
+<msg time="2026-03-04T17:49:34.057053" level="INFO">Successfully changed active browser: browser=a71db090-efea-40d4-bf9d-08adf05627a1</msg>
+<msg time="2026-03-04T17:49:34.057178" level="INFO">Reusing existing browser with id: browser=a71db090-efea-40d4-bf9d-08adf05627a1</msg>
+<arg>headless=False</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Create a new playwright Browser with specified options.</doc>
+<status status="PASS" start="2026-03-04T17:49:34.052795" elapsed="0.004457"/>
+</kw>
+<kw name="New Page" owner="Browser">
+<msg time="2026-03-04T17:49:35.933717" level="INFO">Successfully initialized new page object and opened url: https://the-internet.herokuapp.com/login</msg>
+<msg time="2026-03-04T17:49:35.933945" level="INFO">No context was open. New context was automatically opened when this page is created.</msg>
+<arg>${URL}</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Open a new Page.</doc>
+<status status="PASS" start="2026-03-04T17:49:34.057425" elapsed="1.876795"/>
+</kw>
+<status status="PASS" start="2026-03-04T17:49:34.052047" elapsed="1.882771"/>
+</kw>
+<kw name="Preencher Campos De Login">
+<kw name="Fill Text" owner="Browser">
+<msg time="2026-03-04T17:49:35.937078" level="INFO">Fills the text 'tomsmith' in the given field.</msg>
+<arg>${USERNAME_INPUT}</arg>
+<arg>tomsmith</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Clears and fills the given ``txt`` into the text field found by ``selector``.</doc>
+<status status="PASS" start="2026-03-04T17:49:35.936152" elapsed="0.058932"/>
+</kw>
+<kw name="Fill Text" owner="Browser">
+<msg time="2026-03-04T17:49:35.995893" level="INFO">Fills the text 'SuperSecretPassword!' in the given field.</msg>
+<arg>${PASSWORD_INPUT}</arg>
+<arg>SuperSecretPassword!</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Clears and fills the given ``txt`` into the text field found by ``selector``.</doc>
+<status status="PASS" start="2026-03-04T17:49:35.995285" elapsed="0.022012"/>
+</kw>
+<status status="PASS" start="2026-03-04T17:49:35.935280" elapsed="0.082321"/>
+</kw>
+<kw name="Clicar No Botao De Login">
+<kw name="Click" owner="Browser">
+<msg time="2026-03-04T17:49:36.019531" level="INFO">Clicks the element 'xpath=//button[@class="radius"]'.</msg>
+<arg>${LOGIN_BUTTON}</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Simulates mouse click on the element found by ``selector``.</doc>
+<status status="PASS" start="2026-03-04T17:49:36.018631" elapsed="0.332734"/>
+</kw>
+<kw name="Get Page Source" owner="Browser">
+<tag>Assertion</tag>
+<tag>Getter</tag>
+<tag>PageContent</tag>
+<doc>Gets pages HTML source as a string.</doc>
+<status status="PASS" start="2026-03-04T17:49:36.351881" elapsed="0.112002"/>
+</kw>
+<kw name="Close Browser" owner="Browser">
+<msg time="2026-03-04T17:49:36.604539" level="INFO">Closed browser</msg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Closes the current browser.</doc>
+<status status="PASS" start="2026-03-04T17:49:36.464347" elapsed="0.140384"/>
+</kw>
+<status status="PASS" start="2026-03-04T17:49:36.017951" elapsed="0.586905"/>
+</kw>
+<status status="PASS" start="2026-03-04T17:49:34.048422" elapsed="2.556559"/>
+</test>
+<status status="PASS" start="2026-03-04T17:49:34.041323" elapsed="2.567996"/>
+</suite>
+<suite id="s1-s3" name="Generated Test 5" source="/home/eusouanderson/treino/AutomaWeb/Documentos/🧪_Login_Page/generated_test_5.robot">
+<test id="s1-s3-t1" name="Teste de Login" line="10">
+<kw name="Open Browser" owner="Browser">
+<msg time="2026-03-04T17:49:36.617448" level="FAIL">ValueError: Argument 'browser' got value 'chrome' that cannot be converted to SupportedBrowsers: SupportedBrowsers does not have member 'chrome'. Available: 'chromium', 'firefox' and 'webkit'</msg>
+<arg>${url}</arg>
+<arg>browser=chrome</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Opens a new browser instance. Use this keyword for quick experiments or debugging sessions.</doc>
+<status status="FAIL" start="2026-03-04T17:49:36.616991" elapsed="0.000971">ValueError: Argument 'browser' got value 'chrome' that cannot be converted to SupportedBrowsers: SupportedBrowsers does not have member 'chrome'. Available: 'chromium', 'firefox' and 'webkit'</status>
+</kw>
+<kw name="Login">
+<arg>${username}</arg>
+<arg>${password}</arg>
+<status status="NOT RUN" start="2026-03-04T17:49:36.618134" elapsed="0.000060"/>
+</kw>
+<kw name="Verify Login">
+<status status="NOT RUN" start="2026-03-04T17:49:36.618286" elapsed="0.000036"/>
+</kw>
+<status status="FAIL" start="2026-03-04T17:49:36.615483" elapsed="0.002960">ValueError: Argument 'browser' got value 'chrome' that cannot be converted to SupportedBrowsers: SupportedBrowsers does not have member 'chrome'. Available: 'chromium', 'firefox' and 'webkit'</status>
+</test>
+<status status="FAIL" start="2026-03-04T17:49:36.612476" elapsed="0.010137"/>
+</suite>
+<suite id="s1-s4" name="Generated Test 6" source="/home/eusouanderson/treino/AutomaWeb/Documentos/🧪_Login_Page/generated_test_6.robot">
+<test id="s1-s4-t1" name="Testar Login Com Credenciais Validas" line="13">
+<kw name="Open Browser" owner="Browser">
+<msg time="2026-03-04T17:49:36.633140" level="WARN">Open Browser is for quick experimentation and debugging only. Use New Page for production.</msg>
+<msg time="2026-03-04T17:49:36.633468" level="INFO">{"browser": "chromium", "headless": false, "chromiumSandbox": false, "devtools": false, "handleSIGHUP": true, "handleSIGINT": true, "handleSIGTERM": true, "slowMo": 0.0, "timeout": 30000.0, "tracesDir": "/home/eusouanderson/treino/AutomaWeb/Documentos/\ud83e\uddea_Login_Page/reports/3_20260304_174854/browser/traces/temp/1488ebc2-766c-411e-8236-be14863a8f63"}</msg>
+<msg time="2026-03-04T17:49:36.848741" level="INFO">Successfully created browser with options: {"browser":"chromium","headless":false,"chromiumSandbox":false,"devtools":false,"handleSIGHUP":true,"handleSIGINT":true,"handleSIGTERM":true,"slowMo":0,"timeout":30000,"tracesDir":"/home/eusouanderson/treino/AutomaWeb/Documentos/🧪_Login_Page/reports/3_20260304_174854/browser/traces/temp/1488ebc2-766c-411e-8236-be14863a8f63"}</msg>
+<msg time="2026-03-04T17:49:36.849589" level="INFO">{
+  "acceptDownloads": true,
+  "bypassCSP": true,
+  "forcedColors": "none",
+  "ignoreHTTPSErrors": false,
+  "javaScriptEnabled": true,
+  "offline": false,
+  "reducedMotion": "no-preference",
+  "serviceWorkers": "allow",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  }
+}</msg>
+<msg time="2026-03-04T17:49:36.861095" level="INFO">Successfully created context. </msg>
+<msg time="2026-03-04T17:49:36.861213" level="INFO">{'acceptDownloads': True, 'bypassCSP': True, 'forcedColors': 'none', 'ignoreHTTPSErrors': False, 'javaScriptEnabled': True, 'offline': False, 'reducedMotion': 'no-preference', 'serviceWorkers': 'allow', 'viewport': {'width': 1280, 'height': 720}}</msg>
+<msg time="2026-03-04T17:49:38.803638" level="INFO">Successfully initialized new page object and opened url: https://the-internet.herokuapp.com/login</msg>
+<arg>${url}</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Opens a new browser instance. Use this keyword for quick experiments or debugging sessions.</doc>
+<status status="PASS" start="2026-03-04T17:49:36.632602" elapsed="2.171343"/>
+</kw>
+<kw name="Input Text">
+<msg time="2026-03-04T17:49:38.806918" level="FAIL">No keyword with name 'Input Text' found.</msg>
+<arg>${username_input}</arg>
+<arg>${valid_username}</arg>
+<status status="FAIL" start="2026-03-04T17:49:38.806570" elapsed="0.000495">No keyword with name 'Input Text' found.</status>
+</kw>
+<kw name="Input Text">
+<arg>${password_input}</arg>
+<arg>${valid_password}</arg>
+<status status="NOT RUN" start="2026-03-04T17:49:38.807402" elapsed="0.000134"/>
+</kw>
+<kw name="Click Element">
+<arg>${login_button}</arg>
+<status status="NOT RUN" start="2026-03-04T17:49:38.807750" elapsed="0.000086"/>
+</kw>
+<kw name="Wait Until Page Contains">
+<arg>You logged into a secure area!</arg>
+<status status="NOT RUN" start="2026-03-04T17:49:38.807939" elapsed="0.000063"/>
+</kw>
+<kw name="Close Browser" owner="Browser">
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Closes the current browser.</doc>
+<status status="NOT RUN" start="2026-03-04T17:49:38.808147" elapsed="0.000083"/>
+</kw>
+<msg time="2026-03-04T17:49:38.827141" level="INFO">Switching context to context=51472335-3ad1-4a33-8d67-af17215432c2 in CURRENT</msg>
+<msg time="2026-03-04T17:49:38.834118" level="INFO">Successfully changed active context: context=51472335-3ad1-4a33-8d67-af17215432c2</msg>
+<msg time="2026-03-04T17:49:38.845128" level="INFO">Successfully closed Context</msg>
+<status status="FAIL" start="2026-03-04T17:49:36.630539" elapsed="2.177942">No keyword with name 'Input Text' found.</status>
+</test>
+<test id="s1-s4-t2" name="Testar Login Com Credenciais Invalidas" line="21">
+<kw name="Open Browser" owner="Browser">
+<msg time="2026-03-04T17:49:38.848627" level="WARN">Open Browser is for quick experimentation and debugging only. Use New Page for production.</msg>
+<msg time="2026-03-04T17:49:38.848777" level="INFO">Switching browser to browser=89631cb9-945b-43cf-860b-4306c7185b31</msg>
+<msg time="2026-03-04T17:49:38.851049" level="INFO">Successfully changed active browser: browser=89631cb9-945b-43cf-860b-4306c7185b31</msg>
+<msg time="2026-03-04T17:49:38.851224" level="INFO">Reusing existing browser with id: browser=89631cb9-945b-43cf-860b-4306c7185b31</msg>
+<msg time="2026-03-04T17:49:38.852375" level="INFO">{
+  "acceptDownloads": true,
+  "bypassCSP": true,
+  "forcedColors": "none",
+  "ignoreHTTPSErrors": false,
+  "javaScriptEnabled": true,
+  "offline": false,
+  "reducedMotion": "no-preference",
+  "serviceWorkers": "allow",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  }
+}</msg>
+<msg time="2026-03-04T17:49:38.863059" level="INFO">Successfully created context. </msg>
+<msg time="2026-03-04T17:49:38.863141" level="INFO">{'acceptDownloads': True, 'bypassCSP': True, 'forcedColors': 'none', 'ignoreHTTPSErrors': False, 'javaScriptEnabled': True, 'offline': False, 'reducedMotion': 'no-preference', 'serviceWorkers': 'allow', 'viewport': {'width': 1280, 'height': 720}}</msg>
+<msg time="2026-03-04T17:49:40.735017" level="INFO">Successfully initialized new page object and opened url: https://the-internet.herokuapp.com/login</msg>
+<arg>${url}</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Opens a new browser instance. Use this keyword for quick experiments or debugging sessions.</doc>
+<status status="PASS" start="2026-03-04T17:49:38.848114" elapsed="1.887224"/>
+</kw>
+<kw name="Input Text">
+<msg time="2026-03-04T17:49:40.738340" level="FAIL">No keyword with name 'Input Text' found.</msg>
+<arg>${username_input}</arg>
+<arg>invalid_username</arg>
+<status status="FAIL" start="2026-03-04T17:49:40.737998" elapsed="0.000468">No keyword with name 'Input Text' found.</status>
+</kw>
+<kw name="Input Text">
+<arg>${password_input}</arg>
+<arg>invalid_password</arg>
+<status status="NOT RUN" start="2026-03-04T17:49:40.738842" elapsed="0.000177"/>
+</kw>
+<kw name="Click Element">
+<arg>${login_button}</arg>
+<status status="NOT RUN" start="2026-03-04T17:49:40.739256" elapsed="0.000154"/>
+</kw>
+<kw name="Wait Until Page Contains">
+<arg>Your username is invalid!</arg>
+<status status="NOT RUN" start="2026-03-04T17:49:40.739711" elapsed="0.000133"/>
+</kw>
+<kw name="Close Browser" owner="Browser">
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Closes the current browser.</doc>
+<status status="NOT RUN" start="2026-03-04T17:49:40.740066" elapsed="0.000168"/>
+</kw>
+<msg time="2026-03-04T17:49:40.772944" level="INFO">Switching context to context=c752fc58-2c68-44bf-ba76-2672f8d3f94e in CURRENT</msg>
+<msg time="2026-03-04T17:49:40.784925" level="INFO">Successfully changed active context: context=c752fc58-2c68-44bf-ba76-2672f8d3f94e</msg>
+<msg time="2026-03-04T17:49:40.803074" level="INFO">Successfully closed Context</msg>
+<status status="FAIL" start="2026-03-04T17:49:38.845546" elapsed="1.895082">No keyword with name 'Input Text' found.</status>
+</test>
+<status status="FAIL" start="2026-03-04T17:49:36.626226" elapsed="4.178034"/>
+</suite>
+<status status="FAIL" start="2026-03-04T17:49:29.085192" elapsed="11.728207"/>
+</suite>
+<statistics>
+<total>
+<stat pass="1" fail="4" skip="0">All Tests</stat>
+</total>
+<tag>
+</tag>
+<suite>
+<stat name="Generated Test 9 &amp; Generated Test 4 &amp; Generated Test 5 &amp; Generated Test 6" id="s1" pass="1" fail="4" skip="0">Generated Test 9 &amp; Generated Test 4 &amp; Generated Test 5 &amp; Generated Test 6</stat>
+<stat name="Generated Test 9" id="s1-s1" pass="0" fail="1" skip="0">Generated Test 9 &amp; Generated Test 4 &amp; Generated Test 5 &amp; Generated Test 6.Generated Test 9</stat>
+<stat name="Generated Test 4" id="s1-s2" pass="1" fail="0" skip="0">Generated Test 9 &amp; Generated Test 4 &amp; Generated Test 5 &amp; Generated Test 6.Generated Test 4</stat>
+<stat name="Generated Test 5" id="s1-s3" pass="0" fail="1" skip="0">Generated Test 9 &amp; Generated Test 4 &amp; Generated Test 5 &amp; Generated Test 6.Generated Test 5</stat>
+<stat name="Generated Test 6" id="s1-s4" pass="0" fail="2" skip="0">Generated Test 9 &amp; Generated Test 4 &amp; Generated Test 5 &amp; Generated Test 6.Generated Test 6</stat>
+</suite>
+</statistics>
+<errors>
+<msg time="2026-03-04T17:49:36.633140" level="WARN">Open Browser is for quick experimentation and debugging only. Use New Page for production.</msg>
+<msg time="2026-03-04T17:49:38.848627" level="WARN">Open Browser is for quick experimentation and debugging only. Use New Page for production.</msg>
+</errors>
+</robot>

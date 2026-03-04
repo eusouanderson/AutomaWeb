@@ -130,6 +130,12 @@
       <div id="tests-tab" class="tab-content">
         <div class="section">
           <h2>Histórico de Testes</h2>
+          <div class="form-group">
+            <label for="tests-project">Projeto</label>
+            <select id="tests-project">
+              <option value="">Selecione um projeto...</option>
+            </select>
+          </div>
           <div id="tests-list" class="list"></div>
         </div>
       </div>
@@ -179,6 +185,24 @@
             <button id="view-report-btn" class="btn btn-primary">📊 Ver Relatório MkDocs</button>
             <button id="view-robot-report-btn" class="btn btn-secondary">🤖 Relatório Robot</button>
             <button id="view-log-btn" class="btn btn-secondary">📝 Ver Log</button>
+          </div>
+          <div id="recreate-panel" class="recreate-panel hidden">
+            <h3>Recriar teste com IA</h3>
+            <p class="recreate-helper">
+              Detectamos falhas/erros. Você pode enviar este feedback para a IA e pedir uma nova
+              versão do teste.
+            </p>
+            <div class="form-group">
+              <label for="execution-feedback">Feedback para IA</label>
+              <textarea
+                id="execution-feedback"
+                rows="6"
+                placeholder="Descreva o que falhou para a IA corrigir o teste"
+              ></textarea>
+            </div>
+            <button id="recreate-test-btn" class="btn btn-primary">
+              🤖 Pedir para IA recriar o teste
+            </button>
           </div>
         </div>
       </div>

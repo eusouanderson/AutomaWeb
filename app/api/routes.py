@@ -140,6 +140,15 @@ async def get_test(test_id: int, session: AsyncSession = Depends(get_db)) -> Gen
     return GeneratedTestOut.model_validate(generated)
 
 
+@router.delete("/tests/{test_id}")
+async def delete_test(test_id: int, session: AsyncSession = Depends(get_db)) -> dict:
+    service = TestService()
+    deleted = await service.delete_generated_test(session, test_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Test not found")
+    return {"message": "Teste deletado com sucesso"}
+
+
 @router.get("/tests/{test_id}/download")
 async def download_test(test_id: int, session: AsyncSession = Depends(get_db)) -> FileResponse:
     service = TestService()
