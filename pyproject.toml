@@ -1,0 +1,44 @@
+[tool.poetry]
+name = "automaweb"
+package-mode = false
+
+[project]
+name = "automaweb"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Bob",email = "bob@example.com"}
+]
+requires-python = ">=3.12,<4.0"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+    "sqlalchemy[asyncio]>=2.0.25",
+    "asyncpg>=0.29.0",
+    "aiosqlite>=0.20.0",
+    "pydantic>=2.6.0",
+    "pydantic-settings>=2.2.0",
+    "python-dotenv>=1.0.0",
+    "groq>=1.0.0",
+    "tenacity>=8.2.3",
+    "httpx>=0.27.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "robotframework>=7.0",
+    "robotframework-browser>=18.0.0",
+]
+
+
+[tool.pytest.ini_options]
+testpaths = ["app/tests"]
+asyncio_mode = "auto"
+addopts = "--cov=app --cov-report=term-missing --cov-report=html --cov-fail-under=95"
+
+[tool.coverage.run]
+omit = ["app/tests/*"]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
