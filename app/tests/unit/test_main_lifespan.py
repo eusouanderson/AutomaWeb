@@ -20,3 +20,25 @@ async def test_root_route() -> None:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.get("/")
         assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_lifespan_calls_setup_and_init(monkeypatch) -> None:
+    from app import main
+
+    calls = {"setup": False, "init": False}
+
+    def fake_setup_logging() -> None:
+        calls["setup"] = True
+
+    async def fake_init_db(db_engine=None) -> None:
+        calls["init"] = True
+
+    monkeypatch.setattr(main, "setup_logging", fake_setup_logging)
+    monkeypatch.setattr(main, "init_db", fake_init_db)
+
+    async with main.lifespan(main.app):
+        pass
+
+    assert calls["setup"] is True
+    assert calls["init"] is True

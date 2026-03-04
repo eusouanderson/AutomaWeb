@@ -99,7 +99,8 @@ class TestService:
         # Drop any leftover non-section note lines
         filtered = []
         for line in cleaned:
-            if line.strip().startswith("**"):
+            stripped = line.strip()
+            if stripped.startswith("**") and not stripped.startswith("***"):
                 continue
             if line.strip().lower().startswith("observação"):
                 continue
