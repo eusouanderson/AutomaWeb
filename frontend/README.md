@@ -1,45 +1,86 @@
 # AutomaWeb Frontend
 
-Interface web para o sistema de geração de testes Robot Framework.
+Lightweight SPA frontend served directly by FastAPI.
 
-## Instalação
+## Stack
+
+- Vanilla JavaScript with ES Modules
+- Axios for API requests
+- ToastifyJS for notifications
+- Vitest for unit tests
+
+## Run
 
 ```bash
 cd frontend
 npm install
-```
-
-## Desenvolvimento
-
-O frontend é servido automaticamente pelo FastAPI. Basta rodar o backend:
-
-```bash
 cd ..
 poetry run python dev.py
 ```
 
-Acesse: http://localhost:8888
+App URL: `http://localhost:8888`
 
-## Bibliotecas Utilizadas
+## Test
 
-- **Axios**: Cliente HTTP para chamadas à API
-- **Toastify.js**: Notificações toast elegantes
+```bash
+cd frontend
+npm run test
+```
 
-## Estrutura
+## Frontend Architecture
+
+Note: FastAPI currently serves static files from `frontend/public`, so the architecture is placed there.
 
 ```
 frontend/
-├── package.json       # Dependências npm
-└── public/
-    ├── index.html    # HTML principal
-    ├── styles.css    # Estilos
-    └── app.js        # Lógica da aplicação
+    package.json
+    public/
+        index.html
+        app.js
+        router.js
+        api/
+            client.js
+            automaweb.api.js
+        services/
+            test.service.js
+            scan.service.js
+        components/
+            button.js
+            modal.js
+            toast.js
+            loader.js
+        pages/
+            dashboard/
+                dashboard.page.js
+                dashboard.html
+            test-generator/
+                generator.page.js
+                generator.html
+            project-scan/
+                scan.page.js
+                scan.html
+        state/
+            store.js
+        utils/
+            dom.js
+            validators.js
+            helpers.js
+        styles/
+            global.css
+            layout.css
+            components.css
+        tests/
+            api.test.js
+            utils.test.js
 ```
 
-## Funcionalidades
+## Folder Responsibilities
 
-- ✅ Criar e listar projetos
-- ✅ Gerar testes com IA (Groq)
-- ✅ Visualizar código gerado
-- ✅ Copiar código
-- ✅ Download arquivo .robot
+- `api/`: only low-level HTTP communication and endpoint mapping.
+- `services/`: business rules, validation, and orchestration of API calls.
+- `components/`: reusable UI blocks without page-specific rules.
+- `pages/`: route-level screens; light orchestration and event binding.
+- `state/`: centralized app state with subscribe/update pattern.
+- `utils/`: pure reusable helpers and DOM utilities.
+- `styles/`: global tokens, layout system, and component-level styles.
+- `tests/`: unit tests for API contract wrappers and pure utilities.

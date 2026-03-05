@@ -1,4 +1,5 @@
 """Service for executing Robot Framework tests and generating reports"""
+import asyncio
 import logging
 import os
 import shutil
@@ -93,11 +94,12 @@ class TestExecutionService:
         )
 
         # Ensure Browser deps installed
-        self._ensure_rfbrowser()
+        await asyncio.to_thread(self._ensure_rfbrowser)
 
         # Execute Robot Framework tests
         try:
-            result = subprocess.run(
+            result = await asyncio.to_thread(
+                subprocess.run,
                 [
                     "robot",
                     "--outputdir", str(output_dir),
@@ -292,7 +294,8 @@ nav:
 
         # Build MkDocs site
         try:
-            subprocess.run(
+            await asyncio.to_thread(
+                subprocess.run,
                 ["mkdocs", "build"],
                 cwd=str(docs_dir),
                 capture_output=True,

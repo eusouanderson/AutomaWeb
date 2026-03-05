@@ -96,6 +96,17 @@ app/static/projects/
 *.robot
 !app/tests/e2e/*.robot
 
+# Robot Framework runtime artifacts
+output.xml
+log.html
+report.html
+playwright-log.txt
+browser/
+**/reports/
+**/browser/
+**/traces/
+**/screenshot/
+
 # Logs
 *.log
 logs/

@@ -1,0 +1,34 @@
+<section class="panel">
+  <header class="panel-head">
+    <h2>Project Dashboard</h2>
+    <p>Create projects and keep test metadata organized.</p>
+  </header>
+
+  <form id="create-project-form" class="form-grid">
+    <label>
+      Project name
+      <input id="project-name" type="text" required minlength="2" />
+    </label>
+    <label>
+      Project URL
+      <input id="project-url" type="url" placeholder="https://example.com" required />
+    </label>
+    <label>
+      Test directory
+      <input id="project-test-dir" type="text" placeholder="/path/to/tests" required />
+    </label>
+    <label class="full-row">
+      Description
+      <textarea id="project-description" rows="3"></textarea>
+    </label>
+    <div class="full-row" id="project-submit-slot"></div>
+  </form>
+</section>
+
+<section class="panel">
+  <header class="panel-head">
+    <h2>Projects</h2>
+    <p>Active projects from your FastAPI backend.</p>
+  </header>
+  <div id="projects-list" class="stack-list"></div>
+</section>

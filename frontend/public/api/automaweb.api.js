@@ -1,0 +1,33 @@
+import { request, streamPost } from './client.js';
+
+export function listProjects() {
+  return request({ method: 'GET', url: '/projects' });
+}
+
+export function createProject(payload) {
+  return request({ method: 'POST', url: '/projects', data: payload });
+}
+
+export function deleteProject(projectId) {
+  return request({ method: 'DELETE', url: `/projects/${projectId}` });
+}
+
+export function listGeneratedTests(projectId) {
+  return request({ method: 'GET', url: `/projects/${projectId}/tests` });
+}
+
+export function deleteGeneratedTest(testId) {
+  return request({ method: 'DELETE', url: `/tests/${testId}` });
+}
+
+export function generateRobotTest(payload) {
+  return request({ method: 'POST', url: '/tests/generate', data: payload });
+}
+
+export function runTests(payload) {
+  return request({ method: 'POST', url: '/executions/run', data: payload });
+}
+
+export function scanProject(url, onMessage) {
+  return streamPost('/scan', { url }, onMessage);
+}

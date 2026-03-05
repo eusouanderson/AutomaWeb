@@ -1,0 +1,27 @@
+<section class="panel">
+  <header class="panel-head">
+    <h2>Project Scan</h2>
+    <p>Scan UI elements before generating tests.</p>
+  </header>
+
+  <form id="scan-form" class="form-grid">
+    <label>
+      Project
+      <select id="scan-project" required>
+        <option value="">Select project</option>
+      </select>
+    </label>
+    <div id="scan-action-slot"></div>
+  </form>
+
+  <div class="scan-grid">
+    <article class="panel panel-nested">
+      <h3>Progress</h3>
+      <div id="scan-progress" class="stack-list muted"></div>
+    </article>
+    <article class="panel panel-nested">
+      <h3>Summary</h3>
+      <div id="scan-summary" class="muted">No scan yet.</div>
+    </article>
+  </div>
+</section>

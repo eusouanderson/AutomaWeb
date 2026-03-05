@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import asyncio
 from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -66,7 +67,8 @@ class TestService:
             page_structure = scan_result.model_dump()
 
         try:
-            content = self._groq_client.generate_robot_test(
+            content = await asyncio.to_thread(
+                self._groq_client.generate_robot_test,
                 prompt=prompt,
                 context=context,
                 page_structure=page_structure,
