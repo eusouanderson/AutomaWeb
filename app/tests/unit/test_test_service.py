@@ -90,6 +90,24 @@ class APIConnectionFailingGroqClient:
         raise APIConnectionError("network")
 
 
+class UnexpectedLLMError(Exception):
+    pass
+
+
+class UnexpectedFailingGroqClient:
+    def generate_robot_test(self, prompt, context=None, page_structure=None):
+        raise UnexpectedLLMError("unexpected")
+
+
+class CapturingGroqClient:
+    def __init__(self):
+        self.captured_page_structure = None
+
+    def generate_robot_test(self, prompt, context=None, page_structure=None):
+        self.captured_page_structure = page_structure
+        return "*** Test Cases ***\nExample\n    Log    OK"
+
+
 @pytest_asyncio.fixture()
 async def session(tmp_path) -> AsyncSession:
     settings.STATIC_DIR = str(tmp_path)
@@ -118,6 +136,18 @@ async def test_generate_test(session: AsyncSession) -> None:
 
     assert generated.id is not None
     assert "*** Test Cases ***" in generated.content
+
+
+@pytest.mark.asyncio
+async def test_generate_test_raises_when_project_not_found() -> None:
+    service = TestService(
+        test_repository=DummyTestRepository(),
+        project_repository=DummyProjectRepository(None),
+        groq_client=DummyGroqClient(),
+    )
+
+    with pytest.raises(ValueError, match="Project not found"):
+        await service.generate_test(session=None, project_id=999, prompt="Gerar teste")
 
 
 @pytest.mark.asyncio
@@ -172,6 +202,72 @@ async def test_generate_test_raises_llm_unavailable_on_api_connection_error(tmp_
         await service.generate_test(session=None, project_id=1, prompt="Gerar teste")
 
     assert test_repo.updated_statuses[-1] == "failed"
+
+
+@pytest.mark.asyncio
+async def test_generate_test_uses_scanned_page_structure(tmp_path) -> None:
+    settings.STATIC_DIR = str(tmp_path)
+    project = Project(id=1, name="Projeto", description="Desc", test_directory=str(tmp_path), url="https://example.com")
+    test_repo = DummyTestRepository()
+    groq_client = CapturingGroqClient()
+    service = TestService(
+        test_repository=test_repo,
+        project_repository=DummyProjectRepository(project),
+        groq_client=groq_client,
+        element_scanner=SuccessfulScanService(),
+    )
+
+    generated = await service.generate_test(session=None, project_id=1, prompt="Gerar teste")
+
+    assert generated.id == 99
+    assert groq_client.captured_page_structure == {"title": "Page"}
+
+
+@pytest.mark.asyncio
+async def test_generate_test_reraises_unexpected_llm_exception(tmp_path) -> None:
+    settings.STATIC_DIR = str(tmp_path)
+    project = Project(id=1, name="Projeto", description="Desc", test_directory=str(tmp_path), url=None)
+    test_repo = DummyTestRepository()
+    service = TestService(
+        test_repository=test_repo,
+        project_repository=DummyProjectRepository(project),
+        groq_client=UnexpectedFailingGroqClient(),
+        element_scanner=SuccessfulScanService(),
+    )
+
+    with pytest.raises(UnexpectedLLMError, match="unexpected"):
+        await service.generate_test(session=None, project_id=1, prompt="Gerar teste")
+
+
+@pytest.mark.asyncio
+async def test_list_generated_tests_by_project_success() -> None:
+    project = Project(id=1, name="Projeto", description="Desc")
+    test_repo = DummyTestRepository()
+    service = TestService(
+        test_repository=test_repo,
+        project_repository=DummyProjectRepository(project),
+        groq_client=DummyGroqClient(),
+    )
+
+    items = await service.list_generated_tests_by_project(session=None, project_id=1)
+
+    assert items == ["dummy"]
+
+
+@pytest.mark.asyncio
+async def test_get_generated_test_passthrough() -> None:
+    generated = type("Generated", (), {"id": 7})()
+    test_repo = DummyTestRepository()
+    test_repo.generated_to_return = generated
+    service = TestService(
+        test_repository=test_repo,
+        project_repository=DummyProjectRepository(None),
+        groq_client=DummyGroqClient(),
+    )
+
+    found = await service.get_generated_test(session=None, test_id=7)
+
+    assert found is generated
 
 
 @pytest.mark.asyncio
@@ -236,3 +332,71 @@ def test_sanitize_robot_output_filters_noise_and_normalizes_library() -> None:
     assert "Library    Browser" in cleaned
     assert "Observação" not in cleaned
     assert "** nota" not in cleaned
+
+
+def test_sanitize_robot_output_hardens_strict_mode_selector_from_context() -> None:
+    service = TestService(groq_client=DummyGroqClient())
+    content = (
+        "*** Settings ***\n"
+        "Library    Browser\n"
+        "*** Test Cases ***\n"
+        "Caso\n"
+        "    Wait For Elements State    css=.card-title    visible    10\n"
+        "    Click    css=.card-title\n"
+    )
+    context = "strict mode violation: locator('.card-title') resolved to 9 elements"
+
+    cleaned = service._sanitize_robot_output(content, context=context)
+
+    assert "css=.card-title >> nth=0" in cleaned
+
+
+def test_sanitize_robot_output_converts_open_browser_and_invalid_selector_prefixes() -> None:
+    service = TestService(groq_client=DummyGroqClient())
+    content = (
+        "*** Settings ***\n"
+        "Library    Browser\n"
+        "*** Test Cases ***\n"
+        "Caso\n"
+        "    Open Browser    https://example.com    browser=chrome\n"
+        "    Click    id:login\n"
+        "    Wait For Elements State    xpath://button[@type='submit']    visible    10\n"
+    )
+
+    cleaned = service._sanitize_robot_output(content)
+
+    assert "New Browser    chromium" in cleaned
+    assert "New Context" in cleaned
+    assert "New Page    https://example.com" in cleaned
+    assert "Click    css=#login" in cleaned
+    assert "Wait For Elements State    xpath=//button[@type='submit']" in cleaned
+
+
+def test_sanitize_robot_output_applies_strict_mode_on_non_class_selector() -> None:
+    service = TestService(groq_client=DummyGroqClient())
+    content = (
+        "*** Settings ***\n"
+        "Library    Browser\n"
+        "*** Test Cases ***\n"
+        "Caso\n"
+        "    Click    css=#login\n"
+    )
+    context = "strict mode violation: locator('#login') resolved to 2 elements"
+
+    cleaned = service._sanitize_robot_output(content, context=context)
+
+    assert "Click    css=#login >> nth=0" in cleaned
+
+
+def test_normalize_selector_covers_css_and_dot_prefixes() -> None:
+    service = TestService(groq_client=DummyGroqClient())
+
+    assert service._normalize_selector("css:.btn-primary") == "css=.btn-primary"
+    assert service._normalize_selector(".card-title") == "css=.card-title"
+
+
+def test_make_selector_unique_covers_already_unique_and_non_css() -> None:
+    service = TestService(groq_client=DummyGroqClient())
+
+    assert service._make_selector_unique("css=.card-title >> nth=0") == "css=.card-title >> nth=0"
+    assert service._make_selector_unique("xpath=//button") == "xpath=//button"

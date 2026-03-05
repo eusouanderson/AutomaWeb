@@ -85,7 +85,7 @@ def test_groq_client_generate_with_cache() -> None:
 
 
 def test_groq_client_initialization_insecure_skip_verify() -> None:
-    from unittest.mock import patch
+    from unittest.mock import MagicMock, patch
     from app.llm.groq_client import GroqClient
 
     with patch.dict("os.environ", {"GROQ_API_KEY": "test_key"}):
@@ -99,13 +99,14 @@ def test_groq_client_initialization_insecure_skip_verify() -> None:
 
         with patch("app.llm.groq_client.settings", settings):
             with patch("app.llm.groq_client.httpx.Client") as mock_http_client:
-                GroqClient()
+                with patch("app.llm.groq_client.Groq", return_value=MagicMock()):
+                    GroqClient()
 
                 assert mock_http_client.call_args.kwargs["verify"] is False
 
 
 def test_groq_client_initialization_with_ca_bundle() -> None:
-    from unittest.mock import patch
+    from unittest.mock import MagicMock, patch
     from app.llm.groq_client import GroqClient
 
     with patch.dict("os.environ", {"GROQ_API_KEY": "test_key"}):
@@ -119,7 +120,8 @@ def test_groq_client_initialization_with_ca_bundle() -> None:
 
         with patch("app.llm.groq_client.settings", settings):
             with patch("app.llm.groq_client.httpx.Client") as mock_http_client:
-                GroqClient()
+                with patch("app.llm.groq_client.Groq", return_value=MagicMock()):
+                    GroqClient()
 
                 assert mock_http_client.call_args.kwargs["verify"] == "/etc/ssl/custom-ca.pem"
 

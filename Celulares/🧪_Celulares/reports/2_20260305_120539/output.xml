@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot generator="Robot 7.4.2 (Python 3.12.3 on linux)" generated="2026-03-05T12:05:39.452484" rpa="false" schemaversion="5">
+<suite id="s1" name="Generated Test 28" source="/home/eusouanderson/treino/AutomaWeb/Celulares/🧪_Celulares/generated_test_28.robot">
+<kw name="New Browser" owner="Browser" type="SETUP">
+<msg time="2026-03-05T12:05:39.554111" level="INFO">{"browser": "chromium", "headless": true, "chromiumSandbox": false, "devtools": false, "handleSIGHUP": true, "handleSIGINT": true, "handleSIGTERM": true, "slowMo": 0.0, "timeout": 30000.0, "tracesDir": "/home/eusouanderson/treino/AutomaWeb/Celulares/\ud83e\uddea_Celulares/reports/2_20260305_120539/browser/traces/temp/fec79c7b-ae0c-4d17-9d49-fabf11d5024e"}</msg>
+<msg time="2026-03-05T12:05:39.557519" level="INFO">Starting Browser process /home/eusouanderson/.cache/pypoetry/virtualenvs/automaweb-s9FmxQLL-py3.12/lib/python3.12/site-packages/Browser/wrapper/index.js using at 127.0.0.1:48543</msg>
+<msg time="2026-03-05T12:05:40.042777" level="INFO">Successfully created browser with options: {"browser":"chromium","headless":true,"chromiumSandbox":false,"devtools":false,"handleSIGHUP":true,"handleSIGINT":true,"handleSIGTERM":true,"slowMo":0,"timeout":30000,"tracesDir":"/home/eusouanderson/treino/AutomaWeb/Celulares/🧪_Celulares/reports/2_20260305_120539/browser/traces/temp/fec79c7b-ae0c-4d17-9d49-fabf11d5024e"}</msg>
+<arg>chromium</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Create a new playwright Browser with specified options.</doc>
+<status status="PASS" start="2026-03-05T12:05:39.553599" elapsed="0.489387"/>
+</kw>
+<test id="s1-t1" name="Abrir Navegador E Navegar Entre Elementos" line="12">
+<kw name="New Context" owner="Browser">
+<msg time="2026-03-05T12:05:40.050182" level="INFO">{
+  "acceptDownloads": true,
+  "bypassCSP": false,
+  "forcedColors": "none",
+  "ignoreHTTPSErrors": false,
+  "javaScriptEnabled": true,
+  "offline": false,
+  "reducedMotion": "no-preference",
+  "serviceWorkers": "allow",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  }
+}</msg>
+<msg time="2026-03-05T12:05:40.061920" level="INFO">Successfully created context. </msg>
+<msg time="2026-03-05T12:05:40.061988" level="INFO">{'acceptDownloads': True, 'bypassCSP': False, 'forcedColors': 'none', 'ignoreHTTPSErrors': False, 'javaScriptEnabled': True, 'offline': False, 'reducedMotion': 'no-preference', 'serviceWorkers': 'allow', 'viewport': {'width': 1280, 'height': 720}}</msg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Create a new BrowserContext with specified options.</doc>
+<status status="PASS" start="2026-03-05T12:05:40.048431" elapsed="0.013619"/>
+</kw>
+<kw name="New Page" owner="Browser">
+<msg time="2026-03-05T12:05:41.317505" level="INFO">Successfully initialized new page object and opened url: https://www.demoblaze.com/</msg>
+<arg>${url}</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Open a new Page.</doc>
+<status status="PASS" start="2026-03-05T12:05:40.062197" elapsed="1.255464"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<msg time="2026-03-05T12:05:42.166153" level="INFO">Waited for Element with selector css=.card-title &gt;&gt; nth=0 at state visible</msg>
+<arg>css=.card-title &gt;&gt; nth=0</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="PASS" start="2026-03-05T12:05:41.317821" elapsed="0.848542"/>
+</kw>
+<kw name="Click" owner="Browser">
+<msg time="2026-03-05T12:05:42.167341" level="INFO">Clicks the element 'css=.card-title:nth-child(1) &gt;&gt; nth=0'.</msg>
+<arg>css=.card-title:nth-child(1) &gt;&gt; nth=0</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Simulates mouse click on the element found by ``selector``.</doc>
+<status status="PASS" start="2026-03-05T12:05:42.166606" elapsed="0.213947"/>
+</kw>
+<kw name="Get Title" owner="Browser">
+<msg time="2026-03-05T12:05:42.405064" level="INFO">Title: 'STORE'</msg>
+<msg time="2026-03-05T12:05:42.405208" level="INFO">${titulo_obtido} = STORE</msg>
+<var>${titulo_obtido}</var>
+<tag>Assertion</tag>
+<tag>Getter</tag>
+<tag>PageContent</tag>
+<doc>Returns the title of the current page.</doc>
+<status status="PASS" start="2026-03-05T12:05:42.380721" elapsed="0.024507"/>
+</kw>
+<kw name="Should Be Equal" owner="BuiltIn">
+<arg>${titulo_obtido}</arg>
+<arg>${titulo}</arg>
+<doc>Fails if the given objects are unequal.</doc>
+<status status="PASS" start="2026-03-05T12:05:42.405373" elapsed="0.000318"/>
+</kw>
+<kw name="Close Context" owner="Browser" type="TEARDOWN">
+<msg time="2026-03-05T12:05:42.410296" level="INFO">Switching browser to CURRENT</msg>
+<msg time="2026-03-05T12:05:42.415801" level="INFO">Returned active browser id. CURRENT</msg>
+<msg time="2026-03-05T12:05:42.419697" level="INFO">Switching context to CURRENT in CURRENT</msg>
+<msg time="2026-03-05T12:05:42.425333" level="INFO">Returned active context id: CURRENT</msg>
+<msg time="2026-03-05T12:05:42.425802" level="INFO">Switching context to context=8ff71ef5-6c40-4c4e-be1c-eb0d2438b347 in CURRENT</msg>
+<msg time="2026-03-05T12:05:42.431785" level="INFO">Successfully changed active context: context=8ff71ef5-6c40-4c4e-be1c-eb0d2438b347</msg>
+<msg time="2026-03-05T12:05:42.438774" level="INFO">Successfully closed Context</msg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Closes a Context.</doc>
+<status status="PASS" start="2026-03-05T12:05:42.405822" elapsed="0.033149"/>
+</kw>
+<status status="PASS" start="2026-03-05T12:05:40.043155" elapsed="2.395903"/>
+</test>
+<test id="s1-t2" name="Abrir Navegador E Navegar Entre Elementos Com ID" line="20">
+<kw name="New Context" owner="Browser">
+<msg time="2026-03-05T12:05:42.446084" level="INFO">{
+  "acceptDownloads": true,
+  "bypassCSP": false,
+  "forcedColors": "none",
+  "ignoreHTTPSErrors": false,
+  "javaScriptEnabled": true,
+  "offline": false,
+  "reducedMotion": "no-preference",
+  "serviceWorkers": "allow",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  }
+}</msg>
+<msg time="2026-03-05T12:05:42.450564" level="INFO">Successfully created context. </msg>
+<msg time="2026-03-05T12:05:42.450629" level="INFO">{'acceptDownloads': True, 'bypassCSP': False, 'forcedColors': 'none', 'ignoreHTTPSErrors': False, 'javaScriptEnabled': True, 'offline': False, 'reducedMotion': 'no-preference', 'serviceWorkers': 'allow', 'viewport': {'width': 1280, 'height': 720}}</msg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Create a new BrowserContext with specified options.</doc>
+<status status="PASS" start="2026-03-05T12:05:42.445297" elapsed="0.005384"/>
+</kw>
+<kw name="New Page" owner="Browser">
+<msg time="2026-03-05T12:05:43.555799" level="INFO">Successfully initialized new page object and opened url: https://www.demoblaze.com/</msg>
+<arg>${url}</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Open a new Page.</doc>
+<status status="PASS" start="2026-03-05T12:05:42.450872" elapsed="1.105347"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<msg time="2026-03-05T12:05:53.683575" level="INFO" html="true">&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td colspan="3"&gt;&lt;a href="browser/screenshot/fail-screenshot-1.png" target="_blank"&gt;&lt;img src="browser/screenshot/fail-screenshot-1.png" width="800px"/&gt;&lt;/a&gt;</msg>
+<msg time="2026-03-05T12:05:53.683705" level="INFO">See also file:///home/eusouanderson/treino/AutomaWeb/Celulares/%F0%9F%A7%AA_Celulares/reports/2_20260305_120539/playwright-log.txt for additional details.</msg>
+<msg time="2026-03-05T12:05:53.683946" level="FAIL">Error: locator.waitFor: Error: strict mode violation: locator('#itemc') resolved to 3 elements:
+    1) &lt;a href="#" id="itemc" class="list-group-item" onclick="byCat('phone')"&gt;Phones&lt;/a&gt; aka getByRole('link', { name: 'Phones' })
+    2) &lt;a href="#" id="itemc" class="list-group-item" onclick="byCat('notebook')"&gt;Laptops&lt;/a&gt; aka getByRole('link', { name: 'Laptops' })
+    3) &lt;a href="#" id="itemc" class="list-group-item" onclick="byCat('monitor')"&gt;Monitors&lt;/a&gt; aka getByRole('link', { name: 'Monitors' })
+
+Call log:
+  - waiting for locator('#itemc') to be visible
+</msg>
+<arg>css=#itemc</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="FAIL" start="2026-03-05T12:05:43.556689" elapsed="10.128768">Error: locator.waitFor: Error: strict mode violation: locator('#itemc') resolved to 3 elements:
+    1) &lt;a href="#" id="itemc" class="list-group-item" onclick="byCat('phone')"&gt;Phones&lt;/a&gt; aka getByRole('link', { name: 'Phones' })
+    2) &lt;a href="#" id="itemc" class="list-group-item" onclick="byCat('notebook')"&gt;Laptops&lt;/a&gt; aka getByRole('link', { name: 'Laptops' })
+    3) &lt;a href="#" id="itemc" class="list-group-item" onclick="byCat('monitor')"&gt;Monitors&lt;/a&gt; aka getByRole('link', { name: 'Monitors' })
+
+Call log:
+  - waiting for locator('#itemc') to be visible
+</status>
+</kw>
+<kw name="Click" owner="Browser">
+<arg>css=#itemc</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Simulates mouse click on the element found by ``selector``.</doc>
+<status status="NOT RUN" start="2026-03-05T12:05:53.685610" elapsed="0.000064"/>
+</kw>
+<kw name="Get Title" owner="Browser">
+<var>${titulo_obtido}</var>
+<tag>Assertion</tag>
+<tag>Getter</tag>
+<tag>PageContent</tag>
+<doc>Returns the title of the current page.</doc>
+<status status="NOT RUN" start="2026-03-05T12:05:53.685744" elapsed="0.000033"/>
+</kw>
+<kw name="Should Be Equal" owner="BuiltIn">
+<arg>${titulo_obtido}</arg>
+<arg>${titulo}</arg>
+<doc>Fails if the given objects are unequal.</doc>
+<status status="NOT RUN" start="2026-03-05T12:05:53.685840" elapsed="0.000031"/>
+</kw>
+<kw name="Close Context" owner="Browser" type="TEARDOWN">
+<msg time="2026-03-05T12:05:53.689906" level="INFO">Switching browser to CURRENT</msg>
+<msg time="2026-03-05T12:05:53.692085" level="INFO">Returned active browser id. CURRENT</msg>
+<msg time="2026-03-05T12:05:53.695661" level="INFO">Switching context to CURRENT in CURRENT</msg>
+<msg time="2026-03-05T12:05:53.700609" level="INFO">Returned active context id: CURRENT</msg>
+<msg time="2026-03-05T12:05:53.701079" level="INFO">Switching context to context=a4981744-e3cd-41e2-a6c1-fa07a56739dc in CURRENT</msg>
+<msg time="2026-03-05T12:05:53.706549" level="INFO">Successfully changed active context: context=a4981744-e3cd-41e2-a6c1-fa07a56739dc</msg>
+<msg time="2026-03-05T12:05:53.711556" level="INFO">Successfully closed Context</msg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Closes a Context.</doc>
+<status status="PASS" start="2026-03-05T12:05:53.686021" elapsed="0.025676"/>
+</kw>
+<status status="FAIL" start="2026-03-05T12:05:42.442447" elapsed="11.269327">Error: locator.waitFor: Error: strict mode violation: locator('#itemc') resolved to 3 elements:
+    1) &lt;a href="#" id="itemc" class="list-group-item" onclick="byCat('phone')"&gt;Phones&lt;/a&gt; aka getByRole('link', { name: 'Phones' })
+    2) &lt;a href="#" id="itemc" class="list-group-item" onclick="byCat('notebook')"&gt;Laptops&lt;/a&gt; aka getByRole('link', { name: 'Laptops' })
+    3) &lt;a href="#" id="itemc" class="list-group-item" onclick="byCat('monitor')"&gt;Monitors&lt;/a&gt; aka getByRole('link', { name: 'Monitors' })
+
+Call log:
+  - waiting for locator('#itemc') to be visible
+</status>
+</test>
+<test id="s1-t3" name="Abrir Navegador E Navegar Entre Elementos Com XPath" line="28">
+<kw name="New Context" owner="Browser">
+<msg time="2026-03-05T12:05:53.717692" level="INFO">{
+  "acceptDownloads": true,
+  "bypassCSP": false,
+  "forcedColors": "none",
+  "ignoreHTTPSErrors": false,
+  "javaScriptEnabled": true,
+  "offline": false,
+  "reducedMotion": "no-preference",
+  "serviceWorkers": "allow",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  }
+}</msg>
+<msg time="2026-03-05T12:05:53.722472" level="INFO">Successfully created context. </msg>
+<msg time="2026-03-05T12:05:53.722537" level="INFO">{'acceptDownloads': True, 'bypassCSP': False, 'forcedColors': 'none', 'ignoreHTTPSErrors': False, 'javaScriptEnabled': True, 'offline': False, 'reducedMotion': 'no-preference', 'serviceWorkers': 'allow', 'viewport': {'width': 1280, 'height': 720}}</msg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Create a new BrowserContext with specified options.</doc>
+<status status="PASS" start="2026-03-05T12:05:53.716448" elapsed="0.006142"/>
+</kw>
+<kw name="New Page" owner="Browser">
+<msg time="2026-03-05T12:05:54.836859" level="INFO">Successfully initialized new page object and opened url: https://www.demoblaze.com/</msg>
+<arg>${url}</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Open a new Page.</doc>
+<status status="PASS" start="2026-03-05T12:05:53.722726" elapsed="1.114312"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<msg time="2026-03-05T12:06:08.298269" level="INFO" html="true">&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td colspan="3"&gt;&lt;a href="browser/screenshot/fail-screenshot-2.png" target="_blank"&gt;&lt;img src="browser/screenshot/fail-screenshot-2.png" width="800px"/&gt;&lt;/a&gt;</msg>
+<msg time="2026-03-05T12:06:08.298391" level="INFO">See also file:///home/eusouanderson/treino/AutomaWeb/Celulares/%F0%9F%A7%AA_Celulares/reports/2_20260305_120539/playwright-log.txt for additional details.</msg>
+<msg time="2026-03-05T12:06:08.298493" level="FAIL">Error: locator.waitFor: Error: strict mode violation: locator('//*[@id="itemc"]') resolved to 3 elements:
+    1) &lt;a href="#" id="itemc" class="list-group-item" onclick="byCat('phone')"&gt;Phones&lt;/a&gt; aka getByRole('link', { name: 'Phones' })
+    2) &lt;a href="#" id="itemc" class="list-group-item" onclick="byCat('notebook')"&gt;Laptops&lt;/a&gt; aka getByRole('link', { name: 'Laptops' })
+    3) &lt;a href="#" id="itemc" class="list-group-item" onclick="byCat('monitor')"&gt;Monitors&lt;/a&gt; aka getByRole('link', { name: 'Monitors' })
+
+Call log:
+  - waiting for locator('//*[@id="itemc"]') to be visible
+</msg>
+<arg>xpath=//*[@id="itemc"]</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="FAIL" start="2026-03-05T12:05:54.837232" elapsed="13.461780">Error: locator.waitFor: Error: strict mode violation: locator('//*[@id="itemc"]') resolved to 3 elements:
+    1) &lt;a href="#" id="itemc" class="list-group-item" onclick="byCat('phone')"&gt;Phones&lt;/a&gt; aka getByRole('link', { name: 'Phones' })
+    2) &lt;a href="#" id="itemc" class="list-group-item" onclick="byCat('notebook')"&gt;Laptops&lt;/a&gt; aka getByRole('link', { name: 'Laptops' })
+    3) &lt;a href="#" id="itemc" class="list-group-item" onclick="byCat('monitor')"&gt;Monitors&lt;/a&gt; aka getByRole('link', { name: 'Monitors' })
+
+Call log:
+  - waiting for locator('//*[@id="itemc"]') to be visible
+</status>
+</kw>
+<kw name="Click" owner="Browser">
+<arg>xpath=//*[@id="itemc"]</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Simulates mouse click on the element found by ``selector``.</doc>
+<status status="NOT RUN" start="2026-03-05T12:06:08.299199" elapsed="0.000070"/>
+</kw>
+<kw name="Get Title" owner="Browser">
+<var>${titulo_obtido}</var>
+<tag>Assertion</tag>
+<tag>Getter</tag>
+<tag>PageContent</tag>
+<doc>Returns the title of the current page.</doc>
+<status status="NOT RUN" start="2026-03-05T12:06:08.299356" elapsed="0.000093"/>
+</kw>
+<kw name="Should Be Equal" owner="BuiltIn">
+<arg>${titulo_obtido}</arg>
+<arg>${titulo}</arg>
+<doc>Fails if the given objects are unequal.</doc>
+<status status="NOT RUN" start="2026-03-05T12:06:08.299537" elapsed="0.000036"/>
+</kw>
+<kw name="Close Context" owner="Browser" type="TEARDOWN">
+<msg time="2026-03-05T12:06:08.304866" level="INFO">Switching browser to CURRENT</msg>
+<msg time="2026-03-05T12:06:08.306513" level="INFO">Returned active browser id. CURRENT</msg>
+<msg time="2026-03-05T12:06:08.309293" level="INFO">Switching context to CURRENT in CURRENT</msg>
+<msg time="2026-03-05T12:06:08.313850" level="INFO">Returned active context id: CURRENT</msg>
+<msg time="2026-03-05T12:06:08.314356" level="INFO">Switching context to context=ab75394c-2027-465c-b73d-903399b44152 in CURRENT</msg>
+<msg time="2026-03-05T12:06:08.320043" level="INFO">Successfully changed active context: context=ab75394c-2027-465c-b73d-903399b44152</msg>
+<msg time="2026-03-05T12:06:08.325595" level="INFO">Successfully closed Context</msg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Closes a Context.</doc>
+<status status="PASS" start="2026-03-05T12:06:08.299727" elapsed="0.026043"/>
+</kw>
+<status status="FAIL" start="2026-03-05T12:05:53.714820" elapsed="14.611025">Error: locator.waitFor: Error: strict mode violation: locator('//*[@id="itemc"]') resolved to 3 elements:
+    1) &lt;a href="#" id="itemc" class="list-group-item" onclick="byCat('phone')"&gt;Phones&lt;/a&gt; aka getByRole('link', { name: 'Phones' })
+    2) &lt;a href="#" id="itemc" class="list-group-item" onclick="byCat('notebook')"&gt;Laptops&lt;/a&gt; aka getByRole('link', { name: 'Laptops' })
+    3) &lt;a href="#" id="itemc" class="list-group-item" onclick="byCat('monitor')"&gt;Monitors&lt;/a&gt; aka getByRole('link', { name: 'Monitors' })
+
+Call log:
+  - waiting for locator('//*[@id="itemc"]') to be visible
+</status>
+</test>
+<kw name="Close Browser" owner="Browser" type="TEARDOWN">
+<msg time="2026-03-05T12:06:08.354551" level="INFO">Closed browser</msg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Closes the current browser.</doc>
+<status status="PASS" start="2026-03-05T12:06:08.329122" elapsed="0.025587"/>
+</kw>
+<status status="FAIL" start="2026-03-05T12:05:39.453102" elapsed="28.901670"/>
+</suite>
+<statistics>
+<total>
+<stat pass="1" fail="2" skip="0">All Tests</stat>
+</total>
+<tag>
+</tag>
+<suite>
+<stat name="Generated Test 28" id="s1" pass="1" fail="2" skip="0">Generated Test 28</stat>
+</suite>
+</statistics>
+<errors>
+</errors>
+</robot>

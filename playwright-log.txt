@@ -1,0 +1,51 @@
+{"level":30,"time":"2026-03-05T16:50:25.055Z","pid":78719,"hostname":"6JFF9J3","msg":"Listening on 127.0.0.1:35285"}
+{"level":30,"time":"2026-03-05T16:50:25.077Z","pid":78719,"hostname":"6JFF9J3","msg":"Start of node method newBrowser"}
+{"level":30,"time":"2026-03-05T16:50:25.134Z","pid":78719,"hostname":"6JFF9J3","msg":"Adding browser to stack: chromium, version: 145.0.7632.6"}
+{"level":30,"time":"2026-03-05T16:50:25.135Z","pid":78719,"hostname":"6JFF9J3","msg":"Adding 0 contexts to browser"}
+{"level":30,"time":"2026-03-05T16:50:25.135Z","pid":78719,"hostname":"6JFF9J3","msg":"End of node method newBrowser"}
+{"level":30,"time":"2026-03-05T16:50:25.141Z","pid":78719,"hostname":"6JFF9J3","msg":"Start of node method newContext"}
+{"level":30,"time":"2026-03-05T16:50:25.141Z","pid":78719,"hostname":"6JFF9J3","msg":"Creating new context with options: {\"acceptDownloads\":true,\"bypassCSP\":false,\"forcedColors\":\"none\",\"ignoreHTTPSErrors\":false,\"javaScriptEnabled\":true,\"offline\":false,\"reducedMotion\":\"no-preference\",\"serviceWorkers\":\"allow\",\"viewport\":{\"width\":1280,\"height\":720}}"}
+{"level":30,"time":"2026-03-05T16:50:25.141Z","pid":78719,"hostname":"6JFF9J3","msg":"currentBrowser: {\"name\":\"chromium\",\"browser\":{\"_type\":\"Browser\",\"_guid\":\"browser@06179c8f9c97ff6ab9c7192ad9f892c8\"},\"headless\":true,\"_contextStack\":[],\"id\":\"browser=cc66548e-a0fc-4501-bdbf-5e9637a2ad70\"}"}
+{"level":30,"time":"2026-03-05T16:50:25.141Z","pid":78719,"hostname":"6JFF9J3","msg":"Trace file: "}
+{"level":30,"time":"2026-03-05T16:50:25.150Z","pid":78719,"hostname":"6JFF9J3","msg":"Setting default timeout for context context=0c1e6c25-f071-47d0-89b2-6333513f87c6 to 10000"}
+{"level":30,"time":"2026-03-05T16:50:25.150Z","pid":78719,"hostname":"6JFF9J3","msg":"Changed active context: context=0c1e6c25-f071-47d0-89b2-6333513f87c6"}
+{"level":30,"time":"2026-03-05T16:50:25.150Z","pid":78719,"hostname":"6JFF9J3","msg":"End of node method newContext"}
+{"level":30,"time":"2026-03-05T16:50:25.155Z","pid":78719,"hostname":"6JFF9J3","msg":"Start of node method newPage"}
+{"level":30,"time":"2026-03-05T16:50:25.156Z","pid":78719,"hostname":"6JFF9J3","msg":"currentBrowser: {\"name\":\"chromium\",\"browser\":{\"_type\":\"Browser\",\"_guid\":\"browser@06179c8f9c97ff6ab9c7192ad9f892c8\"},\"headless\":true,\"_contextStack\":[{\"id\":\"context=0c1e6c25-f071-47d0-89b2-6333513f87c6\",\"c\":{\"_type\":\"BrowserContext\",\"_guid\":\"browser-context@91114abba5c62c16f3d8f0463a3f819a\"},\"pageStack\":[],\"options\":{\"acceptDownloads\":true,\"bypassCSP\":false,\"forcedColors\":\"none\",\"ignoreHTTPSErrors\":false,\"javaScriptEnabled\":true,\"offline\":false,\"reducedMotion\":\"no-preference\",\"serviceWorkers\":\"allow\",\"viewport\":{\"width\":1280,\"height\":720}},\"traceFile\":\"\"}],\"id\":\"browser=cc66548e-a0fc-4501-bdbf-5e9637a2ad70\"}"}
+{"level":30,"time":"2026-03-05T16:50:25.187Z","pid":78719,"hostname":"6JFF9J3","msg":"Video path: undefined"}
+{"level":30,"time":"2026-03-05T16:50:25.187Z","pid":78719,"hostname":"6JFF9J3","msg":"Changed active page"}
+{"level":30,"time":"2026-03-05T16:50:25.762Z","pid":78719,"hostname":"6JFF9J3","msg":"End of node method newPage"}
+{"level":30,"time":"2026-03-05T16:50:25.767Z","pid":78719,"hostname":"6JFF9J3","msg":"Start of node method waitForElementState"}
+{"level":30,"time":"2026-03-05T16:50:25.768Z","pid":78719,"hostname":"6JFF9J3","msg":"Strict mode is enabled, find Locator with css=input[name=\"q\"] in page."}
+{"level":30,"time":"2026-03-05T16:50:35.771Z","pid":78719,"hostname":"6JFF9J3","msg":"Error of node method  waitForElementState"}
+================= Original suppressed error =================
+locator.waitFor: Timeout 10000ms exceeded.
+Call log:
+[2m  - waiting for locator('input[name="q"]') to be visible[22m
+
+    at waitForElementState (/home/eusouanderson/.cache/pypoetry/virtualenvs/automaweb-s9FmxQLL-py3.12/lib/python3.12/site-packages/Browser/wrapper/index.js:11721:19)
+    at async PlaywrightServer.waitForElementsState (/home/eusouanderson/.cache/pypoetry/virtualenvs/automaweb-s9FmxQLL-py3.12/lib/python3.12/site-packages/Browser/wrapper/index.js:13635:28) {
+  name: 'TimeoutError'
+}
+=============================================================
+{"level":30,"time":"2026-03-05T16:50:35.795Z","pid":78719,"hostname":"6JFF9J3","msg":"Start of node method takeScreenshot"}
+{"level":30,"time":"2026-03-05T16:50:35.795Z","pid":78719,"hostname":"6JFF9J3","Take screenshot with options: ":{"path":"/home/eusouanderson/treino/AutomaWeb/browser/screenshot/fail-screenshot-1.png","fileType":"png","fullPage":false,"timeout":10000,"omitBackground":false}}
+{"level":30,"time":"2026-03-05T16:50:35.831Z","pid":78719,"hostname":"6JFF9J3","msg":"End of node method takeScreenshot"}
+{"level":30,"time":"2026-03-05T16:50:35.839Z","pid":78719,"hostname":"6JFF9J3","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-03-05T16:50:35.842Z","pid":78719,"hostname":"6JFF9J3","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-03-05T16:50:35.844Z","pid":78719,"hostname":"6JFF9J3","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-03-05T16:50:35.846Z","pid":78719,"hostname":"6JFF9J3","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-03-05T16:50:35.848Z","pid":78719,"hostname":"6JFF9J3","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-03-05T16:50:35.850Z","pid":78719,"hostname":"6JFF9J3","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-03-05T16:50:35.853Z","pid":78719,"hostname":"6JFF9J3","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-03-05T16:50:35.855Z","pid":78719,"hostname":"6JFF9J3","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-03-05T16:50:35.857Z","pid":78719,"hostname":"6JFF9J3","msg":"Changed active context: context=0c1e6c25-f071-47d0-89b2-6333513f87c6"}
+{"level":30,"time":"2026-03-05T16:50:35.857Z","pid":78719,"hostname":"6JFF9J3","msg":"Changing current active page: page=ed079655-ba5c-4a1d-a238-a2796a7e79e8"}
+{"level":30,"time":"2026-03-05T16:50:35.857Z","pid":78719,"hostname":"6JFF9J3","msg":"Changed active page"}
+{"level":30,"time":"2026-03-05T16:50:35.859Z","pid":78719,"hostname":"6JFF9J3","msg":"Start of node method closeContext"}
+{"level":30,"time":"2026-03-05T16:50:35.863Z","pid":78719,"hostname":"6JFF9J3","msg":"Removed page=00d392c7-9f53-46f0-99e2-beb846701138 from context=0c1e6c25-f071-47d0-89b2-6333513f87c6 page stack"}
+{"level":30,"time":"2026-03-05T16:50:35.865Z","pid":78719,"hostname":"6JFF9J3","msg":"End of node method closeContext"}
+{"level":30,"time":"2026-03-05T16:50:35.870Z","pid":78719,"hostname":"6JFF9J3","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-03-05T16:50:35.870Z","pid":78719,"hostname":"6JFF9J3","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-03-05T16:50:35.885Z","pid":78719,"hostname":"6JFF9J3","msg":"Start of node method closeAllBrowsers"}
+{"level":30,"time":"2026-03-05T16:50:35.903Z","pid":78719,"hostname":"6JFF9J3","msg":"End of node method closeAllBrowsers"}

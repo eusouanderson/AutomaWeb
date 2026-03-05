@@ -15,7 +15,6 @@ from app.schemas.scan import ScanResult
 
 ProgressCallback = Callable[[str], Awaitable[None]]
 
-
 class ElementScannerError(Exception):
     """Raised when page scan fails."""
 

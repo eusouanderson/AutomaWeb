@@ -81,7 +81,19 @@ class GroqClient:
             "Responda SOMENTE com código Robot Framework válido. "
             "Não inclua explicações, observações, markdown, nem texto fora das seções do Robot. "
             "Use apenas as seções: *** Settings ***, *** Variables ***, *** Test Cases ***, *** Keywords ***. "
-            "Use 'Library    Browser' e NÃO use Playwright/PlaywrightLibrary."
+            "Use 'Library    Browser' e NÃO use Playwright/PlaywrightLibrary. "
+            "Objetivo: gerar testes estáveis, executáveis e funcionais no Browser Library. "
+            "Regras obrigatórias: "
+            "1) NÃO use 'Open Browser'. Use sempre 'New Browser    chromium', 'New Context' e 'New Page'. "
+            "2) Inclua fechamento com 'Close Browser' via teardown (preferencialmente Test Teardown ou Suite Teardown). "
+            "3) Antes de qualquer ação, faça espera explícita com 'Wait For Elements State' (visible/attached) com timeout entre 10-15s. "
+            "4) Use seletores válidos do Browser Library: 'css=#id', 'css=.class', 'css=[attr=\"v\"]', 'xpath=...'. "
+            "5) NÃO use o formato inválido 'id:algo'. "
+            "6) Prefira seletores estáveis: id, data-testid, name, aria-label. Evite xpath absoluto longo. "
+            "7) Para validação de título, use '${titulo}    Get Title' seguido de 'Should Be Equal'. "
+            "8) Mantenha o cenário solicitado pelo usuário, sem inventar passos fora do fluxo principal. "
+            "9) Gere comandos de navegação robustos (ex.: Go Back apenas após página de detalhe estar visível). "
+            "10) Se houver múltiplos casos, mantenha cada caso independente e reprodutível."
         )
         if page_structure:
             system_prompt = (

@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot generator="Robot 7.4.2 (Python 3.12.3 on linux)" generated="2026-03-05T13:46:15.965678" rpa="false" schemaversion="5">
+<suite id="s1" name="Generated Test 29" source="/home/eusouanderson/treino/AutomaWeb/Google/🧪_Google/generated_test_29.robot">
+<test id="s1-t1" name="Abrir Navegador E Navegar Entre Elementos" line="9">
+<kw name="New Browser" owner="Browser">
+<msg time="2026-03-05T13:46:16.079092" level="INFO">{"browser": "chromium", "headless": true, "chromiumSandbox": false, "devtools": false, "handleSIGHUP": true, "handleSIGINT": true, "handleSIGTERM": true, "slowMo": 0.0, "timeout": 30000.0, "tracesDir": "/home/eusouanderson/treino/AutomaWeb/Google/\ud83e\uddea_Google/reports/4_20260305_134535/browser/traces/temp/85e5b47f-d89e-48b0-84a0-2ed33ace040f"}</msg>
+<msg time="2026-03-05T13:46:16.082905" level="INFO">Starting Browser process /home/eusouanderson/.cache/pypoetry/virtualenvs/automaweb-s9FmxQLL-py3.12/lib/python3.12/site-packages/Browser/wrapper/index.js using at 127.0.0.1:39131</msg>
+<msg time="2026-03-05T13:46:16.693163" level="INFO">Successfully created browser with options: {"browser":"chromium","headless":true,"chromiumSandbox":false,"devtools":false,"handleSIGHUP":true,"handleSIGINT":true,"handleSIGTERM":true,"slowMo":0,"timeout":30000,"tracesDir":"/home/eusouanderson/treino/AutomaWeb/Google/🧪_Google/reports/4_20260305_134535/browser/traces/temp/85e5b47f-d89e-48b0-84a0-2ed33ace040f"}</msg>
+<arg>chromium</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Create a new playwright Browser with specified options.</doc>
+<status status="PASS" start="2026-03-05T13:46:16.078362" elapsed="0.615016"/>
+</kw>
+<kw name="New Context" owner="Browser">
+<msg time="2026-03-05T13:46:16.694916" level="INFO">{
+  "acceptDownloads": true,
+  "bypassCSP": false,
+  "forcedColors": "none",
+  "ignoreHTTPSErrors": false,
+  "javaScriptEnabled": true,
+  "offline": false,
+  "reducedMotion": "no-preference",
+  "serviceWorkers": "allow",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  }
+}</msg>
+<msg time="2026-03-05T13:46:16.708141" level="INFO">Successfully created context. </msg>
+<msg time="2026-03-05T13:46:16.708219" level="INFO">{'acceptDownloads': True, 'bypassCSP': False, 'forcedColors': 'none', 'ignoreHTTPSErrors': False, 'javaScriptEnabled': True, 'offline': False, 'reducedMotion': 'no-preference', 'serviceWorkers': 'allow', 'viewport': {'width': 1280, 'height': 720}}</msg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Create a new BrowserContext with specified options.</doc>
+<status status="PASS" start="2026-03-05T13:46:16.693687" elapsed="0.014616"/>
+</kw>
+<kw name="New Page" owner="Browser">
+<msg time="2026-03-05T13:46:17.370508" level="INFO">Successfully initialized new page object and opened url: https://www.google.com/</msg>
+<arg>${url}</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Open a new Page.</doc>
+<status status="PASS" start="2026-03-05T13:46:16.708538" elapsed="0.662180"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<msg time="2026-03-05T13:46:30.779539" level="INFO" html="true">&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td colspan="3"&gt;&lt;a href="browser/screenshot/fail-screenshot-1.png" target="_blank"&gt;&lt;img src="browser/screenshot/fail-screenshot-1.png" width="800px"/&gt;&lt;/a&gt;</msg>
+<msg time="2026-03-05T13:46:30.779672" level="INFO">See also file:///home/eusouanderson/treino/AutomaWeb/Google/%F0%9F%A7%AA_Google/reports/4_20260305_134535/playwright-log.txt for additional details.</msg>
+<msg time="2026-03-05T13:46:30.779923" level="FAIL">TimeoutError: locator.waitFor: Timeout 10000ms exceeded.
+Call log:
+  - waiting for locator('input[name="q"]') to be visible
+</msg>
+<arg>css=input[name="q"]</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="FAIL" start="2026-03-05T13:46:17.370883" elapsed="13.410748">TimeoutError: locator.waitFor: Timeout 10000ms exceeded.
+Call log:
+  - waiting for locator('input[name="q"]') to be visible
+</status>
+</kw>
+<kw name="Type Text" owner="Browser">
+<arg>css=input[name="q"]</arg>
+<arg>robot framework</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Types the given ``txt`` into the text field found by ``selector``.</doc>
+<status status="NOT RUN" start="2026-03-05T13:46:30.781847" elapsed="0.000080"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<arg>css=input[name="btnK"]</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="NOT RUN" start="2026-03-05T13:46:30.782010" elapsed="0.000037"/>
+</kw>
+<kw name="Click" owner="Browser">
+<arg>css=input[name="btnK"]</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Simulates mouse click on the element found by ``selector``.</doc>
+<status status="NOT RUN" start="2026-03-05T13:46:30.782126" elapsed="0.000039"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<arg>css=#rso</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="NOT RUN" start="2026-03-05T13:46:30.782222" elapsed="0.000029"/>
+</kw>
+<kw name="Get Title" owner="Browser">
+<var>${titulo pagina}</var>
+<tag>Assertion</tag>
+<tag>Getter</tag>
+<tag>PageContent</tag>
+<doc>Returns the title of the current page.</doc>
+<status status="NOT RUN" start="2026-03-05T13:46:30.782310" elapsed="0.000028"/>
+</kw>
+<kw name="Should Be Equal" owner="BuiltIn">
+<arg>${titulo pagina}</arg>
+<arg>${titulo}</arg>
+<doc>Fails if the given objects are unequal.</doc>
+<status status="NOT RUN" start="2026-03-05T13:46:30.782418" elapsed="0.000067"/>
+</kw>
+<kw name="Close Browser" owner="Browser">
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Closes the current browser.</doc>
+<status status="NOT RUN" start="2026-03-05T13:46:30.782568" elapsed="0.000031"/>
+</kw>
+<msg time="2026-03-05T13:46:30.800373" level="INFO">Switching context to context=5e6a8bc5-aed8-4be8-88c3-94cbc0fe3757 in CURRENT</msg>
+<msg time="2026-03-05T13:46:30.807988" level="INFO">Successfully changed active context: context=5e6a8bc5-aed8-4be8-88c3-94cbc0fe3757</msg>
+<msg time="2026-03-05T13:46:30.815976" level="INFO">Successfully closed Context</msg>
+<status status="FAIL" start="2026-03-05T13:46:16.077474" elapsed="14.705272">TimeoutError: locator.waitFor: Timeout 10000ms exceeded.
+Call log:
+  - waiting for locator('input[name="q"]') to be visible
+</status>
+</test>
+<status status="FAIL" start="2026-03-05T13:46:15.966415" elapsed="14.850107"/>
+</suite>
+<statistics>
+<total>
+<stat pass="0" fail="1" skip="0">All Tests</stat>
+</total>
+<tag>
+</tag>
+<suite>
+<stat name="Generated Test 29" id="s1" pass="0" fail="1" skip="0">Generated Test 29</stat>
+</suite>
+</statistics>
+<errors>
+</errors>
+</robot>

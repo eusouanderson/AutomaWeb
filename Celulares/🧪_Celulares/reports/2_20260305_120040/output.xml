@@ -1,0 +1,390 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot generator="Robot 7.4.2 (Python 3.12.3 on linux)" generated="2026-03-05T12:00:40.440493" rpa="false" schemaversion="5">
+<suite id="s1" name="Generated Test 26" source="/home/eusouanderson/treino/AutomaWeb/Celulares/🧪_Celulares/generated_test_26.robot">
+<test id="s1-t1" name="Abrir Navegador E Navegar Entre Elementos" line="10">
+<kw name="New Browser" owner="Browser">
+<msg time="2026-03-05T12:00:40.576308" level="INFO">{"browser": "chromium", "headless": true, "chromiumSandbox": false, "devtools": false, "handleSIGHUP": true, "handleSIGINT": true, "handleSIGTERM": true, "slowMo": 0.0, "timeout": 30000.0, "tracesDir": "/home/eusouanderson/treino/AutomaWeb/Celulares/\ud83e\uddea_Celulares/reports/2_20260305_120040/browser/traces/temp/ab012ae7-0968-4df1-9fb4-a5f9348530b8"}</msg>
+<msg time="2026-03-05T12:00:40.581008" level="INFO">Starting Browser process /home/eusouanderson/.cache/pypoetry/virtualenvs/automaweb-s9FmxQLL-py3.12/lib/python3.12/site-packages/Browser/wrapper/index.js using at 127.0.0.1:46123</msg>
+<msg time="2026-03-05T12:00:41.192452" level="INFO">Successfully created browser with options: {"browser":"chromium","headless":true,"chromiumSandbox":false,"devtools":false,"handleSIGHUP":true,"handleSIGINT":true,"handleSIGTERM":true,"slowMo":0,"timeout":30000,"tracesDir":"/home/eusouanderson/treino/AutomaWeb/Celulares/🧪_Celulares/reports/2_20260305_120040/browser/traces/temp/ab012ae7-0968-4df1-9fb4-a5f9348530b8"}</msg>
+<arg>chromium</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Create a new playwright Browser with specified options.</doc>
+<status status="PASS" start="2026-03-05T12:00:40.575346" elapsed="0.617261"/>
+</kw>
+<kw name="New Context" owner="Browser">
+<msg time="2026-03-05T12:00:41.194076" level="INFO">{
+  "acceptDownloads": true,
+  "bypassCSP": false,
+  "forcedColors": "none",
+  "ignoreHTTPSErrors": false,
+  "javaScriptEnabled": true,
+  "offline": false,
+  "reducedMotion": "no-preference",
+  "serviceWorkers": "allow",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  }
+}</msg>
+<msg time="2026-03-05T12:00:41.207321" level="INFO">Successfully created context. </msg>
+<msg time="2026-03-05T12:00:41.207443" level="INFO">{'acceptDownloads': True, 'bypassCSP': False, 'forcedColors': 'none', 'ignoreHTTPSErrors': False, 'javaScriptEnabled': True, 'offline': False, 'reducedMotion': 'no-preference', 'serviceWorkers': 'allow', 'viewport': {'width': 1280, 'height': 720}}</msg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Create a new BrowserContext with specified options.</doc>
+<status status="PASS" start="2026-03-05T12:00:41.192885" elapsed="0.014675"/>
+</kw>
+<kw name="New Page" owner="Browser">
+<msg time="2026-03-05T12:00:42.415934" level="INFO">Successfully initialized new page object and opened url: https://www.demoblaze.com/</msg>
+<arg>${URL}</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Open a new Page.</doc>
+<status status="PASS" start="2026-03-05T12:00:41.207840" elapsed="1.208297"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<msg time="2026-03-05T12:00:43.269914" level="INFO">Waited for Element with selector css=.card-title &gt;&gt; nth=0 at state visible</msg>
+<arg>css=.card-title &gt;&gt; nth=0</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="PASS" start="2026-03-05T12:00:42.416323" elapsed="0.853720"/>
+</kw>
+<kw name="Click" owner="Browser">
+<msg time="2026-03-05T12:00:43.270561" level="INFO">Clicks the element 'css=.card-title:nth-of-type(1)'.</msg>
+<msg time="2026-03-05T12:00:43.402277" level="INFO" html="true">&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td colspan="3"&gt;&lt;a href="browser/screenshot/fail-screenshot-1.png" target="_blank"&gt;&lt;img src="browser/screenshot/fail-screenshot-1.png" width="800px"/&gt;&lt;/a&gt;</msg>
+<msg time="2026-03-05T12:00:43.402400" level="INFO">See also file:///home/eusouanderson/treino/AutomaWeb/Celulares/%F0%9F%A7%AA_Celulares/reports/2_20260305_120040/playwright-log.txt for additional details.</msg>
+<msg time="2026-03-05T12:00:43.402659" level="FAIL">Error: locator.click: Error: strict mode violation: locator('.card-title:nth-of-type(1)') resolved to 9 elements:
+    1) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'Samsung galaxy s6' })
+    2) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'Nokia lumia' })
+    3) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'Nexus' })
+    4) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'Samsung galaxy s7' })
+    5) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'Iphone 6 32gb' })
+    6) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'Sony xperia z5' })
+    7) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'HTC One M9' })
+    8) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'Sony vaio i5' })
+    9) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'Sony vaio i7' })
+
+Call log:
+  - waiting for locator('.card-title:nth-of-type(1)')
+</msg>
+<arg>css=.card-title:nth-of-type(1)</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Simulates mouse click on the element found by ``selector``.</doc>
+<status status="FAIL" start="2026-03-05T12:00:43.270191" elapsed="0.134179">Error: locator.click: Error: strict mode violation: locator('.card-title:nth-of-type(1)') resolved to 9 elements:
+    1) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'Samsung galaxy s6' })
+    2) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'Nokia lumia' })
+    3) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'Nexus' })
+    4) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'Samsung galaxy s7' })
+    5) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'Iphone 6 32gb' })
+    6) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'Sony xperia z5' })
+    7) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'HTC One M9' })
+    8) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'Sony vaio i5' })
+    9) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'Sony vaio i7' })
+
+Call log:
+  - waiting for locator('.card-title:nth-of-type(1)')
+</status>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<arg>css=.card-title &gt;&gt; nth=0</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="NOT RUN" start="2026-03-05T12:00:43.404523" elapsed="0.000065"/>
+</kw>
+<kw name="Get Title" owner="Browser">
+<var>${titulo_atual}</var>
+<tag>Assertion</tag>
+<tag>Getter</tag>
+<tag>PageContent</tag>
+<doc>Returns the title of the current page.</doc>
+<status status="NOT RUN" start="2026-03-05T12:00:43.404659" elapsed="0.000033"/>
+</kw>
+<kw name="Should Be Equal" owner="BuiltIn">
+<arg>${titulo_atual}</arg>
+<arg>${titulo}</arg>
+<doc>Fails if the given objects are unequal.</doc>
+<status status="NOT RUN" start="2026-03-05T12:00:43.404782" elapsed="0.000041"/>
+</kw>
+<kw name="Go Back" owner="Browser">
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Navigates to the previous page in history.</doc>
+<status status="NOT RUN" start="2026-03-05T12:00:43.404878" elapsed="0.000028"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<arg>css=.card-title &gt;&gt; nth=0</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="NOT RUN" start="2026-03-05T12:00:43.404964" elapsed="0.000028"/>
+</kw>
+<msg time="2026-03-05T12:00:43.420987" level="INFO">Switching context to context=e53345e5-9d0c-4bc5-acc1-de081eadd862 in CURRENT</msg>
+<msg time="2026-03-05T12:00:43.428492" level="INFO">Successfully changed active context: context=e53345e5-9d0c-4bc5-acc1-de081eadd862</msg>
+<msg time="2026-03-05T12:00:43.435543" level="INFO">Successfully closed Context</msg>
+<status status="FAIL" start="2026-03-05T12:00:40.574250" elapsed="2.830865">Error: locator.click: Error: strict mode violation: locator('.card-title:nth-of-type(1)') resolved to 9 elements:
+    1) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'Samsung galaxy s6' })
+    2) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'Nokia lumia' })
+    3) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'Nexus' })
+    4) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'Samsung galaxy s7' })
+    5) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'Iphone 6 32gb' })
+    6) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'Sony xperia z5' })
+    7) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'HTC One M9' })
+    8) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'Sony vaio i5' })
+    9) &lt;h4 class="card-title"&gt;…&lt;/h4&gt; aka getByRole('heading', { name: 'Sony vaio i7' })
+
+Call log:
+  - waiting for locator('.card-title:nth-of-type(1)')
+</status>
+</test>
+<test id="s1-t2" name="Abrir Navegador E Navegar Entre Elementos Com ID" line="22">
+<kw name="New Browser" owner="Browser">
+<msg time="2026-03-05T12:00:43.438935" level="INFO">Switching browser to browser=a60e08be-b8f1-4278-b6d2-4f7c0376e3ac</msg>
+<msg time="2026-03-05T12:00:43.440961" level="INFO">Successfully changed active browser: browser=a60e08be-b8f1-4278-b6d2-4f7c0376e3ac</msg>
+<msg time="2026-03-05T12:00:43.441068" level="INFO">Reusing existing browser with id: browser=a60e08be-b8f1-4278-b6d2-4f7c0376e3ac</msg>
+<arg>chromium</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Create a new playwright Browser with specified options.</doc>
+<status status="PASS" start="2026-03-05T12:00:43.438488" elapsed="0.002642"/>
+</kw>
+<kw name="New Context" owner="Browser">
+<msg time="2026-03-05T12:00:43.442742" level="INFO">{
+  "acceptDownloads": true,
+  "bypassCSP": false,
+  "forcedColors": "none",
+  "ignoreHTTPSErrors": false,
+  "javaScriptEnabled": true,
+  "offline": false,
+  "reducedMotion": "no-preference",
+  "serviceWorkers": "allow",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  }
+}</msg>
+<msg time="2026-03-05T12:00:43.447559" level="INFO">Successfully created context. </msg>
+<msg time="2026-03-05T12:00:43.447627" level="INFO">{'acceptDownloads': True, 'bypassCSP': False, 'forcedColors': 'none', 'ignoreHTTPSErrors': False, 'javaScriptEnabled': True, 'offline': False, 'reducedMotion': 'no-preference', 'serviceWorkers': 'allow', 'viewport': {'width': 1280, 'height': 720}}</msg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Create a new BrowserContext with specified options.</doc>
+<status status="PASS" start="2026-03-05T12:00:43.441341" elapsed="0.006340"/>
+</kw>
+<kw name="New Page" owner="Browser">
+<msg time="2026-03-05T12:00:44.848888" level="INFO">Successfully initialized new page object and opened url: https://www.demoblaze.com/</msg>
+<arg>${URL}</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Open a new Page.</doc>
+<status status="PASS" start="2026-03-05T12:00:43.447820" elapsed="1.401424"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<msg time="2026-03-05T12:00:44.876992" level="INFO">Waited for Element with selector css=#nava at state visible</msg>
+<arg>css=#nava</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="PASS" start="2026-03-05T12:00:44.849682" elapsed="0.027475"/>
+</kw>
+<kw name="Click" owner="Browser">
+<msg time="2026-03-05T12:00:44.878167" level="INFO">Clicks the element 'css=#nava'.</msg>
+<arg>css=#nava</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Simulates mouse click on the element found by ``selector``.</doc>
+<status status="PASS" start="2026-03-05T12:00:44.877487" elapsed="0.373457"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<msg time="2026-03-05T12:00:45.317428" level="INFO">Waited for Element with selector css=.nav-link &gt;&gt; nth=0 at state visible</msg>
+<arg>css=.nav-link &gt;&gt; nth=0</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="PASS" start="2026-03-05T12:00:45.251230" elapsed="0.066474"/>
+</kw>
+<kw name="Get Title" owner="Browser">
+<msg time="2026-03-05T12:00:45.323941" level="INFO">Title: 'STORE'</msg>
+<msg time="2026-03-05T12:00:45.324150" level="INFO">${titulo_atual} = STORE</msg>
+<var>${titulo_atual}</var>
+<tag>Assertion</tag>
+<tag>Getter</tag>
+<tag>PageContent</tag>
+<doc>Returns the title of the current page.</doc>
+<status status="PASS" start="2026-03-05T12:00:45.318180" elapsed="0.006002"/>
+</kw>
+<kw name="Should Be Equal" owner="BuiltIn">
+<arg>${titulo_atual}</arg>
+<arg>${titulo}</arg>
+<doc>Fails if the given objects are unequal.</doc>
+<status status="PASS" start="2026-03-05T12:00:45.324503" elapsed="0.000683"/>
+</kw>
+<kw name="Go Back" owner="Browser">
+<msg time="2026-03-05T12:00:45.367836" level="INFO">Did Go Back</msg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Navigates to the previous page in history.</doc>
+<status status="PASS" start="2026-03-05T12:00:45.325349" elapsed="0.042733"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<msg time="2026-03-05T12:00:45.397409" level="INFO">Waited for Element with selector css=.nav-link &gt;&gt; nth=0 at state visible</msg>
+<arg>css=.nav-link &gt;&gt; nth=0</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="PASS" start="2026-03-05T12:00:45.368347" elapsed="0.029370"/>
+</kw>
+<msg time="2026-03-05T12:00:45.414601" level="INFO">Switching context to context=17f874c7-a73e-4a9c-9b0e-927d10aba924 in CURRENT</msg>
+<msg time="2026-03-05T12:00:45.421089" level="INFO">Successfully changed active context: context=17f874c7-a73e-4a9c-9b0e-927d10aba924</msg>
+<msg time="2026-03-05T12:00:45.427821" level="INFO">Successfully closed Context</msg>
+<status status="PASS" start="2026-03-05T12:00:43.435927" elapsed="1.962074"/>
+</test>
+<test id="s1-t3" name="Abrir Navegador E Navegar Entre Elementos Com XPath" line="34">
+<kw name="New Browser" owner="Browser">
+<msg time="2026-03-05T12:00:45.431773" level="INFO">Switching browser to browser=a60e08be-b8f1-4278-b6d2-4f7c0376e3ac</msg>
+<msg time="2026-03-05T12:00:45.434517" level="INFO">Successfully changed active browser: browser=a60e08be-b8f1-4278-b6d2-4f7c0376e3ac</msg>
+<msg time="2026-03-05T12:00:45.434672" level="INFO">Reusing existing browser with id: browser=a60e08be-b8f1-4278-b6d2-4f7c0376e3ac</msg>
+<arg>chromium</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Create a new playwright Browser with specified options.</doc>
+<status status="PASS" start="2026-03-05T12:00:45.430970" elapsed="0.003782"/>
+</kw>
+<kw name="New Context" owner="Browser">
+<msg time="2026-03-05T12:00:45.436473" level="INFO">{
+  "acceptDownloads": true,
+  "bypassCSP": false,
+  "forcedColors": "none",
+  "ignoreHTTPSErrors": false,
+  "javaScriptEnabled": true,
+  "offline": false,
+  "reducedMotion": "no-preference",
+  "serviceWorkers": "allow",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  }
+}</msg>
+<msg time="2026-03-05T12:00:45.442796" level="INFO">Successfully created context. </msg>
+<msg time="2026-03-05T12:00:45.442903" level="INFO">{'acceptDownloads': True, 'bypassCSP': False, 'forcedColors': 'none', 'ignoreHTTPSErrors': False, 'javaScriptEnabled': True, 'offline': False, 'reducedMotion': 'no-preference', 'serviceWorkers': 'allow', 'viewport': {'width': 1280, 'height': 720}}</msg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Create a new BrowserContext with specified options.</doc>
+<status status="PASS" start="2026-03-05T12:00:45.435000" elapsed="0.007985"/>
+</kw>
+<kw name="New Page" owner="Browser">
+<msg time="2026-03-05T12:00:46.541972" level="INFO">Successfully initialized new page object and opened url: https://www.demoblaze.com/</msg>
+<arg>${URL}</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Open a new Page.</doc>
+<status status="PASS" start="2026-03-05T12:00:45.443276" elapsed="1.098987"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<msg time="2026-03-05T12:00:47.386464" level="INFO">Waited for Element with selector xpath=/html/body/div[5]/div/div[2]/div[1]/div[1]/div/a at state visible</msg>
+<arg>xpath=/html/body/div[5]/div/div[2]/div[1]/div[1]/div/a</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="PASS" start="2026-03-05T12:00:46.542642" elapsed="0.843973"/>
+</kw>
+<kw name="Click" owner="Browser">
+<msg time="2026-03-05T12:00:47.387426" level="INFO">Clicks the element 'xpath=/html/body/div[5]/div/div[2]/div[1]/div[1]/div/a'.</msg>
+<arg>xpath=/html/body/div[5]/div/div[2]/div[1]/div[1]/div/a</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Simulates mouse click on the element found by ``selector``.</doc>
+<status status="PASS" start="2026-03-05T12:00:47.386792" elapsed="0.180623"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<msg time="2026-03-05T12:00:57.670587" level="INFO" html="true">&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td colspan="3"&gt;&lt;a href="browser/screenshot/fail-screenshot-2.png" target="_blank"&gt;&lt;img src="browser/screenshot/fail-screenshot-2.png" width="800px"/&gt;&lt;/a&gt;</msg>
+<msg time="2026-03-05T12:00:57.670717" level="INFO">See also file:///home/eusouanderson/treino/AutomaWeb/Celulares/%F0%9F%A7%AA_Celulares/reports/2_20260305_120040/playwright-log.txt for additional details.</msg>
+<msg time="2026-03-05T12:00:57.670848" level="FAIL">TimeoutError: locator.waitFor: Timeout 10000ms exceeded.
+Call log:
+  - waiting for locator('xpath=/html/body/div[5]/div/div[2]/div[1]/div[1]/div/a') to be visible
+</msg>
+<arg>xpath=/html/body/div[5]/div/div[2]/div[1]/div[1]/div/a</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="FAIL" start="2026-03-05T12:00:47.567624" elapsed="10.104090">TimeoutError: locator.waitFor: Timeout 10000ms exceeded.
+Call log:
+  - waiting for locator('xpath=/html/body/div[5]/div/div[2]/div[1]/div[1]/div/a') to be visible
+</status>
+</kw>
+<kw name="Get Title" owner="Browser">
+<var>${titulo_atual}</var>
+<tag>Assertion</tag>
+<tag>Getter</tag>
+<tag>PageContent</tag>
+<doc>Returns the title of the current page.</doc>
+<status status="NOT RUN" start="2026-03-05T12:00:57.671871" elapsed="0.000066"/>
+</kw>
+<kw name="Should Be Equal" owner="BuiltIn">
+<arg>${titulo_atual}</arg>
+<arg>${titulo}</arg>
+<doc>Fails if the given objects are unequal.</doc>
+<status status="NOT RUN" start="2026-03-05T12:00:57.672014" elapsed="0.000060"/>
+</kw>
+<kw name="Go Back" owner="Browser">
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Navigates to the previous page in history.</doc>
+<status status="NOT RUN" start="2026-03-05T12:00:57.672140" elapsed="0.000033"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<arg>xpath=/html/body/div[5]/div/div[2]/div[1]/div[1]/div/a</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="NOT RUN" start="2026-03-05T12:00:57.672233" elapsed="0.000030"/>
+</kw>
+<msg time="2026-03-05T12:00:57.684604" level="INFO">Switching context to context=b323ad27-fb5d-49ba-9319-89eb3a75e139 in CURRENT</msg>
+<msg time="2026-03-05T12:00:57.689939" level="INFO">Successfully changed active context: context=b323ad27-fb5d-49ba-9319-89eb3a75e139</msg>
+<msg time="2026-03-05T12:00:57.695359" level="INFO">Successfully closed Context</msg>
+<status status="FAIL" start="2026-03-05T12:00:45.428267" elapsed="12.244106">TimeoutError: locator.waitFor: Timeout 10000ms exceeded.
+Call log:
+  - waiting for locator('xpath=/html/body/div[5]/div/div[2]/div[1]/div[1]/div/a') to be visible
+</status>
+</test>
+<kw name="Close Browser" owner="Browser" type="TEARDOWN">
+<msg time="2026-03-05T12:00:57.722872" level="INFO">Closed browser</msg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Closes the current browser.</doc>
+<status status="PASS" start="2026-03-05T12:00:57.696078" elapsed="0.026929"/>
+</kw>
+<status status="FAIL" start="2026-03-05T12:00:40.441457" elapsed="17.281612"/>
+</suite>
+<statistics>
+<total>
+<stat pass="1" fail="2" skip="0">All Tests</stat>
+</total>
+<tag>
+</tag>
+<suite>
+<stat name="Generated Test 26" id="s1" pass="1" fail="2" skip="0">Generated Test 26</stat>
+</suite>
+</statistics>
+<errors>
+</errors>
+</robot>

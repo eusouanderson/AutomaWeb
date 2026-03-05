@@ -16,7 +16,7 @@ function buildExecutionFeedback(data) {
 
   lines = lines.concat([
     '',
-    'Objetivo: manter o cenário original e ajustar seletores, esperas e fluxo para evitar falhas.'
+    'Objetivo: Corrigir os testes Robot Framework com base nos erros de execução.'
   ]);
   return lines.join('\n').slice(0, 6000);
 }

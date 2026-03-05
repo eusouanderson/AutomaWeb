@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.db.base import Base
 from app.models.project import Project
+from app.models import generated_test, test_request  # noqa: F401
 from app.services.project_service import ProjectService
 
 

@@ -1,5 +1,6 @@
 from datetime import datetime
 from pathlib import Path
+import subprocess
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -83,6 +84,42 @@ async def test_execute_tests_happy_path(tmp_path, monkeypatch) -> None:
     assert execution.status == "completed"
     assert execution.passed == 1
     assert execution.total_tests == 1
+
+
+@pytest.mark.asyncio
+async def test_execute_tests_runs_robot_non_interactive(tmp_path, monkeypatch) -> None:
+    settings.STATIC_DIR = str(tmp_path / "static")
+    project = _prepare_project(tmp_path)
+
+    service = TestExecutionService(
+        project_repository=DummyProjectRepo(project),
+        test_repository=DummyTestRepo(),
+    )
+
+    _create_robot_file(project)
+    call_kwargs = {}
+
+    def fake_run(*args, **kwargs):
+        call_kwargs.update(kwargs)
+
+        class Result:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        return Result()
+
+    async def fake_generate_mkdocs_report(project, output_dir, stats):
+        return None
+
+    monkeypatch.setattr(service, "_ensure_rfbrowser", lambda: None)
+    monkeypatch.setattr(service, "_parse_robot_output", lambda *_: {"total": 1, "passed": 1, "failed": 0, "skipped": 0})
+    monkeypatch.setattr(service, "_generate_mkdocs_report", fake_generate_mkdocs_report)
+    monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
+
+    await service.execute_tests(session=None, project_id=1)
+
+    assert call_kwargs.get("stdin") is subprocess.DEVNULL
 
 
 @pytest.mark.asyncio
@@ -325,6 +362,7 @@ def test_parse_robot_output_invalid_xml(tmp_path) -> None:
 
 def test_ensure_rfbrowser_handles_exception(monkeypatch) -> None:
     service = TestExecutionService()
+    TestExecutionService._rfbrowser_ready = False
 
     def fake_run(*args, **kwargs):
         raise RuntimeError("rfbrowser missing")
@@ -332,6 +370,51 @@ def test_ensure_rfbrowser_handles_exception(monkeypatch) -> None:
     monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
 
     service._ensure_rfbrowser()
+
+
+def test_ensure_rfbrowser_handles_wrapper_path_resolution_error(monkeypatch) -> None:
+    service = TestExecutionService()
+    TestExecutionService._rfbrowser_ready = False
+    calls = []
+
+    def fake_resolve(self):
+        raise RuntimeError("resolve failed")
+
+    def fake_run(*args, **kwargs):
+        calls.append((args, kwargs))
+
+        class Result:
+            returncode = 0
+
+        return Result()
+
+    monkeypatch.setattr("app.services.test_execution_service.Path.resolve", fake_resolve)
+    monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
+
+    service._ensure_rfbrowser()
+
+    assert len(calls) == 1
+
+
+def test_ensure_rfbrowser_runs_only_once_when_ready(monkeypatch) -> None:
+    service = TestExecutionService()
+    TestExecutionService._rfbrowser_ready = False
+    calls = []
+
+    def fake_run(*args, **kwargs):
+        calls.append((args, kwargs))
+
+        class Result:
+            returncode = 0
+
+        return Result()
+
+    monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
+
+    service._ensure_rfbrowser()
+    service._ensure_rfbrowser()
+
+    assert len(calls) == 1
 
 
 @pytest.mark.asyncio

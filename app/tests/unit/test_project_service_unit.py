@@ -61,6 +61,13 @@ def test_cleanup_project_reports_handles_remove_error(tmp_path, monkeypatch) -> 
     service._cleanup_project_reports(1)
 
 
+def test_cleanup_project_reports_noop_when_reports_root_missing(tmp_path) -> None:
+    settings.STATIC_DIR = str(tmp_path)
+    service = ProjectService()
+
+    service._cleanup_project_reports(1)
+
+
 def test_cleanup_project_directories_uses_default_projects_dir(tmp_path) -> None:
     settings.STATIC_DIR = str(tmp_path)
     service = ProjectService()
@@ -71,6 +78,28 @@ def test_cleanup_project_directories_uses_default_projects_dir(tmp_path) -> None
     service._cleanup_project_directories(project)
 
     assert not project_dir.exists()
+
+
+def test_cleanup_project_directories_handles_remove_error(tmp_path, monkeypatch) -> None:
+    service = ProjectService()
+    project = _fake_project(name="Projeto Erro", test_directory=str(tmp_path))
+    project_dir = tmp_path / service._safe_dir_name(project.name)
+    project_dir.mkdir(parents=True, exist_ok=True)
+
+    warning_calls = []
+
+    def fake_rmtree(path):
+        raise OSError("cannot remove project dir")
+
+    def fake_warning(*args, **kwargs):
+        warning_calls.append(args)
+
+    monkeypatch.setattr("app.services.project_service.shutil.rmtree", fake_rmtree)
+    monkeypatch.setattr("app.services.project_service.logger.warning", fake_warning)
+
+    service._cleanup_project_directories(project)
+
+    assert len(warning_calls) == 1
 
 
 def test_safe_dir_name_falls_back_to_project() -> None:

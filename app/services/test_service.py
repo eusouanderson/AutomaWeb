@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -84,7 +85,7 @@ class TestService:
                 raise LLMServiceUnavailableError("LLM provider connection failed") from exc
             raise
 
-        content = self._sanitize_robot_output(content)
+        content = self._sanitize_robot_output(content, context=context)
         test_request.status = "completed"
         await self._test_repository.update_test_request(session, test_request)
 
@@ -141,7 +142,7 @@ class TestService:
         safe = "".join(c for c in name if c.isalnum() or c in ("-", "_", " ")).strip().replace(" ", "_") or "project"
         return f"🧪_{safe}"
 
-    def _sanitize_robot_output(self, content: str) -> str:
+    def _sanitize_robot_output(self, content: str, context: str | None = None) -> str:
         """Remove qualquer texto fora das seções Robot e normaliza libs."""
         lines = [line.rstrip() for line in content.splitlines()]
         # Keep only from first valid section
@@ -177,4 +178,83 @@ class TestService:
             for l in cleaned
         ]
 
+        cleaned = self._harden_robot_lines(cleaned, context=context)
+
         return "\n".join(cleaned).strip() + "\n"
+
+    def _harden_robot_lines(self, lines: list[str], context: str | None = None) -> list[str]:
+        strict_selectors = self._extract_strict_mode_selectors(context)
+        selector_keywords = {
+            "Click",
+            "Wait For Elements State",
+            "Get Element",
+            "Get Elements",
+            "Input Text",
+            "Fill Text",
+            "Type Text",
+        }
+
+        hardened: list[str] = []
+        for line in lines:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("***"):
+                hardened.append(line)
+                continue
+
+            indent = line[: len(line) - len(line.lstrip())]
+            parts = re.split(r"\s{2,}", stripped)
+            keyword = parts[0] if parts else ""
+
+            if keyword == "Open Browser" and len(parts) >= 2:
+                page_url = parts[1]
+                hardened.append(f"{indent}New Browser    chromium")
+                hardened.append(f"{indent}New Context")
+                hardened.append(f"{indent}New Page    {page_url}")
+                continue
+
+            if keyword in selector_keywords and len(parts) >= 2:
+                selector = self._normalize_selector(parts[1])
+
+                # Class-only selectors often match many elements and break strict mode.
+                if self._is_class_only_css_selector(selector):
+                    selector = self._make_selector_unique(selector)
+
+                if selector in strict_selectors or selector.replace("css=", "") in strict_selectors:
+                    selector = self._make_selector_unique(selector)
+
+                parts[1] = selector
+                hardened.append(f"{indent}{'    '.join(parts)}")
+                continue
+
+            hardened.append(line)
+
+        return hardened
+
+    def _extract_strict_mode_selectors(self, context: str | None) -> set[str]:
+        if not context:
+            return set()
+        return set(re.findall(r"locator\('([^']+)'\)", context))
+
+    def _normalize_selector(self, selector: str) -> str:
+        if selector.startswith("id:"):
+            return f"css=#{selector[3:]}"
+        if selector.startswith("css:"):
+            return f"css={selector[4:]}"
+        if selector.startswith("xpath:"):
+            return f"xpath={selector[6:]}"
+        if selector.startswith("."):
+            return f"css={selector}"
+        return selector
+
+    def _is_class_only_css_selector(self, selector: str) -> bool:
+        if not selector.startswith("css=."):
+            return False
+        body = selector[4:]
+        return all(token not in body for token in (" ", ">", "+", "~", "[", ":", ">>"))
+
+    def _make_selector_unique(self, selector: str) -> str:
+        if selector.endswith(" >> nth=0"):
+            return selector
+        if selector.startswith("css="):
+            return f"{selector} >> nth=0"
+        return selector

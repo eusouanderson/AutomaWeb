@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 class TestExecutionService:
     """Service for executing tests and generating reports."""
 
+    _rfbrowser_ready = False
+
     def __init__(
         self,
         project_repository: ProjectRepository | None = None,
@@ -106,6 +108,7 @@ class TestExecutionService:
                 ],
                 capture_output=True,
                 text=True,
+                stdin=subprocess.DEVNULL,
                 timeout=300,  # 5 minutes timeout
             )
 
@@ -149,6 +152,9 @@ class TestExecutionService:
 
     def _ensure_rfbrowser(self) -> None:
         """Install Browser dependencies if missing."""
+        if self.__class__._rfbrowser_ready:
+            return
+
         try:
             wrapper_path = Path(__file__).resolve().parent.parent.parent / ".venv"
         except Exception:
@@ -156,7 +162,9 @@ class TestExecutionService:
 
         # If rfbrowser is available, run init to ensure deps
         try:
-            subprocess.run(["rfbrowser", "init"], capture_output=True, text=True, timeout=120)
+            result = subprocess.run(["rfbrowser", "init"], capture_output=True, text=True, timeout=120)
+            if result.returncode == 0:
+                self.__class__._rfbrowser_ready = True
         except Exception as exc:
             logger.warning(f"rfbrowser init failed or not available: {exc}")
 

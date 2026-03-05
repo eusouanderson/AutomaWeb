@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot generator="Robot 7.4.2 (Python 3.12.3 on linux)" generated="2026-03-05T11:25:45.443092" rpa="false" schemaversion="5">
+<suite id="s1" name="Generated Test 22" source="/home/eusouanderson/treino/AutomaWeb/Celulares/🧪_Celulares/generated_test_22.robot">
+<test id="s1-t1" name="Abrir Navegador E Navegar Entre Elementos" line="10">
+<kw name="New Browser" owner="Browser">
+<msg time="2026-03-05T11:25:45.592260" level="INFO">{"browser": "chromium", "headless": true, "chromiumSandbox": false, "devtools": false, "handleSIGHUP": true, "handleSIGINT": true, "handleSIGTERM": true, "slowMo": 0.0, "timeout": 30000.0, "tracesDir": "/home/eusouanderson/treino/AutomaWeb/Celulares/\ud83e\uddea_Celulares/reports/2_20260305_112545/browser/traces/temp/ef18d2b3-af42-4dd3-850f-294d82ca4041"}</msg>
+<msg time="2026-03-05T11:25:45.595921" level="INFO">Starting Browser process /home/eusouanderson/.cache/pypoetry/virtualenvs/automaweb-s9FmxQLL-py3.12/lib/python3.12/site-packages/Browser/wrapper/index.js using at 127.0.0.1:40127</msg>
+<msg time="2026-03-05T11:25:46.207631" level="INFO">Successfully created browser with options: {"browser":"chromium","headless":true,"chromiumSandbox":false,"devtools":false,"handleSIGHUP":true,"handleSIGINT":true,"handleSIGTERM":true,"slowMo":0,"timeout":30000,"tracesDir":"/home/eusouanderson/treino/AutomaWeb/Celulares/🧪_Celulares/reports/2_20260305_112545/browser/traces/temp/ef18d2b3-af42-4dd3-850f-294d82ca4041"}</msg>
+<arg>chromium</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Create a new playwright Browser with specified options.</doc>
+<status status="PASS" start="2026-03-05T11:25:45.591577" elapsed="0.616335"/>
+</kw>
+<kw name="New Context" owner="Browser">
+<msg time="2026-03-05T11:25:46.209930" level="INFO">{
+  "acceptDownloads": true,
+  "bypassCSP": false,
+  "forcedColors": "none",
+  "ignoreHTTPSErrors": false,
+  "javaScriptEnabled": true,
+  "offline": false,
+  "reducedMotion": "no-preference",
+  "serviceWorkers": "allow",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  }
+}</msg>
+<msg time="2026-03-05T11:25:46.226913" level="INFO">Successfully created context. </msg>
+<msg time="2026-03-05T11:25:46.227032" level="INFO">{'acceptDownloads': True, 'bypassCSP': False, 'forcedColors': 'none', 'ignoreHTTPSErrors': False, 'javaScriptEnabled': True, 'offline': False, 'reducedMotion': 'no-preference', 'serviceWorkers': 'allow', 'viewport': {'width': 1280, 'height': 720}}</msg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Create a new BrowserContext with specified options.</doc>
+<status status="PASS" start="2026-03-05T11:25:46.208228" elapsed="0.018925"/>
+</kw>
+<kw name="New Page" owner="Browser">
+<msg time="2026-03-05T11:25:47.394593" level="INFO">Successfully initialized new page object and opened url: https://www.demoblaze.com/</msg>
+<arg>${url}</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Open a new Page.</doc>
+<status status="PASS" start="2026-03-05T11:25:46.227395" elapsed="1.167491"/>
+</kw>
+<kw name="Wait For E">
+<msg time="2026-03-05T11:25:47.397877" level="FAIL">No keyword with name 'Wait For E' found. Did you mean:
+    Browser.Wait For
+    Browser.Wait For Alert
+    Browser.Wait For Alerts</msg>
+<status status="FAIL" start="2026-03-05T11:25:47.396807" elapsed="0.001254">No keyword with name 'Wait For E' found. Did you mean:
+    Browser.Wait For
+    Browser.Wait For Alert
+    Browser.Wait For Alerts</status>
+</kw>
+<kw name="Click" owner="Browser">
+<arg>css=#nava</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Simulates mouse click on the element found by ``selector``.</doc>
+<status status="NOT RUN" start="2026-03-05T11:25:47.398344" elapsed="0.000115"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<arg>css=.nav-link &gt;&gt; nth=0</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="NOT RUN" start="2026-03-05T11:25:47.398576" elapsed="0.000049"/>
+</kw>
+<kw name="Click" owner="Browser">
+<arg>css=.nav-link &gt;&gt; nth=0</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Simulates mouse click on the element found by ``selector``.</doc>
+<status status="NOT RUN" start="2026-03-05T11:25:47.398703" elapsed="0.000042"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<arg>css=.carousel-control-prev &gt;&gt; nth=0</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="NOT RUN" start="2026-03-05T11:25:47.398840" elapsed="0.000045"/>
+</kw>
+<kw name="Click" owner="Browser">
+<arg>css=.carousel-control-prev &gt;&gt; nth=0</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Simulates mouse click on the element found by ``selector``.</doc>
+<status status="NOT RUN" start="2026-03-05T11:25:47.398956" elapsed="0.000040"/>
+</kw>
+<kw name="Go Back" owner="Browser">
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Navigates to the previous page in history.</doc>
+<status status="NOT RUN" start="2026-03-05T11:25:47.399067" elapsed="0.000034"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<arg>css=.list-group-item &gt;&gt; nth=0</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="NOT RUN" start="2026-03-05T11:25:47.399166" elapsed="0.000032"/>
+</kw>
+<kw name="Click" owner="Browser">
+<arg>css=.list-group-item &gt;&gt; nth=0</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Simulates mouse click on the element found by ``selector``.</doc>
+<status status="NOT RUN" start="2026-03-05T11:25:47.399262" elapsed="0.000042"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<arg>css=.hrefch &gt;&gt; nth=0</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="NOT RUN" start="2026-03-05T11:25:47.399397" elapsed="0.000068"/>
+</kw>
+<kw name="Click" owner="Browser">
+<arg>css=.hrefch &gt;&gt; nth=0</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Simulates mouse click on the element found by ``selector``.</doc>
+<status status="NOT RUN" start="2026-03-05T11:25:47.399567" elapsed="0.000055"/>
+</kw>
+<kw name="Get Title" owner="Browser">
+<var>${titulo_atual}</var>
+<tag>Assertion</tag>
+<tag>Getter</tag>
+<tag>PageContent</tag>
+<doc>Returns the title of the current page.</doc>
+<status status="NOT RUN" start="2026-03-05T11:25:47.399714" elapsed="0.000066"/>
+</kw>
+<kw name="Should Be Equal" owner="BuiltIn">
+<arg>${titulo_atual}</arg>
+<arg>${titulo}</arg>
+<doc>Fails if the given objects are unequal.</doc>
+<status status="NOT RUN" start="2026-03-05T11:25:47.399967" elapsed="0.000050"/>
+</kw>
+<msg time="2026-03-05T11:25:47.432379" level="INFO">Switching context to context=0c858e06-ee6c-42af-ab3b-68d43da94b91 in CURRENT</msg>
+<msg time="2026-03-05T11:25:47.440514" level="INFO">Successfully changed active context: context=0c858e06-ee6c-42af-ab3b-68d43da94b91</msg>
+<msg time="2026-03-05T11:25:47.449059" level="INFO">Successfully closed Context</msg>
+<status status="FAIL" start="2026-03-05T11:25:45.590871" elapsed="1.809291">No keyword with name 'Wait For E' found. Did you mean:
+    Browser.Wait For
+    Browser.Wait For Alert
+    Browser.Wait For Alerts</status>
+</test>
+<kw name="Close Browser" owner="Browser" type="TEARDOWN">
+<msg time="2026-03-05T11:25:47.477935" level="INFO">Closed browser</msg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Closes the current browser.</doc>
+<status status="PASS" start="2026-03-05T11:25:47.449728" elapsed="0.028370"/>
+</kw>
+<status status="FAIL" start="2026-03-05T11:25:45.443738" elapsed="2.034440"/>
+</suite>
+<statistics>
+<total>
+<stat pass="0" fail="1" skip="0">All Tests</stat>
+</total>
+<tag>
+</tag>
+<suite>
+<stat name="Generated Test 22" id="s1" pass="0" fail="1" skip="0">Generated Test 22</stat>
+</suite>
+</statistics>
+<errors>
+</errors>
+</robot>
