@@ -11,7 +11,7 @@ run:
 	uvicorn app.main:app --reload
 
 test:
-	pytest -q
+	pytest
 
 lint:
 	python -m compileall app

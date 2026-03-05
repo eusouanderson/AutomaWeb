@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 
 import pytest
 
@@ -9,6 +10,8 @@ from app.api import routes
 from app.models.generated_test import GeneratedTest
 from app.models.project import Project
 from app.models.test_execution import TestExecution
+from app.services.element_scanner import ElementScannerError
+from app.services.test_service import LLMServiceUnavailableError, ScanUnavailableError
 
 
 @pytest.mark.asyncio
@@ -296,3 +299,142 @@ async def test_execute_tests_route_error(monkeypatch) -> None:
         await routes.execute_tests(payload, session=None)
 
     assert exc.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_list_project_tests_route_success(monkeypatch) -> None:
+    generated = GeneratedTest(
+        id=10,
+        test_request_id=20,
+        content="*** Test Cases ***",
+        file_path="/tmp/path/generated_test_10.robot",
+        created_at=datetime.utcnow(),
+    )
+
+    async def fake_list_generated_tests_by_project(self, session: AsyncSession, project_id: int):
+        return [generated]
+
+    monkeypatch.setattr(routes.TestService, "list_generated_tests_by_project", fake_list_generated_tests_by_project)
+
+    result = await routes.list_project_tests(1, session=None)
+
+    assert len(result) == 1
+    assert result[0].id == 10
+    assert result[0].file_path == "generated_test_10.robot"
+
+
+@pytest.mark.asyncio
+async def test_list_project_tests_route_not_found(monkeypatch) -> None:
+    async def fake_list_generated_tests_by_project(self, session: AsyncSession, project_id: int):
+        raise ValueError("Project not found")
+
+    monkeypatch.setattr(routes.TestService, "list_generated_tests_by_project", fake_list_generated_tests_by_project)
+
+    with pytest.raises(HTTPException) as exc:
+        await routes.list_project_tests(999, session=None)
+
+    assert exc.value.status_code == 404
+    assert exc.value.detail == "Project not found"
+
+
+@pytest.mark.asyncio
+async def test_generate_test_route_llm_unavailable(monkeypatch) -> None:
+    async def fake_generate_test(self, session: AsyncSession, project_id: int, prompt: str, context: str | None = None):
+        raise LLMServiceUnavailableError("upstream unavailable")
+
+    monkeypatch.setattr(routes.TestService, "generate_test", fake_generate_test)
+    payload = routes.TestGenerateRequest(project_id=1, prompt="Teste")
+
+    with pytest.raises(HTTPException) as exc:
+        await routes.generate_test(payload, session=None)
+
+    assert exc.value.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_generate_test_route_scan_unavailable(monkeypatch) -> None:
+    async def fake_generate_test(self, session: AsyncSession, project_id: int, prompt: str, context: str | None = None):
+        raise ScanUnavailableError("scan failed")
+
+    monkeypatch.setattr(routes.TestService, "generate_test", fake_generate_test)
+    payload = routes.TestGenerateRequest(project_id=1, prompt="Teste")
+
+    with pytest.raises(HTTPException) as exc:
+        await routes.generate_test(payload, session=None)
+
+    assert exc.value.status_code == 502
+    assert "scan failed" in exc.value.detail
+
+
+@pytest.mark.asyncio
+async def test_scan_page_stream_success(monkeypatch) -> None:
+    class DummyScanResult:
+        def model_dump(self):
+            return {"title": "Home", "total_elements": 1}
+
+    class DummyScanner:
+        async def scan_url(self, _url: str, progress_callback=None):
+            await progress_callback("step-1")
+            return DummyScanResult()
+
+    monkeypatch.setattr(routes, "ElementScannerService", lambda: DummyScanner())
+
+    response = await routes.scan_page(routes.ScanRequest(url="https://example.com"))
+    body_iter = response.body_iterator
+
+    first = await anext(body_iter)
+    second = await anext(body_iter)
+
+    progress = json.loads(first.removeprefix("data: ").strip())
+    result = json.loads(second.removeprefix("data: ").strip())
+
+    assert progress["type"] == "progress"
+    assert progress["message"] == "step-1"
+    assert result["type"] == "result"
+    assert result["data"]["title"] == "Home"
+
+    with pytest.raises(StopAsyncIteration):
+        await anext(body_iter)
+
+
+@pytest.mark.asyncio
+async def test_scan_page_stream_error(monkeypatch) -> None:
+    class DummyScanner:
+        async def scan_url(self, _url: str, progress_callback=None):
+            raise ElementScannerError("scan boom")
+
+    monkeypatch.setattr(routes, "ElementScannerService", lambda: DummyScanner())
+
+    response = await routes.scan_page(routes.ScanRequest(url="https://example.com"))
+    body_iter = response.body_iterator
+    event = await anext(body_iter)
+    payload = json.loads(event.removeprefix("data: ").strip())
+
+    assert payload["type"] == "error"
+    assert payload["message"] == "scan boom"
+
+    with pytest.raises(StopAsyncIteration):
+        await anext(body_iter)
+
+
+@pytest.mark.asyncio
+async def test_scan_page_stream_cancels_running_task_on_close(monkeypatch) -> None:
+    release_scan = routes.asyncio.Event()
+
+    class DummyScanner:
+        async def scan_url(self, _url: str, progress_callback=None):
+            await progress_callback("starting")
+            await release_scan.wait()
+            return type("Result", (), {"model_dump": lambda self: {"ok": True}})()
+
+    monkeypatch.setattr(routes, "ElementScannerService", lambda: DummyScanner())
+
+    response = await routes.scan_page(routes.ScanRequest(url="https://example.com"))
+    body_iter = response.body_iterator
+
+    first = await anext(body_iter)
+    payload = json.loads(first.removeprefix("data: ").strip())
+    assert payload["type"] == "progress"
+
+    await body_iter.aclose()
+    release_scan.set()

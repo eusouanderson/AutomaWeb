@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot generator="Robot 7.4.2 (Python 3.12.3 on linux)" generated="2026-03-05T10:03:12.183087" rpa="false" schemaversion="5">
+<suite id="s1" name="Generated Test 2 &amp; Generated Test 3">
+<suite id="s1-s1" name="Generated Test 2" source="/home/eusouanderson/treino/AutomaWeb/Celulares/🧪_Celulares/generated_test_2.robot">
+<test id="s1-s1-t1" name="Abrir Pagina E Navegar Por Celulares" line="8">
+<kw name="Open Browser" owner="Browser">
+<msg time="2026-03-05T10:03:12.313282" level="FAIL">ValueError: Argument 'browser' got value 'chrome' that cannot be converted to SupportedBrowsers: SupportedBrowsers does not have member 'chrome'. Available: 'chromium', 'firefox' and 'webkit'</msg>
+<arg>${URL}</arg>
+<arg>browser=chrome</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Opens a new browser instance. Use this keyword for quick experiments or debugging sessions.</doc>
+<status status="FAIL" start="2026-03-05T10:03:12.312677" elapsed="0.006629">ValueError: Argument 'browser' got value 'chrome' that cannot be converted to SupportedBrowsers: SupportedBrowsers does not have member 'chrome'. Available: 'chromium', 'firefox' and 'webkit'</status>
+</kw>
+<kw name="Click" owner="Browser">
+<arg>id:nava</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Simulates mouse click on the element found by ``selector``.</doc>
+<status status="NOT RUN" start="2026-03-05T10:03:12.319740" elapsed="0.000212"/>
+</kw>
+<kw name="Click" owner="Browser">
+<arg>id:itemc</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Simulates mouse click on the element found by ``selector``.</doc>
+<status status="NOT RUN" start="2026-03-05T10:03:12.320190" elapsed="0.000080"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<arg>xpath:/html[1]/body[1]/div[5]/div[1]/div[2]</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="NOT RUN" start="2026-03-05T10:03:12.320398" elapsed="0.000052"/>
+</kw>
+<kw name="Get Element" owner="Browser">
+<var>${CELULAR1}</var>
+<arg>xpath:/html[1]/body[1]/div[5]/div[1]/div[2]/div[1]/div[1]/div[1]/h4[1]/a[1]</arg>
+<tag>Getter</tag>
+<tag>PageContent</tag>
+<doc>Returns a reference to a Playwright [https://playwright.dev/docs/api/class-locator|Locator].</doc>
+<status status="NOT RUN" start="2026-03-05T10:03:12.320547" elapsed="0.000047"/>
+</kw>
+<kw name="Get Element" owner="Browser">
+<var>${CELULAR2}</var>
+<arg>xpath:/html[1]/body[1]/div[5]/div[1]/div[2]/div[1]/div[2]/div[1]/div[1]/h4[1]/a[1]</arg>
+<tag>Getter</tag>
+<tag>PageContent</tag>
+<doc>Returns a reference to a Playwright [https://playwright.dev/docs/api/class-locator|Locator].</doc>
+<status status="NOT RUN" start="2026-03-05T10:03:12.320679" elapsed="0.000067"/>
+</kw>
+<kw name="Get Element" owner="Browser">
+<var>${CELULAR3}</var>
+<arg>xpath:/html[1]/body[1]/div[5]/div[1]/div[2]/div[1]/div[3]/div[1]/div[1]/h4[1]/a[1]</arg>
+<tag>Getter</tag>
+<tag>PageContent</tag>
+<doc>Returns a reference to a Playwright [https://playwright.dev/docs/api/class-locator|Locator].</doc>
+<status status="NOT RUN" start="2026-03-05T10:03:12.320837" elapsed="0.000045"/>
+</kw>
+<kw name="Click" owner="Browser">
+<arg>${CELULAR1}</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Simulates mouse click on the element found by ``selector``.</doc>
+<status status="NOT RUN" start="2026-03-05T10:03:12.320977" elapsed="0.000062"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<arg>xpath:/html[1]/body[1]/div[5]/div[1]/div[1]</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="NOT RUN" start="2026-03-05T10:03:12.321130" elapsed="0.000042"/>
+</kw>
+<kw name="Go Back" owner="Browser">
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Navigates to the previous page in history.</doc>
+<status status="NOT RUN" start="2026-03-05T10:03:12.321282" elapsed="0.000046"/>
+</kw>
+<kw name="Click" owner="Browser">
+<arg>${CELULAR2}</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Simulates mouse click on the element found by ``selector``.</doc>
+<status status="NOT RUN" start="2026-03-05T10:03:12.321400" elapsed="0.000039"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<arg>xpath:/html[1]/body[1]/div[5]/div[1]/div[1]</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="NOT RUN" start="2026-03-05T10:03:12.321514" elapsed="0.000041"/>
+</kw>
+<kw name="Go Back" owner="Browser">
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Navigates to the previous page in history.</doc>
+<status status="NOT RUN" start="2026-03-05T10:03:12.321628" elapsed="0.000042"/>
+</kw>
+<kw name="Click" owner="Browser">
+<arg>${CELULAR3}</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Simulates mouse click on the element found by ``selector``.</doc>
+<status status="NOT RUN" start="2026-03-05T10:03:12.321740" elapsed="0.000038"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<arg>xpath:/html[1]/body[1]/div[5]/div[1]/div[1]</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="NOT RUN" start="2026-03-05T10:03:12.321848" elapsed="0.000038"/>
+</kw>
+<kw name="Close Browser" owner="Browser">
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Closes the current browser.</doc>
+<status status="NOT RUN" start="2026-03-05T10:03:12.321959" elapsed="0.000045"/>
+</kw>
+<msg time="2026-03-05T10:03:12.327017" level="INFO">Starting Browser process /home/eusouanderson/.cache/pypoetry/virtualenvs/automaweb-s9FmxQLL-py3.12/lib/python3.12/site-packages/Browser/wrapper/index.js using at 127.0.0.1:49457</msg>
+<status status="FAIL" start="2026-03-05T10:03:12.311948" elapsed="0.010263">ValueError: Argument 'browser' got value 'chrome' that cannot be converted to SupportedBrowsers: SupportedBrowsers does not have member 'chrome'. Available: 'chromium', 'firefox' and 'webkit'</status>
+</test>
+<status status="FAIL" start="2026-03-05T10:03:12.213857" elapsed="0.663860"/>
+</suite>
+<suite id="s1-s2" name="Generated Test 3" source="/home/eusouanderson/treino/AutomaWeb/Celulares/🧪_Celulares/generated_test_3.robot">
+<test id="s1-s2-t1" name="Abrir Pagina E Navegar Por Celulares" line="8">
+<kw name="Open Browser" owner="Browser">
+<msg time="2026-03-05T10:03:12.904923" level="WARN">Open Browser is for quick experimentation and debugging only. Use New Page for production.</msg>
+<msg time="2026-03-05T10:03:12.905195" level="INFO">{"browser": "chromium", "headless": false, "chromiumSandbox": false, "devtools": false, "handleSIGHUP": true, "handleSIGINT": true, "handleSIGTERM": true, "slowMo": 0.0, "timeout": 30000.0, "tracesDir": "/home/eusouanderson/treino/AutomaWeb/Celulares/\ud83e\uddea_Celulares/reports/2_20260305_100238/browser/traces/temp/e12be77f-5d57-4652-a7b5-bd4fe0990dfd"}</msg>
+<msg time="2026-03-05T10:03:13.094993" level="INFO">Successfully created browser with options: {"browser":"chromium","headless":false,"chromiumSandbox":false,"devtools":false,"handleSIGHUP":true,"handleSIGINT":true,"handleSIGTERM":true,"slowMo":0,"timeout":30000,"tracesDir":"/home/eusouanderson/treino/AutomaWeb/Celulares/🧪_Celulares/reports/2_20260305_100238/browser/traces/temp/e12be77f-5d57-4652-a7b5-bd4fe0990dfd"}</msg>
+<msg time="2026-03-05T10:03:13.096139" level="INFO">{
+  "acceptDownloads": true,
+  "bypassCSP": true,
+  "forcedColors": "none",
+  "ignoreHTTPSErrors": false,
+  "javaScriptEnabled": true,
+  "offline": false,
+  "reducedMotion": "no-preference",
+  "serviceWorkers": "allow",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  }
+}</msg>
+<msg time="2026-03-05T10:03:13.113404" level="INFO">Successfully created context. </msg>
+<msg time="2026-03-05T10:03:13.113485" level="INFO">{'acceptDownloads': True, 'bypassCSP': True, 'forcedColors': 'none', 'ignoreHTTPSErrors': False, 'javaScriptEnabled': True, 'offline': False, 'reducedMotion': 'no-preference', 'serviceWorkers': 'allow', 'viewport': {'width': 1280, 'height': 720}}</msg>
+<msg time="2026-03-05T10:03:14.536500" level="INFO">Successfully initialized new page object and opened url: https://www.demoblaze.com/</msg>
+<arg>${url}</arg>
+<arg>chromium</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Opens a new browser instance. Use this keyword for quick experiments or debugging sessions.</doc>
+<status status="PASS" start="2026-03-05T10:03:12.904461" elapsed="1.632351"/>
+</kw>
+<kw name="Click" owner="Browser">
+<msg time="2026-03-05T10:03:14.537612" level="INFO">Clicks the element 'id:nava'.</msg>
+<msg time="2026-03-05T10:03:14.696392" level="INFO" html="true">&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td colspan="3"&gt;&lt;a href="browser/screenshot/fail-screenshot-1.png" target="_blank"&gt;&lt;img src="browser/screenshot/fail-screenshot-1.png" width="800px"/&gt;&lt;/a&gt;</msg>
+<msg time="2026-03-05T10:03:14.696613" level="INFO">See also file:///home/eusouanderson/treino/AutomaWeb/Celulares/%F0%9F%A7%AA_Celulares/reports/2_20260305_100238/playwright-log.txt for additional details.</msg>
+<arg>id:nava</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Simulates mouse click on the element found by ``selector``.</doc>
+<status status="FAIL" start="2026-03-05T10:03:14.537055" elapsed="147.179433">Execution terminated by signal</status>
+</kw>
+<kw name="Click" owner="Browser">
+<arg>id:itemc</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Simulates mouse click on the element found by ``selector``.</doc>
+<status status="NOT RUN" start="2026-03-05T10:05:41.717179" elapsed="0.000283"/>
+</kw>
+<msg time="2026-03-05T10:05:41.740657" level="INFO">Switching context to context=01d530e3-e8ae-4848-a273-ff653a77611c in CURRENT</msg>
+<msg time="2026-03-05T10:05:41.750210" level="INFO">Successfully changed active context: context=01d530e3-e8ae-4848-a273-ff653a77611c</msg>
+<msg time="2026-03-05T10:05:41.755228" level="INFO">Successfully closed Context</msg>
+<status status="FAIL" start="2026-03-05T10:03:12.902249" elapsed="148.815766">Execution terminated by signal</status>
+</test>
+<status status="FAIL" start="2026-03-05T10:03:12.897761" elapsed="148.858950"/>
+</suite>
+<status status="FAIL" start="2026-03-05T10:03:12.183899" elapsed="149.580607"/>
+</suite>
+<statistics>
+<total>
+<stat pass="0" fail="2" skip="0">All Tests</stat>
+</total>
+<tag>
+</tag>
+<suite>
+<stat name="Generated Test 2 &amp; Generated Test 3" id="s1" pass="0" fail="2" skip="0">Generated Test 2 &amp; Generated Test 3</stat>
+<stat name="Generated Test 2" id="s1-s1" pass="0" fail="1" skip="0">Generated Test 2 &amp; Generated Test 3.Generated Test 2</stat>
+<stat name="Generated Test 3" id="s1-s2" pass="0" fail="1" skip="0">Generated Test 2 &amp; Generated Test 3.Generated Test 3</stat>
+</suite>
+</statistics>
+<errors>
+<msg time="2026-03-05T10:03:12.904923" level="WARN">Open Browser is for quick experimentation and debugging only. Use New Page for production.</msg>
+</errors>
+</robot>

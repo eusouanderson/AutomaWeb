@@ -36,7 +36,7 @@ dependencies = [
 [tool.pytest.ini_options]
 testpaths = ["app/tests"]
 asyncio_mode = "auto"
-addopts = "--cov=app --cov-report=term-missing --cov-report=html --cov-fail-under=95"
+addopts = "-vv -s --cov=app --cov-report=term-missing --cov-report=html --cov-fail-under=95"
 
 [tool.coverage.run]
 omit = ["app/tests/*"]

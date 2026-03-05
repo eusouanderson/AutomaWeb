@@ -18,31 +18,49 @@ class DummyProjectRepo:
         return self._project
 
 
+class _DummyGeneratedTest:
+    def __init__(self, file_path: str):
+        self.file_path = file_path
+
+
 class DummyTestRepo:
     async def get_generated_test(self, session: AsyncSession, test_id: int):
         return None
+
+    async def list_generated_tests_by_ids_for_project(self, session: AsyncSession, project_id: int, test_ids: list[int]):
+        return [_DummyGeneratedTest(f"/tmp/generated_{test_id}.robot") for test_id in test_ids]
+
+
+def _prepare_project(tmp_path, name: str = "Projeto") -> Project:
+    return Project(
+        id=1,
+        name=name,
+        description="Desc",
+        test_directory=str(tmp_path / "tests"),
+        created_at=datetime.utcnow(),
+    )
+
+
+def _create_robot_file(project: Project) -> Path:
+    safe_name = TestService()._safe_dir_name(project.name)
+    project_dir = Path(project.test_directory) / safe_name
+    project_dir.mkdir(parents=True, exist_ok=True)
+    robot_file = project_dir / "sample.robot"
+    robot_file.write_text("*** Test Cases ***\nExample\n    Log    Hello")
+    return project_dir
 
 
 @pytest.mark.asyncio
 async def test_execute_tests_happy_path(tmp_path, monkeypatch) -> None:
     settings.STATIC_DIR = str(tmp_path / "static")
-    project = Project(
-        id=1,
-        name="Projeto",
-        description="Desc",
-        test_directory=str(tmp_path / "tests"),
-        created_at=datetime.utcnow(),
-    )
+    project = _prepare_project(tmp_path)
 
     service = TestExecutionService(
         project_repository=DummyProjectRepo(project),
         test_repository=DummyTestRepo(),
     )
 
-    safe_name = TestService()._safe_dir_name(project.name)
-    project_dir = Path(project.test_directory) / safe_name
-    project_dir.mkdir(parents=True, exist_ok=True)
-    (project_dir / "sample.robot").write_text("*** Test Cases ***\nExample\n    Log    Hello")
+    _create_robot_file(project)
 
     def fake_run(*args, **kwargs):
         class Result:
@@ -68,70 +86,86 @@ async def test_execute_tests_happy_path(tmp_path, monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_execute_tests_project_not_found(monkeypatch) -> None:
+async def test_execute_tests_with_selected_test_ids(tmp_path, monkeypatch) -> None:
+    settings.STATIC_DIR = str(tmp_path / "static")
+    project = _prepare_project(tmp_path)
+    service = TestExecutionService(
+        project_repository=DummyProjectRepo(project),
+        test_repository=DummyTestRepo(),
+    )
+
+    def fake_run(*args, **kwargs):
+        class Result:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        return Result()
+
+    async def fake_generate_mkdocs_report(project, output_dir, stats):
+        return None
+
+    monkeypatch.setattr(service, "_ensure_rfbrowser", lambda: None)
+    monkeypatch.setattr(service, "_parse_robot_output", lambda *_: {"total": 2, "passed": 2, "failed": 0, "skipped": 0})
+    monkeypatch.setattr(service, "_generate_mkdocs_report", fake_generate_mkdocs_report)
+    monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
+
+    execution = await service.execute_tests(session=None, project_id=1, test_ids=[10, 20])
+
+    assert execution.status == "completed"
+    assert execution.total_tests == 2
+
+
+@pytest.mark.asyncio
+async def test_execute_tests_project_not_found() -> None:
     service = TestExecutionService(
         project_repository=DummyProjectRepo(None),
         test_repository=DummyTestRepo(),
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Project not found"):
         await service.execute_tests(session=None, project_id=1)
 
 
 @pytest.mark.asyncio
-async def test_execute_tests_missing_test_directory(monkeypatch) -> None:
+async def test_execute_tests_missing_test_directory() -> None:
     project = Project(id=1, name="Projeto", description="Desc", test_directory=None)
     service = TestExecutionService(
         project_repository=DummyProjectRepo(project),
         test_repository=DummyTestRepo(),
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Project test directory not configured"):
         await service.execute_tests(session=None, project_id=1)
 
 
 @pytest.mark.asyncio
 async def test_execute_tests_no_test_files(tmp_path) -> None:
-    project = Project(
-        id=1,
-        name="Projeto",
-        description="Desc",
-        test_directory=str(tmp_path / "tests"),
-    )
+    project = _prepare_project(tmp_path)
     service = TestExecutionService(
         project_repository=DummyProjectRepo(project),
         test_repository=DummyTestRepo(),
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="No test files found"):
         await service.execute_tests(session=None, project_id=1)
 
 
 @pytest.mark.asyncio
-async def test_execute_tests_failed_returncode(tmp_path, monkeypatch) -> None:
+async def test_execute_tests_failed_returncode_with_default_message(tmp_path, monkeypatch) -> None:
     settings.STATIC_DIR = str(tmp_path / "static")
-    project = Project(
-        id=1,
-        name="Projeto",
-        description="Desc",
-        test_directory=str(tmp_path / "tests"),
-    )
-
+    project = _prepare_project(tmp_path)
     service = TestExecutionService(
         project_repository=DummyProjectRepo(project),
         test_repository=DummyTestRepo(),
     )
-
-    safe_name = TestService()._safe_dir_name(project.name)
-    project_dir = Path(project.test_directory) / safe_name
-    project_dir.mkdir(parents=True, exist_ok=True)
-    (project_dir / "sample.robot").write_text("*** Test Cases ***\nExample\n    Log    Hello")
+    _create_robot_file(project)
 
     def fake_run(*args, **kwargs):
         class Result:
             returncode = 1
             stdout = ""
-            stderr = "Erro"
+            stderr = ""
 
         return Result()
 
@@ -144,29 +178,20 @@ async def test_execute_tests_failed_returncode(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
 
     execution = await service.execute_tests(session=None, project_id=1)
+
     assert execution.status == "failed"
-    assert execution.error_output == "Erro"
+    assert execution.error_output == "Test execution failed"
 
 
 @pytest.mark.asyncio
 async def test_execute_tests_timeout(tmp_path, monkeypatch) -> None:
     settings.STATIC_DIR = str(tmp_path / "static")
-    project = Project(
-        id=1,
-        name="Projeto",
-        description="Desc",
-        test_directory=str(tmp_path / "tests"),
-    )
-
+    project = _prepare_project(tmp_path)
     service = TestExecutionService(
         project_repository=DummyProjectRepo(project),
         test_repository=DummyTestRepo(),
     )
-
-    safe_name = TestService()._safe_dir_name(project.name)
-    project_dir = Path(project.test_directory) / safe_name
-    project_dir.mkdir(parents=True, exist_ok=True)
-    (project_dir / "sample.robot").write_text("*** Test Cases ***\nExample\n    Log    Hello")
+    _create_robot_file(project)
 
     def fake_run(*args, **kwargs):
         from subprocess import TimeoutExpired
@@ -179,6 +204,28 @@ async def test_execute_tests_timeout(tmp_path, monkeypatch) -> None:
     execution = await service.execute_tests(session=None, project_id=1)
     assert execution.status == "failed"
     assert execution.error_output == "Test execution timed out"
+
+
+@pytest.mark.asyncio
+async def test_execute_tests_handles_unexpected_exception(tmp_path, monkeypatch) -> None:
+    settings.STATIC_DIR = str(tmp_path / "static")
+    project = _prepare_project(tmp_path)
+    service = TestExecutionService(
+        project_repository=DummyProjectRepo(project),
+        test_repository=DummyTestRepo(),
+    )
+    _create_robot_file(project)
+
+    def fake_run(*args, **kwargs):
+        raise RuntimeError("robot failed badly")
+
+    monkeypatch.setattr(service, "_ensure_rfbrowser", lambda: None)
+    monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
+
+    execution = await service.execute_tests(session=None, project_id=1)
+
+    assert execution.status == "failed"
+    assert execution.error_output == "robot failed badly"
 
 
 def test_error_html() -> None:
@@ -195,6 +242,36 @@ def test_ensure_report_files_creates_fallback(tmp_path) -> None:
     assert (tmp_path / "output.xml").exists()
     assert (tmp_path / "log.html").exists()
     assert (tmp_path / "report.html").exists()
+
+
+def test_sync_reports_for_static_replaces_existing_target(tmp_path) -> None:
+    service = TestExecutionService()
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    source.mkdir()
+    target.mkdir()
+    (source / "log.html").write_text("log")
+    (target / "old.txt").write_text("old")
+
+    service._sync_reports_for_static(source, target)
+
+    assert (target / "log.html").exists()
+    assert not (target / "old.txt").exists()
+
+
+def test_sync_reports_for_static_handles_copy_error(tmp_path, monkeypatch) -> None:
+    service = TestExecutionService()
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    source.mkdir()
+    target.mkdir()
+
+    def fake_copytree(*args, **kwargs):
+        raise OSError("cannot copy")
+
+    monkeypatch.setattr("app.services.test_execution_service.shutil.copytree", fake_copytree)
+
+    service._sync_reports_for_static(source, target)
 
 
 def test_parse_robot_output_missing_file(tmp_path) -> None:
@@ -218,28 +295,43 @@ def test_parse_robot_output_success(tmp_path) -> None:
     output.write_text(xml)
 
     stats = service._parse_robot_output(output)
+
     assert stats["total"] == 3
-    def test_parse_robot_output_invalid_xml(tmp_path) -> None:
-        service = TestExecutionService()
-        output = tmp_path / "output.xml"
-        output.write_text("<robot><statistics><total><stat pass='1' fail='0'></total>")
-
-        stats = service._parse_robot_output(output)
-        assert stats == {"total": 0, "passed": 0, "failed": 0, "skipped": 0}
-
-
-    def test_ensure_rfbrowser_handles_exception(monkeypatch) -> None:
-        service = TestExecutionService()
-
-        def fake_run(*args, **kwargs):
-            raise RuntimeError("rfbrowser missing")
-
-        monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
-        service._ensure_rfbrowser()
-
     assert stats["passed"] == 2
     assert stats["failed"] == 1
     assert stats["skipped"] == 0
+
+
+def test_parse_robot_output_without_stat_returns_zeros(tmp_path) -> None:
+    service = TestExecutionService()
+    xml = "<robot><statistics><total></total></statistics></robot>"
+    output = tmp_path / "output.xml"
+    output.write_text(xml)
+
+    stats = service._parse_robot_output(output)
+
+    assert stats == {"total": 0, "passed": 0, "failed": 0, "skipped": 0}
+
+
+def test_parse_robot_output_invalid_xml(tmp_path) -> None:
+    service = TestExecutionService()
+    output = tmp_path / "output.xml"
+    output.write_text("<robot><statistics><total><stat pass='1' fail='0'></total>")
+
+    stats = service._parse_robot_output(output)
+
+    assert stats == {"total": 0, "passed": 0, "failed": 0, "skipped": 0}
+
+
+def test_ensure_rfbrowser_handles_exception(monkeypatch) -> None:
+    service = TestExecutionService()
+
+    def fake_run(*args, **kwargs):
+        raise RuntimeError("rfbrowser missing")
+
+    monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
+
+    service._ensure_rfbrowser()
 
 
 @pytest.mark.asyncio

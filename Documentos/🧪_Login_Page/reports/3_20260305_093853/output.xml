@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot generator="Robot 7.4.2 (Python 3.12.3 on linux)" generated="2026-03-05T09:39:30.317443" rpa="false" schemaversion="5">
+<suite id="s1" name="Generated Test 12 &amp; Generated Test 13">
+<suite id="s1-s1" name="Generated Test 12" source="/home/eusouanderson/treino/AutomaWeb/Documentos/🧪_Login_Page/generated_test_12.robot">
+<test id="s1-s1-t1" name="Testar Login" line="11">
+<kw name="Open Browser" owner="Browser">
+<msg time="2026-03-05T09:39:30.449880" level="WARN">Open Browser is for quick experimentation and debugging only. Use New Page for production.</msg>
+<msg time="2026-03-05T09:39:30.450209" level="INFO">{"browser": "chromium", "headless": false, "chromiumSandbox": false, "devtools": false, "handleSIGHUP": true, "handleSIGINT": true, "handleSIGTERM": true, "slowMo": 0.0, "timeout": 30000.0, "tracesDir": "/home/eusouanderson/treino/AutomaWeb/Documentos/\ud83e\uddea_Login_Page/reports/3_20260305_093853/browser/traces/temp/99f03c30-75ff-44c9-ad9e-33d23a9e56f4"}</msg>
+<msg time="2026-03-05T09:39:30.454199" level="INFO">Starting Browser process /home/eusouanderson/.cache/pypoetry/virtualenvs/automaweb-s9FmxQLL-py3.12/lib/python3.12/site-packages/Browser/wrapper/index.js using at 127.0.0.1:36015</msg>
+<msg time="2026-03-05T09:39:31.821085" level="INFO">Successfully created browser with options: {"browser":"chromium","headless":false,"chromiumSandbox":false,"devtools":false,"handleSIGHUP":true,"handleSIGINT":true,"handleSIGTERM":true,"slowMo":0,"timeout":30000,"tracesDir":"/home/eusouanderson/treino/AutomaWeb/Documentos/🧪_Login_Page/reports/3_20260305_093853/browser/traces/temp/99f03c30-75ff-44c9-ad9e-33d23a9e56f4"}</msg>
+<msg time="2026-03-05T09:39:31.822537" level="INFO">{
+  "acceptDownloads": true,
+  "bypassCSP": true,
+  "forcedColors": "none",
+  "ignoreHTTPSErrors": false,
+  "javaScriptEnabled": true,
+  "offline": false,
+  "reducedMotion": "no-preference",
+  "serviceWorkers": "allow",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  }
+}</msg>
+<msg time="2026-03-05T09:39:31.846478" level="INFO">Successfully created context. </msg>
+<msg time="2026-03-05T09:39:31.846686" level="INFO">{'acceptDownloads': True, 'bypassCSP': True, 'forcedColors': 'none', 'ignoreHTTPSErrors': False, 'javaScriptEnabled': True, 'offline': False, 'reducedMotion': 'no-preference', 'serviceWorkers': 'allow', 'viewport': {'width': 1280, 'height': 720}}</msg>
+<msg time="2026-03-05T09:39:34.291372" level="INFO">Successfully initialized new page object and opened url: https://the-internet.herokuapp.com/login</msg>
+<arg>${url}</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Opens a new browser instance. Use this keyword for quick experiments or debugging sessions.</doc>
+<status status="PASS" start="2026-03-05T09:39:30.449365" elapsed="3.842470"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<msg time="2026-03-05T09:39:44.383949" level="INFO" html="true">&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td colspan="3"&gt;&lt;a href="browser/screenshot/fail-screenshot-1.png" target="_blank"&gt;&lt;img src="browser/screenshot/fail-screenshot-1.png" width="800px"/&gt;&lt;/a&gt;</msg>
+<msg time="2026-03-05T09:39:44.384254" level="INFO">See also file:///home/eusouanderson/treino/AutomaWeb/Documentos/%F0%9F%A7%AA_Login_Page/reports/3_20260305_093853/playwright-log.txt for additional details.</msg>
+<arg>css:h2</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="FAIL" start="2026-03-05T09:39:34.292481" elapsed="220.149392">Execution terminated by signal</status>
+</kw>
+<kw name="Input Text">
+<arg>id:username</arg>
+<arg>${username}</arg>
+<status status="NOT RUN" start="2026-03-05T09:43:14.442747" elapsed="0.000318"/>
+</kw>
+<kw name="Input Text">
+<arg>id:password</arg>
+<arg>${password}</arg>
+<status status="NOT RUN" start="2026-03-05T09:43:14.443389" elapsed="0.000128"/>
+</kw>
+<kw name="Click" owner="Browser">
+<arg>xpath://button[@type='submit']</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Simulates mouse click on the element found by ``selector``.</doc>
+<status status="NOT RUN" start="2026-03-05T09:43:14.443815" elapsed="0.000179"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<arg>css:h2</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="NOT RUN" start="2026-03-05T09:43:14.444243" elapsed="0.000118"/>
+</kw>
+<kw name="Capture Page Screenshot">
+<status status="NOT RUN" start="2026-03-05T09:43:14.444610" elapsed="0.000161"/>
+</kw>
+<kw name="Close Browser" owner="Browser">
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Closes the current browser.</doc>
+<status status="NOT RUN" start="2026-03-05T09:43:14.444985" elapsed="0.000126"/>
+</kw>
+<msg time="2026-03-05T09:43:14.471208" level="INFO">Switching context to context=8772d6ee-4202-41a4-9e9d-f1fd23195030 in CURRENT</msg>
+<msg time="2026-03-05T09:43:14.478150" level="INFO">Successfully changed active context: context=8772d6ee-4202-41a4-9e9d-f1fd23195030</msg>
+<msg time="2026-03-05T09:43:14.480117" level="INFO">Successfully closed Context</msg>
+<status status="FAIL" start="2026-03-05T09:39:30.448668" elapsed="223.996946">Execution terminated by signal</status>
+</test>
+<status status="FAIL" start="2026-03-05T09:39:30.347548" elapsed="224.133286"/>
+</suite>
+<suite id="s1-s2" name="Generated Test 13" source="/home/eusouanderson/treino/AutomaWeb/Documentos/🧪_Login_Page/generated_test_13.robot">
+<test id="s1-s2-t1" name="Atualizar Página" line="9">
+<tag>robot:exit</tag>
+<status status="FAIL" start="2026-03-05T09:43:14.486070" elapsed="0.000232">Test execution stopped due to a fatal error.</status>
+</test>
+<status status="FAIL" start="2026-03-05T09:43:14.485738" elapsed="0.000749"/>
+</suite>
+<status status="FAIL" start="2026-03-05T09:39:30.318773" elapsed="224.168163"/>
+</suite>
+<statistics>
+<total>
+<stat pass="0" fail="2" skip="0">All Tests</stat>
+</total>
+<tag>
+<stat info="combined" combined="NOT robot:exit" pass="0" fail="1" skip="0">NOT robot:exit</stat>
+</tag>
+<suite>
+<stat name="Generated Test 12 &amp; Generated Test 13" id="s1" pass="0" fail="2" skip="0">Generated Test 12 &amp; Generated Test 13</stat>
+<stat name="Generated Test 12" id="s1-s1" pass="0" fail="1" skip="0">Generated Test 12 &amp; Generated Test 13.Generated Test 12</stat>
+<stat name="Generated Test 13" id="s1-s2" pass="0" fail="1" skip="0">Generated Test 12 &amp; Generated Test 13.Generated Test 13</stat>
+</suite>
+</statistics>
+<errors>
+<msg time="2026-03-05T09:39:30.449880" level="WARN">Open Browser is for quick experimentation and debugging only. Use New Page for production.</msg>
+</errors>
+</robot>

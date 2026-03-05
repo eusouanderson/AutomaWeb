@@ -1,5 +1,6 @@
 import pytest
 import pytest_asyncio
+import importlib
 
 import app.services.element_scanner as scanner_module
 from app.services.element_scanner import ElementScannerError, ElementScannerService
@@ -335,3 +336,21 @@ async def test_close_shared_browser_closes_and_stops(monkeypatch):
     assert playwright.stopped is True
     assert ElementScannerService._shared_browser is None
     assert ElementScannerService._shared_playwright is None
+
+
+def test_import_fallback_without_playwright(monkeypatch):
+    original_import = __import__
+
+    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "playwright.async_api":
+            raise ModuleNotFoundError("playwright missing")
+        return original_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr("builtins.__import__", fake_import)
+    reloaded = importlib.reload(scanner_module)
+
+    assert reloaded.async_playwright is None
+    assert reloaded.PlaywrightTimeoutError is TimeoutError
+
+    monkeypatch.setattr("builtins.__import__", original_import)
+    importlib.reload(scanner_module)
