@@ -41,6 +41,8 @@ frontend/
         api/
             client.js
             automaweb.api.js
+            test/
+                automaweb.api.spec.js
         services/
             test.service.js
             scan.service.js
@@ -65,13 +67,12 @@ frontend/
             dom.js
             validators.js
             helpers.js
+            test/
+                utils.spec.js
         styles/
             global.css
             layout.css
             components.css
-        tests/
-            api.test.js
-            utils.test.js
 ```
 
 ## Folder Responsibilities
@@ -83,4 +84,4 @@ frontend/
 - `state/`: centralized app state with subscribe/update pattern.
 - `utils/`: pure reusable helpers and DOM utilities.
 - `styles/`: global tokens, layout system, and component-level styles.
-- `tests/`: unit tests for API contract wrappers and pure utilities.
+- `test/`: unit tests colocated by domain using the `*.spec.js` pattern.

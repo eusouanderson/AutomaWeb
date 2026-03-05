@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { escapeHtml, truncate } from '../utils/helpers.js';
-import { isValidUrl, requiredText } from '../utils/validators.js';
+import { escapeHtml, truncate } from '../helpers.js';
+import { isValidUrl, requiredText } from '../validators.js';
 
 describe('validators', () => {
   it('validates required text with min chars', () => {

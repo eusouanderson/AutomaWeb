@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<robot generator="Robot 7.4.2 (Python 3.12.3 on linux)" generated="2026-03-05T14:14:46.083855" rpa="false" schemaversion="5">
+<robot generator="Robot 7.4.2 (Python 3.12.3 on linux)" generated="2026-03-05T16:27:38.673614" rpa="false" schemaversion="5">
 <suite id="s1" name="Documentos" source="/home/eusouanderson/treino/AutomaWeb/Documentos">
-<suite id="s1-s1" name="🧪 Login Page" source="/home/eusouanderson/treino/AutomaWeb/Documentos/🧪_Login_Page">
-<suite id="s1-s1-s1" name="Generated Test 32" source="/home/eusouanderson/treino/AutomaWeb/Documentos/🧪_Login_Page/generated_test_32.robot">
-<test id="s1-s1-s1-t1" name="Testar Login" line="12">
+<suite id="s1-s1" name="🧪 You tube" source="/home/eusouanderson/treino/AutomaWeb/Documentos/🧪_You_tube">
+<suite id="s1-s1-s1" name="Generated Test 45" source="/home/eusouanderson/treino/AutomaWeb/Documentos/🧪_You_tube/generated_test_45.robot">
+<test id="s1-s1-s1-t1" name="Testar Título" line="9">
 <kw name="New Browser" owner="Browser">
-<msg time="2026-03-05T14:14:46.202965" level="INFO">{"browser": "chromium", "headless": true, "chromiumSandbox": false, "devtools": false, "handleSIGHUP": true, "handleSIGINT": true, "handleSIGTERM": true, "slowMo": 0.0, "timeout": 30000.0, "tracesDir": "/home/eusouanderson/treino/AutomaWeb/browser/traces/temp/0ae391e6-ac0c-4591-ab66-493da0846675"}</msg>
-<msg time="2026-03-05T14:14:46.206927" level="INFO">Starting Browser process /home/eusouanderson/.cache/pypoetry/virtualenvs/automaweb-s9FmxQLL-py3.12/lib/python3.12/site-packages/Browser/wrapper/index.js using at 127.0.0.1:41947</msg>
-<msg time="2026-03-05T14:14:46.707330" level="INFO">Successfully created browser with options: {"browser":"chromium","headless":true,"chromiumSandbox":false,"devtools":false,"handleSIGHUP":true,"handleSIGINT":true,"handleSIGTERM":true,"slowMo":0,"timeout":30000,"tracesDir":"/home/eusouanderson/treino/AutomaWeb/browser/traces/temp/0ae391e6-ac0c-4591-ab66-493da0846675"}</msg>
+<msg time="2026-03-05T16:27:38.821547" level="INFO">{"browser": "chromium", "headless": true, "chromiumSandbox": false, "devtools": false, "handleSIGHUP": true, "handleSIGINT": true, "handleSIGTERM": true, "slowMo": 0.0, "timeout": 30000.0, "tracesDir": "/home/eusouanderson/treino/AutomaWeb/browser/traces/temp/e30d144c-15a4-46a5-ba21-ebb9bba3fcdc"}</msg>
+<msg time="2026-03-05T16:27:38.825146" level="INFO">Starting Browser process /home/eusouanderson/.cache/pypoetry/virtualenvs/automaweb-s9FmxQLL-py3.12/lib/python3.12/site-packages/Browser/wrapper/index.js using at 127.0.0.1:38649</msg>
+<msg time="2026-03-05T16:27:39.430822" level="INFO">Successfully created browser with options: {"browser":"chromium","headless":true,"chromiumSandbox":false,"devtools":false,"handleSIGHUP":true,"handleSIGINT":true,"handleSIGTERM":true,"slowMo":0,"timeout":30000,"tracesDir":"/home/eusouanderson/treino/AutomaWeb/browser/traces/temp/e30d144c-15a4-46a5-ba21-ebb9bba3fcdc"}</msg>
 <arg>chromium</arg>
 <tag>BrowserControl</tag>
 <tag>Setter</tag>
 <doc>Create a new playwright Browser with specified options.</doc>
-<status status="PASS" start="2026-03-05T14:14:46.202425" elapsed="0.505101"/>
+<status status="PASS" start="2026-03-05T16:27:38.820731" elapsed="0.610390"/>
 </kw>
 <kw name="New Context" owner="Browser">
-<msg time="2026-03-05T14:14:46.709104" level="INFO">{
+<msg time="2026-03-05T16:27:39.433890" level="INFO">{
   "acceptDownloads": true,
   "bypassCSP": false,
   "forcedColors": "none",
@@ -29,111 +29,452 @@
     "height": 720
   }
 }</msg>
-<msg time="2026-03-05T14:14:46.721465" level="INFO">Successfully created context. </msg>
-<msg time="2026-03-05T14:14:46.721572" level="INFO">{'acceptDownloads': True, 'bypassCSP': False, 'forcedColors': 'none', 'ignoreHTTPSErrors': False, 'javaScriptEnabled': True, 'offline': False, 'reducedMotion': 'no-preference', 'serviceWorkers': 'allow', 'viewport': {'width': 1280, 'height': 720}}</msg>
+<msg time="2026-03-05T16:27:39.453142" level="INFO">Successfully created context. </msg>
+<msg time="2026-03-05T16:27:39.453226" level="INFO">{'acceptDownloads': True, 'bypassCSP': False, 'forcedColors': 'none', 'ignoreHTTPSErrors': False, 'javaScriptEnabled': True, 'offline': False, 'reducedMotion': 'no-preference', 'serviceWorkers': 'allow', 'viewport': {'width': 1280, 'height': 720}}</msg>
 <tag>BrowserControl</tag>
 <tag>Setter</tag>
 <doc>Create a new BrowserContext with specified options.</doc>
-<status status="PASS" start="2026-03-05T14:14:46.707936" elapsed="0.013850"/>
+<status status="PASS" start="2026-03-05T16:27:39.431670" elapsed="0.021663"/>
 </kw>
 <kw name="New Page" owner="Browser">
-<msg time="2026-03-05T14:14:48.905840" level="INFO">Successfully initialized new page object and opened url: https://the-internet.herokuapp.com/login</msg>
+<msg time="2026-03-05T16:27:41.427419" level="INFO">Successfully initialized new page object and opened url: https://www.youtube.com/</msg>
 <arg>${url}</arg>
 <tag>BrowserControl</tag>
 <tag>Setter</tag>
 <doc>Open a new Page.</doc>
-<status status="PASS" start="2026-03-05T14:14:46.722260" elapsed="2.183891"/>
+<status status="PASS" start="2026-03-05T16:27:39.453678" elapsed="1.974003"/>
 </kw>
 <kw name="Wait For Elements State" owner="Browser">
-<msg time="2026-03-05T14:14:48.969077" level="INFO">Waited for Element with selector css=#username at state visible</msg>
-<arg>css=#username</arg>
+<msg time="2026-03-05T16:27:54.846318" level="INFO" html="true">&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td colspan="3"&gt;&lt;a href="browser/screenshot/fail-screenshot-1.png" target="_blank"&gt;&lt;img src="browser/screenshot/fail-screenshot-1.png" width="800px"/&gt;&lt;/a&gt;</msg>
+<msg time="2026-03-05T16:27:54.846429" level="INFO">See also file:///home/eusouanderson/treino/AutomaWeb/playwright-log.txt for additional details.</msg>
+<msg time="2026-03-05T16:27:54.846701" level="FAIL">Error: locator.waitFor: Error: strict mode violation: locator('#logo') resolved to 3 elements:
+    1) &lt;ytd-topbar-logo-renderer id="logo" class="style-scope ytd-masthead"&gt;…&lt;/ytd-topbar-logo-renderer&gt; aka locator('#start ytd-topbar-logo-renderer')
+    2) &lt;a href="/" id="logo" aria-label="" title="Página inicial do YouTube" class="yt-simple-endpoint style-scope ytd-topbar-logo-renderer"&gt;…&lt;/a&gt; aka getByRole('link', { name: 'Página inicial do YouTube' })
+    3) &lt;a href="/" id="logo" aria-label="" title="Página inicial do YouTube" class="yt-simple-endpoint style-scope ytd-topbar-logo-renderer"&gt;…&lt;/a&gt; aka locator('#guide-content').getByTitle('Página inicial do YouTube')
+
+Call log:
+  - waiting for locator('#logo') to be visible
+</msg>
+<arg>css=#logo</arg>
 <arg>visible</arg>
 <arg>10</arg>
 <tag>PageContent</tag>
 <tag>Wait</tag>
 <doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
-<status status="PASS" start="2026-03-05T14:14:48.906563" elapsed="0.062741"/>
-</kw>
-<kw name="Fill Text" owner="Browser">
-<msg time="2026-03-05T14:14:48.970576" level="INFO">Fills the text 'tomsmith' in the given field.</msg>
-<arg>css=#username</arg>
-<arg>${username}</arg>
-<tag>PageContent</tag>
-<tag>Setter</tag>
-<doc>Clears and fills the given ``txt`` into the text field found by ``selector``.</doc>
-<status status="PASS" start="2026-03-05T14:14:48.969667" elapsed="0.033726"/>
-</kw>
-<kw name="Fill Text" owner="Browser">
-<msg time="2026-03-05T14:14:49.004395" level="INFO">Fills the text 'SuperSecretPassword!' in the given field.</msg>
-<arg>css=#password</arg>
-<arg>${password}</arg>
-<tag>PageContent</tag>
-<tag>Setter</tag>
-<doc>Clears and fills the given ``txt`` into the text field found by ``selector``.</doc>
-<status status="PASS" start="2026-03-05T14:14:49.003739" elapsed="0.020619"/>
-</kw>
-<kw name="Click" owner="Browser">
-<msg time="2026-03-05T14:14:49.025363" level="INFO">Clicks the element 'css=button'.</msg>
-<arg>css=button</arg>
-<tag>PageContent</tag>
-<tag>Setter</tag>
-<doc>Simulates mouse click on the element found by ``selector``.</doc>
-<status status="PASS" start="2026-03-05T14:14:49.024734" elapsed="0.317601"/>
-</kw>
-<kw name="Wait For Elements State" owner="Browser">
-<msg time="2026-03-05T14:14:49.447014" level="INFO">Waited for Element with selector css=h2 at state visible</msg>
-<arg>css=h2</arg>
-<arg>visible</arg>
-<arg>10</arg>
-<tag>PageContent</tag>
-<tag>Wait</tag>
-<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
-<status status="PASS" start="2026-03-05T14:14:49.342824" elapsed="0.104332"/>
+<status status="FAIL" start="2026-03-05T16:27:41.428022" elapsed="13.420337">Error: locator.waitFor: Error: strict mode violation: locator('#logo') resolved to 3 elements:
+    1) &lt;ytd-topbar-logo-renderer id="logo" class="style-scope ytd-masthead"&gt;…&lt;/ytd-topbar-logo-renderer&gt; aka locator('#start ytd-topbar-logo-renderer')
+    2) &lt;a href="/" id="logo" aria-label="" title="Página inicial do YouTube" class="yt-simple-endpoint style-scope ytd-topbar-logo-renderer"&gt;…&lt;/a&gt; aka getByRole('link', { name: 'Página inicial do YouTube' })
+    3) &lt;a href="/" id="logo" aria-label="" title="Página inicial do YouTube" class="yt-simple-endpoint style-scope ytd-topbar-logo-renderer"&gt;…&lt;/a&gt; aka locator('#guide-content').getByTitle('Página inicial do YouTube')
+
+Call log:
+  - waiting for locator('#logo') to be visible
+</status>
 </kw>
 <kw name="Get Title" owner="Browser">
-<msg time="2026-03-05T14:14:49.451126" level="INFO">Title: 'The Internet'</msg>
-<msg time="2026-03-05T14:14:49.451286" level="INFO">${titulo_obtido} = The Internet</msg>
-<var>${titulo_obtido}</var>
+<var>${title}</var>
 <tag>Assertion</tag>
 <tag>Getter</tag>
 <tag>PageContent</tag>
 <doc>Returns the title of the current page.</doc>
-<status status="PASS" start="2026-03-05T14:14:49.447403" elapsed="0.003906"/>
+<status status="NOT RUN" start="2026-03-05T16:27:54.848609" elapsed="0.000079"/>
 </kw>
 <kw name="Should Be Equal" owner="BuiltIn">
-<arg>${titulo_obtido}</arg>
+<arg>${title}</arg>
 <arg>${titulo}</arg>
 <doc>Fails if the given objects are unequal.</doc>
-<status status="PASS" start="2026-03-05T14:14:49.451535" elapsed="0.000360"/>
+<status status="NOT RUN" start="2026-03-05T16:27:54.848839" elapsed="0.000063"/>
 </kw>
-<msg time="2026-03-05T14:14:49.468223" level="INFO">Switching context to context=9a8f8534-ab22-4267-b832-599bcdef036d in CURRENT</msg>
-<msg time="2026-03-05T14:14:49.475137" level="INFO">Successfully changed active context: context=9a8f8534-ab22-4267-b832-599bcdef036d</msg>
-<msg time="2026-03-05T14:14:49.482023" level="INFO">Successfully closed Context</msg>
-<status status="PASS" start="2026-03-05T14:14:46.201669" elapsed="3.250381"/>
-</test>
-<kw name="Close Browser" owner="Browser" type="TEARDOWN">
-<msg time="2026-03-05T14:14:49.515535" level="INFO">Closed browser</msg>
+<kw name="Close Browser" owner="Browser">
 <tag>BrowserControl</tag>
 <tag>Setter</tag>
 <doc>Closes the current browser.</doc>
-<status status="PASS" start="2026-03-05T14:14:49.482822" elapsed="0.032860"/>
+<status status="NOT RUN" start="2026-03-05T16:27:54.849027" elapsed="0.000044"/>
 </kw>
-<status status="PASS" start="2026-03-05T14:14:46.107321" elapsed="3.408440"/>
+<msg time="2026-03-05T16:27:54.865229" level="INFO">Switching context to context=35f4b3b7-1cc0-4829-8f08-942cb9445f97 in CURRENT</msg>
+<msg time="2026-03-05T16:27:54.874230" level="INFO">Successfully changed active context: context=35f4b3b7-1cc0-4829-8f08-942cb9445f97</msg>
+<msg time="2026-03-05T16:27:54.890539" level="INFO">Successfully closed Context</msg>
+<status status="FAIL" start="2026-03-05T16:27:38.819877" elapsed="16.029389">Error: locator.waitFor: Error: strict mode violation: locator('#logo') resolved to 3 elements:
+    1) &lt;ytd-topbar-logo-renderer id="logo" class="style-scope ytd-masthead"&gt;…&lt;/ytd-topbar-logo-renderer&gt; aka locator('#start ytd-topbar-logo-renderer')
+    2) &lt;a href="/" id="logo" aria-label="" title="Página inicial do YouTube" class="yt-simple-endpoint style-scope ytd-topbar-logo-renderer"&gt;…&lt;/a&gt; aka getByRole('link', { name: 'Página inicial do YouTube' })
+    3) &lt;a href="/" id="logo" aria-label="" title="Página inicial do YouTube" class="yt-simple-endpoint style-scope ytd-topbar-logo-renderer"&gt;…&lt;/a&gt; aka locator('#guide-content').getByTitle('Página inicial do YouTube')
+
+Call log:
+  - waiting for locator('#logo') to be visible
+</status>
+</test>
+<test id="s1-s1-s1-t2" name="Testar Botão de Navegação" line="18">
+<kw name="New Browser" owner="Browser">
+<msg time="2026-03-05T16:27:54.896196" level="INFO">Switching browser to browser=a03c055e-125b-4021-9254-bc81b2e369d4</msg>
+<msg time="2026-03-05T16:27:54.899636" level="INFO">Successfully changed active browser: browser=a03c055e-125b-4021-9254-bc81b2e369d4</msg>
+<msg time="2026-03-05T16:27:54.899855" level="INFO">Reusing existing browser with id: browser=a03c055e-125b-4021-9254-bc81b2e369d4</msg>
+<arg>chromium</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Create a new playwright Browser with specified options.</doc>
+<status status="PASS" start="2026-03-05T16:27:54.895427" elapsed="0.004536"/>
+</kw>
+<kw name="New Context" owner="Browser">
+<msg time="2026-03-05T16:27:54.902045" level="INFO">{
+  "acceptDownloads": true,
+  "bypassCSP": false,
+  "forcedColors": "none",
+  "ignoreHTTPSErrors": false,
+  "javaScriptEnabled": true,
+  "offline": false,
+  "reducedMotion": "no-preference",
+  "serviceWorkers": "allow",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  }
+}</msg>
+<msg time="2026-03-05T16:27:54.914284" level="INFO">Successfully created context. </msg>
+<msg time="2026-03-05T16:27:54.914399" level="INFO">{'acceptDownloads': True, 'bypassCSP': False, 'forcedColors': 'none', 'ignoreHTTPSErrors': False, 'javaScriptEnabled': True, 'offline': False, 'reducedMotion': 'no-preference', 'serviceWorkers': 'allow', 'viewport': {'width': 1280, 'height': 720}}</msg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Create a new BrowserContext with specified options.</doc>
+<status status="PASS" start="2026-03-05T16:27:54.900377" elapsed="0.014111"/>
+</kw>
+<kw name="New Page" owner="Browser">
+<msg time="2026-03-05T16:27:56.690860" level="INFO">Successfully initialized new page object and opened url: https://www.youtube.com/</msg>
+<arg>${url}</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Open a new Page.</doc>
+<status status="PASS" start="2026-03-05T16:27:54.914810" elapsed="1.776293"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<msg time="2026-03-05T16:28:06.783088" level="INFO" html="true">&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td colspan="3"&gt;&lt;a href="browser/screenshot/fail-screenshot-2.png" target="_blank"&gt;&lt;img src="browser/screenshot/fail-screenshot-2.png" width="800px"/&gt;&lt;/a&gt;</msg>
+<msg time="2026-03-05T16:28:06.783291" level="INFO">See also file:///home/eusouanderson/treino/AutomaWeb/playwright-log.txt for additional details.</msg>
+<msg time="2026-03-05T16:28:06.783502" level="FAIL">Error: locator.waitFor: Error: strict mode violation: locator('#button') resolved to 9 elements:
+    1) &lt;button id="button" aria-label="Voltar" class="style-scope yt-icon-button"&gt;…&lt;/button&gt; aka getByLabel('Voltar')
+    2) &lt;button id="button" aria-label="Guia" class="style-scope yt-icon-button"&gt;…&lt;/button&gt; aka getByRole('button', { name: 'Guia' })
+    3) &lt;button id="button" aria-label="Pesquisar" class="style-scope yt-icon-button"&gt;…&lt;/button&gt; aka locator('#search-button-narrow').getByLabel('Pesquisar')
+    4) &lt;div id="button" class="style-scope ytd-topbar-menu-button-renderer"&gt;…&lt;/div&gt; aka locator('#button').nth(3)
+    5) &lt;yt-icon-button id="button" class="style-scope ytd-topbar-menu-button-renderer style-default"&gt;…&lt;/yt-icon-button&gt; aka locator('ytd-topbar-menu-button-renderer a')
+    6) &lt;button id="button" aria-label="Configurações" class="style-scope yt-icon-button"&gt;…&lt;/button&gt; aka getByRole('button', { name: 'Configurações' })
+    7) &lt;button id="button" aria-pressed="true" class="style-scope yt-icon-button"&gt;…&lt;/button&gt; aka locator('.style-scope.ytd-app &gt; #button')
+    8) &lt;button id="button" class="style-scope yt-icon-button"&gt;…&lt;/button&gt; aka locator('.style-scope.ytd-channel-legal-info-renderer &gt; #button')
+    9) &lt;button id="button" aria-label="Recolher" class="style-scope yt-icon-button"&gt;…&lt;/button&gt; aka getByLabel('Recolher')
+
+Call log:
+  - waiting for locator('#button') to be visible
+</msg>
+<arg>css=#button</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="FAIL" start="2026-03-05T16:27:56.691387" elapsed="10.093213">Error: locator.waitFor: Error: strict mode violation: locator('#button') resolved to 9 elements:
+    1) &lt;button id="button" aria-label="Voltar" class="style-scope yt-icon-button"&gt;…&lt;/button&gt; aka getByLabel('Voltar')
+    2) &lt;button id="button" aria-label="Guia" class="style-scope yt-icon-button"&gt;…&lt;/button&gt; aka getByRole('button', { name: 'Guia' })
+    3) &lt;button id="button" aria-label="Pesquisar" class="style-scope yt-icon-button"&gt;…&lt;/button&gt; aka locator('#search-button-narrow').getByLabel('Pesquisar')
+    4) &lt;div id="button" class="style-scope ytd-topbar-menu-button-renderer"&gt;…&lt;/div&gt; aka locator('#button').nth(3)
+    5) &lt;yt-icon-button id="button" class="style-scope ytd-topbar-menu-button-renderer style-default"&gt;…&lt;/yt-icon-button&gt; aka locator('ytd-topbar-menu-button-renderer a')
+    6) &lt;button id="button" aria-label="Configurações" class="style-scope yt-icon-button"&gt;…&lt;/button&gt; aka getByRole('button', { name: 'Configurações' })
+    7) &lt;button id="button" aria-pressed="true" class="style-scope yt-icon-button"&gt;…&lt;/button&gt; aka locator('.style-scope.ytd-app &gt; #button')
+    8) &lt;button id="button" class="style-scope yt-icon-button"&gt;…&lt;/button&gt; aka locator('.style-scope.ytd-channel-legal-info-renderer &gt; #button')
+    9) &lt;button id="button" aria-label="Recolher" class="style-scope yt-icon-button"&gt;…&lt;/button&gt; aka getByLabel('Recolher')
+
+Call log:
+  - waiting for locator('#button') to be visible
+</status>
+</kw>
+<kw name="Click" owner="Browser">
+<arg>css=#button</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Simulates mouse click on the element found by ``selector``.</doc>
+<status status="NOT RUN" start="2026-03-05T16:28:06.784978" elapsed="0.000106"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<arg>css=.style-scope &gt;&gt; nth=0</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="NOT RUN" start="2026-03-05T16:28:06.785276" elapsed="0.000065"/>
+</kw>
+<kw name="Should Be Equal" owner="BuiltIn">
+<arg>${titulo}</arg>
+<arg>${titulo}</arg>
+<doc>Fails if the given objects are unequal.</doc>
+<status status="NOT RUN" start="2026-03-05T16:28:06.785516" elapsed="0.000057"/>
+</kw>
+<kw name="Go Back" owner="Browser">
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Navigates to the previous page in history.</doc>
+<status status="NOT RUN" start="2026-03-05T16:28:06.785704" elapsed="0.000070"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<arg>css=#button</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="NOT RUN" start="2026-03-05T16:28:06.785946" elapsed="0.000073"/>
+</kw>
+<kw name="Close Browser" owner="Browser">
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Closes the current browser.</doc>
+<status status="NOT RUN" start="2026-03-05T16:28:06.786225" elapsed="0.000049"/>
+</kw>
+<msg time="2026-03-05T16:28:06.800839" level="INFO">Switching context to context=79788340-333d-42a3-9453-fe523e34d985 in CURRENT</msg>
+<msg time="2026-03-05T16:28:06.809092" level="INFO">Successfully changed active context: context=79788340-333d-42a3-9453-fe523e34d985</msg>
+<msg time="2026-03-05T16:28:06.820387" level="INFO">Successfully closed Context</msg>
+<status status="FAIL" start="2026-03-05T16:27:54.891290" elapsed="11.895252">Error: locator.waitFor: Error: strict mode violation: locator('#button') resolved to 9 elements:
+    1) &lt;button id="button" aria-label="Voltar" class="style-scope yt-icon-button"&gt;…&lt;/button&gt; aka getByLabel('Voltar')
+    2) &lt;button id="button" aria-label="Guia" class="style-scope yt-icon-button"&gt;…&lt;/button&gt; aka getByRole('button', { name: 'Guia' })
+    3) &lt;button id="button" aria-label="Pesquisar" class="style-scope yt-icon-button"&gt;…&lt;/button&gt; aka locator('#search-button-narrow').getByLabel('Pesquisar')
+    4) &lt;div id="button" class="style-scope ytd-topbar-menu-button-renderer"&gt;…&lt;/div&gt; aka locator('#button').nth(3)
+    5) &lt;yt-icon-button id="button" class="style-scope ytd-topbar-menu-button-renderer style-default"&gt;…&lt;/yt-icon-button&gt; aka locator('ytd-topbar-menu-button-renderer a')
+    6) &lt;button id="button" aria-label="Configurações" class="style-scope yt-icon-button"&gt;…&lt;/button&gt; aka getByRole('button', { name: 'Configurações' })
+    7) &lt;button id="button" aria-pressed="true" class="style-scope yt-icon-button"&gt;…&lt;/button&gt; aka locator('.style-scope.ytd-app &gt; #button')
+    8) &lt;button id="button" class="style-scope yt-icon-button"&gt;…&lt;/button&gt; aka locator('.style-scope.ytd-channel-legal-info-renderer &gt; #button')
+    9) &lt;button id="button" aria-label="Recolher" class="style-scope yt-icon-button"&gt;…&lt;/button&gt; aka getByLabel('Recolher')
+
+Call log:
+  - waiting for locator('#button') to be visible
+</status>
+</test>
+<test id="s1-s1-s1-t3" name="Testar Campo de Pesquisa" line="30">
+<kw name="New Browser" owner="Browser">
+<msg time="2026-03-05T16:28:06.825813" level="INFO">Switching browser to browser=a03c055e-125b-4021-9254-bc81b2e369d4</msg>
+<msg time="2026-03-05T16:28:06.827944" level="INFO">Successfully changed active browser: browser=a03c055e-125b-4021-9254-bc81b2e369d4</msg>
+<msg time="2026-03-05T16:28:06.828129" level="INFO">Reusing existing browser with id: browser=a03c055e-125b-4021-9254-bc81b2e369d4</msg>
+<arg>chromium</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Create a new playwright Browser with specified options.</doc>
+<status status="PASS" start="2026-03-05T16:28:06.825259" elapsed="0.002987"/>
+</kw>
+<kw name="New Context" owner="Browser">
+<msg time="2026-03-05T16:28:06.829888" level="INFO">{
+  "acceptDownloads": true,
+  "bypassCSP": false,
+  "forcedColors": "none",
+  "ignoreHTTPSErrors": false,
+  "javaScriptEnabled": true,
+  "offline": false,
+  "reducedMotion": "no-preference",
+  "serviceWorkers": "allow",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  }
+}</msg>
+<msg time="2026-03-05T16:28:06.840068" level="INFO">Successfully created context. </msg>
+<msg time="2026-03-05T16:28:06.840201" level="INFO">{'acceptDownloads': True, 'bypassCSP': False, 'forcedColors': 'none', 'ignoreHTTPSErrors': False, 'javaScriptEnabled': True, 'offline': False, 'reducedMotion': 'no-preference', 'serviceWorkers': 'allow', 'viewport': {'width': 1280, 'height': 720}}</msg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Create a new BrowserContext with specified options.</doc>
+<status status="PASS" start="2026-03-05T16:28:06.828605" elapsed="0.011683"/>
+</kw>
+<kw name="New Page" owner="Browser">
+<msg time="2026-03-05T16:28:08.730699" level="INFO">Successfully initialized new page object and opened url: https://www.youtube.com/</msg>
+<arg>${url}</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Open a new Page.</doc>
+<status status="PASS" start="2026-03-05T16:28:06.840602" elapsed="1.890327"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<msg time="2026-03-05T16:28:08.889143" level="INFO">Waited for Element with selector css=input[name="search_query"] at state visible</msg>
+<arg>css=input[name="search_query"]</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="PASS" start="2026-03-05T16:28:08.731175" elapsed="0.158241"/>
+</kw>
+<kw name="Input Text">
+<msg time="2026-03-05T16:28:08.891649" level="FAIL">No keyword with name 'Input Text' found.</msg>
+<arg>css=input[name="search_query"]</arg>
+<arg>teste</arg>
+<status status="FAIL" start="2026-03-05T16:28:08.891463" elapsed="0.000254">No keyword with name 'Input Text' found.</status>
+</kw>
+<kw name="Click" owner="Browser">
+<arg>css=button.ytSearchboxComponentSearchButton</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Simulates mouse click on the element found by ``selector``.</doc>
+<status status="NOT RUN" start="2026-03-05T16:28:08.892013" elapsed="0.000103"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<arg>css=.style-scope &gt;&gt; nth=0</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="NOT RUN" start="2026-03-05T16:28:08.892518" elapsed="0.000110"/>
+</kw>
+<kw name="Should Be Equal" owner="BuiltIn">
+<arg>${titulo}</arg>
+<arg>${titulo}</arg>
+<doc>Fails if the given objects are unequal.</doc>
+<status status="NOT RUN" start="2026-03-05T16:28:08.892827" elapsed="0.000075"/>
+</kw>
+<kw name="Go Back" owner="Browser">
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Navigates to the previous page in history.</doc>
+<status status="NOT RUN" start="2026-03-05T16:28:08.893068" elapsed="0.000063"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<arg>css=input[name="search_query"]</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="NOT RUN" start="2026-03-05T16:28:08.893315" elapsed="0.000060"/>
+</kw>
+<kw name="Close Browser" owner="Browser">
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Closes the current browser.</doc>
+<status status="NOT RUN" start="2026-03-05T16:28:08.893535" elapsed="0.000055"/>
+</kw>
+<msg time="2026-03-05T16:28:08.926657" level="INFO">Switching context to context=608a03b6-45af-4926-b7fa-f62cee86663d in CURRENT</msg>
+<msg time="2026-03-05T16:28:08.939183" level="INFO">Successfully changed active context: context=608a03b6-45af-4926-b7fa-f62cee86663d</msg>
+<msg time="2026-03-05T16:28:08.959232" level="INFO">Successfully closed Context</msg>
+<status status="FAIL" start="2026-03-05T16:28:06.821679" elapsed="2.072140">No keyword with name 'Input Text' found.</status>
+</test>
+<test id="s1-s1-s1-t4" name="Testar Link de Login" line="43">
+<kw name="New Browser" owner="Browser">
+<msg time="2026-03-05T16:28:08.964004" level="INFO">Switching browser to browser=a03c055e-125b-4021-9254-bc81b2e369d4</msg>
+<msg time="2026-03-05T16:28:08.968137" level="INFO">Successfully changed active browser: browser=a03c055e-125b-4021-9254-bc81b2e369d4</msg>
+<msg time="2026-03-05T16:28:08.968356" level="INFO">Reusing existing browser with id: browser=a03c055e-125b-4021-9254-bc81b2e369d4</msg>
+<arg>chromium</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Create a new playwright Browser with specified options.</doc>
+<status status="PASS" start="2026-03-05T16:28:08.963193" elapsed="0.005234"/>
+</kw>
+<kw name="New Context" owner="Browser">
+<msg time="2026-03-05T16:28:08.969963" level="INFO">{
+  "acceptDownloads": true,
+  "bypassCSP": false,
+  "forcedColors": "none",
+  "ignoreHTTPSErrors": false,
+  "javaScriptEnabled": true,
+  "offline": false,
+  "reducedMotion": "no-preference",
+  "serviceWorkers": "allow",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  }
+}</msg>
+<msg time="2026-03-05T16:28:08.976380" level="INFO">Successfully created context. </msg>
+<msg time="2026-03-05T16:28:08.976515" level="INFO">{'acceptDownloads': True, 'bypassCSP': False, 'forcedColors': 'none', 'ignoreHTTPSErrors': False, 'javaScriptEnabled': True, 'offline': False, 'reducedMotion': 'no-preference', 'serviceWorkers': 'allow', 'viewport': {'width': 1280, 'height': 720}}</msg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Create a new BrowserContext with specified options.</doc>
+<status status="PASS" start="2026-03-05T16:28:08.968749" elapsed="0.007866"/>
+</kw>
+<kw name="New Page" owner="Browser">
+<msg time="2026-03-05T16:28:10.889708" level="INFO">Successfully initialized new page object and opened url: https://www.youtube.com/</msg>
+<arg>${url}</arg>
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Open a new Page.</doc>
+<status status="PASS" start="2026-03-05T16:28:08.977029" elapsed="1.912879"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<msg time="2026-03-05T16:28:11.056387" level="INFO">Waited for Element with selector css=a.yt-spec-button-shape-next at state visible</msg>
+<arg>css=a.yt-spec-button-shape-next</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="PASS" start="2026-03-05T16:28:10.890178" elapsed="0.166373"/>
+</kw>
+<kw name="Click" owner="Browser">
+<msg time="2026-03-05T16:28:11.057290" level="INFO">Clicks the element 'css=a.yt-spec-button-shape-next'.</msg>
+<arg>css=a.yt-spec-button-shape-next</arg>
+<tag>PageContent</tag>
+<tag>Setter</tag>
+<doc>Simulates mouse click on the element found by ``selector``.</doc>
+<status status="PASS" start="2026-03-05T16:28:11.056822" elapsed="0.712753"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<msg time="2026-03-05T16:28:21.829360" level="INFO" html="true">&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td colspan="3"&gt;&lt;a href="browser/screenshot/fail-screenshot-3.png" target="_blank"&gt;&lt;img src="browser/screenshot/fail-screenshot-3.png" width="800px"/&gt;&lt;/a&gt;</msg>
+<msg time="2026-03-05T16:28:21.829610" level="INFO">See also file:///home/eusouanderson/treino/AutomaWeb/playwright-log.txt for additional details.</msg>
+<msg time="2026-03-05T16:28:21.829796" level="FAIL">TimeoutError: locator.waitFor: Timeout 10000ms exceeded.
+Call log:
+  - waiting for locator('.yt-spec-button-shape-next').first() to be visible
+</msg>
+<arg>css=.yt-spec-button-shape-next &gt;&gt; nth=0</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="FAIL" start="2026-03-05T16:28:11.770010" elapsed="10.060943">TimeoutError: locator.waitFor: Timeout 10000ms exceeded.
+Call log:
+  - waiting for locator('.yt-spec-button-shape-next').first() to be visible
+</status>
+</kw>
+<kw name="Should Be Equal" owner="BuiltIn">
+<arg>${titulo}</arg>
+<arg>${titulo}</arg>
+<doc>Fails if the given objects are unequal.</doc>
+<status status="NOT RUN" start="2026-03-05T16:28:21.831377" elapsed="0.000168"/>
+</kw>
+<kw name="Go Back" owner="Browser">
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Navigates to the previous page in history.</doc>
+<status status="NOT RUN" start="2026-03-05T16:28:21.831869" elapsed="0.000138"/>
+</kw>
+<kw name="Wait For Elements State" owner="Browser">
+<arg>css=a.yt-spec-button-shape-next</arg>
+<arg>visible</arg>
+<arg>10</arg>
+<tag>PageContent</tag>
+<tag>Wait</tag>
+<doc>Waits for the element found by ``selector`` to satisfy state option.</doc>
+<status status="NOT RUN" start="2026-03-05T16:28:21.832308" elapsed="0.000097"/>
+</kw>
+<kw name="Close Browser" owner="Browser">
+<tag>BrowserControl</tag>
+<tag>Setter</tag>
+<doc>Closes the current browser.</doc>
+<status status="NOT RUN" start="2026-03-05T16:28:21.832685" elapsed="0.000087"/>
+</kw>
+<msg time="2026-03-05T16:28:21.854540" level="INFO">Switching context to context=0c0a6689-16d8-449e-b995-0d0a84ed1266 in CURRENT</msg>
+<msg time="2026-03-05T16:28:21.866029" level="INFO">Successfully changed active context: context=0c0a6689-16d8-449e-b995-0d0a84ed1266</msg>
+<msg time="2026-03-05T16:28:21.876318" level="INFO">Successfully closed Context</msg>
+<status status="FAIL" start="2026-03-05T16:28:08.960197" elapsed="12.872885">TimeoutError: locator.waitFor: Timeout 10000ms exceeded.
+Call log:
+  - waiting for locator('.yt-spec-button-shape-next').first() to be visible
+</status>
+</test>
+<status status="FAIL" start="2026-03-05T16:27:38.704810" elapsed="43.172872"/>
 </suite>
-<status status="PASS" start="2026-03-05T14:14:46.106612" elapsed="3.415555"/>
+<status status="FAIL" start="2026-03-05T16:27:38.704003" elapsed="43.179603"/>
 </suite>
-<status status="PASS" start="2026-03-05T14:14:46.084551" elapsed="3.438144"/>
+<status status="FAIL" start="2026-03-05T16:27:38.674832" elapsed="43.209889"/>
 </suite>
 <statistics>
 <total>
-<stat pass="1" fail="0" skip="0">All Tests</stat>
+<stat pass="0" fail="4" skip="0">All Tests</stat>
 </total>
 <tag>
 </tag>
 <suite>
-<stat name="Documentos" id="s1" pass="1" fail="0" skip="0">Documentos</stat>
-<stat name="🧪 Login Page" id="s1-s1" pass="1" fail="0" skip="0">Documentos.🧪 Login Page</stat>
-<stat name="Generated Test 32" id="s1-s1-s1" pass="1" fail="0" skip="0">Documentos.🧪 Login Page.Generated Test 32</stat>
+<stat name="Documentos" id="s1" pass="0" fail="4" skip="0">Documentos</stat>
+<stat name="🧪 You tube" id="s1-s1" pass="0" fail="4" skip="0">Documentos.🧪 You tube</stat>
+<stat name="Generated Test 45" id="s1-s1-s1" pass="0" fail="4" skip="0">Documentos.🧪 You tube.Generated Test 45</stat>
 </suite>
 </statistics>
 <errors>

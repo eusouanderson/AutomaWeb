@@ -26,6 +26,21 @@ function buildExecutionFeedback(data) {
   return lines.join('\n').slice(0, 6000);
 }
 
+function extractExecutionMessage(data) {
+  if (data?.error_output) {
+    const firstLine = String(data.error_output)
+      .split('\n')
+      .find((line) => line.trim());
+    return firstLine || 'A execucao dos testes falhou.';
+  }
+
+  if (Number(data?.failed || 0) > 0) {
+    return `Execucao concluida com falhas: ${data.failed} teste(s) falharam.`;
+  }
+
+  return 'Testes executados com sucesso!';
+}
+
 export function initScannerPage({ onRecreateRequested }) {
   const testsProjectSelect = document.getElementById('tests-project');
   const testsList = document.getElementById('tests-list');
@@ -240,7 +255,11 @@ export function initScannerPage({ onRecreateRequested }) {
       logButton.dataset.logPath = data.log_file || '';
 
       setRecreatePanel(data, projectId);
-      toast('Testes executados com sucesso!');
+
+      const hasFailure =
+        data.status === 'failed' || Number(data.failed || 0) > 0 || Boolean(data.error_output);
+
+      toast(extractExecutionMessage(data), hasFailure ? 'error' : 'success');
     } catch (error) {
       toast(error.message, 'error');
     } finally {

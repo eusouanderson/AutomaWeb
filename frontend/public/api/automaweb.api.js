@@ -25,7 +25,12 @@ export function generateRobotTest(payload) {
 }
 
 export function runTests(payload) {
-  return request({ method: 'POST', url: '/executions/run', data: payload });
+  return request({
+    method: 'POST',
+    url: '/executions/run',
+    data: payload,
+    timeout: 600000
+  });
 }
 
 export function scanProject(url, onMessage) {

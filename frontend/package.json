@@ -7,7 +7,7 @@
     "dev": "echo 'Frontend servido pelo FastAPI'",
     "build": "echo 'No build step needed for vanilla JS'",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:unit": "vitest"
   },
   "dependencies": {
     "axios": "^1.6.0",

@@ -1,17 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('../api/client.js', () => ({
+vi.mock('../client.js', () => ({
   request: vi.fn(),
   streamPost: vi.fn()
 }));
 
-import {
-  createProject,
-  generateRobotTest,
-  listProjects,
-  scanProject
-} from '../api/automaweb.api.js';
-import { request, streamPost } from '../api/client.js';
+import { createProject, generateRobotTest, listProjects, scanProject } from '../automaweb.api.js';
+import { request, streamPost } from '../client.js';
 
 describe('automaweb.api', () => {
   it('delegates listProjects to request()', async () => {

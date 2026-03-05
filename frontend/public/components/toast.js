@@ -11,7 +11,10 @@ export function toast(message, type = 'success') {
       duration: 3000,
       gravity: 'top',
       position: 'right',
-      backgroundColor: palette[type] || palette.info
+      backgroundColor: palette[type] || palette.info,
+      style: {
+        borderRadius: '14px'
+      }
     })
     .showToast();
 }

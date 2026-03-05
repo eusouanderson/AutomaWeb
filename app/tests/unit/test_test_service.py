@@ -388,6 +388,38 @@ def test_sanitize_robot_output_applies_strict_mode_on_non_class_selector() -> No
     assert "Click    css=#login >> nth=0" in cleaned
 
 
+def test_sanitize_robot_output_applies_strict_mode_on_raw_id_selector() -> None:
+    service = TestService(groq_client=DummyGroqClient())
+    content = (
+        "*** Settings ***\n"
+        "Library    Browser\n"
+        "*** Test Cases ***\n"
+        "Caso\n"
+        "    Wait For Elements State    #logo    visible    10\n"
+    )
+    context = "strict mode violation: locator('#logo') resolved to 3 elements"
+
+    cleaned = service._sanitize_robot_output(content, context=context)
+
+    assert "Wait For Elements State    css=#logo >> nth=0    visible    10" in cleaned
+
+
+def test_sanitize_robot_output_applies_strict_mode_on_raw_attribute_selector() -> None:
+    service = TestService(groq_client=DummyGroqClient())
+    content = (
+        "*** Settings ***\n"
+        "Library    Browser\n"
+        "*** Test Cases ***\n"
+        "Caso\n"
+        "    Click    [aria-label=\"Guia\"]\n"
+    )
+    context = "strict mode violation: locator('[aria-label=\"Guia\"]') resolved to 2 elements"
+
+    cleaned = service._sanitize_robot_output(content, context=context)
+
+    assert "Click    css=[aria-label=\"Guia\"] >> nth=0" in cleaned
+
+
 def test_normalize_selector_covers_css_and_dot_prefixes() -> None:
     service = TestService(groq_client=DummyGroqClient())
 

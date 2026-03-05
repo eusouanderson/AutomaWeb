@@ -244,7 +244,15 @@ class TestService:
             return f"css={selector[4:]}"
         if selector.startswith("xpath:"):
             return f"xpath={selector[6:]}"
+        if selector.startswith("#"):
+            return f"css={selector}"
+        if selector.startswith("["):
+            return f"css={selector}"
+        if selector.startswith("/") or selector.startswith("("):
+            return f"xpath={selector}"
         if selector.startswith("."):
+            return f"css={selector}"
+        if re.match(r"^[a-zA-Z][\w-]*(?:[\[\.:#].*)?$", selector):
             return f"css={selector}"
         return selector
 
@@ -259,4 +267,8 @@ class TestService:
             return selector
         if selector.startswith("css="):
             return f"{selector} >> nth=0"
+        if selector.startswith("#") or selector.startswith("[") or re.match(
+            r"^[a-zA-Z][\w-]*(?:[\[\.:#].*)?$", selector
+        ):
+            return f"css={selector} >> nth=0"
         return selector
