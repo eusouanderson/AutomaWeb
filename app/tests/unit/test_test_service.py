@@ -432,3 +432,57 @@ def test_make_selector_unique_covers_already_unique_and_non_css() -> None:
 
     assert service._make_selector_unique("css=.card-title >> nth=0") == "css=.card-title >> nth=0"
     assert service._make_selector_unique("xpath=//button") == "xpath=//button"
+
+
+def test_sanitize_injects_set_browser_timeout_after_new_context() -> None:
+    service = TestService(groq_client=DummyGroqClient())
+    content = (
+        "*** Settings ***\n"
+        "Library    Browser\n"
+        "*** Test Cases ***\n"
+        "Caso\n"
+        "    New Browser    chromium\n"
+        "    New Context\n"
+        "    New Page    https://example.com\n"
+    )
+    cleaned = service._sanitize_robot_output(content)
+    lines = cleaned.splitlines()
+    ctx_idx = next(i for i, l in enumerate(lines) if l.strip() == "New Context")
+    assert "Set Browser Timeout    30s" in lines[ctx_idx + 1]
+
+
+def test_sanitize_removes_useless_wait_before_get_title() -> None:
+    service = TestService(groq_client=DummyGroqClient())
+    content = (
+        "*** Settings ***\n"
+        "Library    Browser\n"
+        "*** Test Cases ***\n"
+        "Testar Título\n"
+        "    New Browser    chromium\n"
+        "    New Context\n"
+        "    New Page    https://example.com\n"
+        "    Wait For Elements State    css=h1    visible    10\n"
+        "    ${titulo_atual}    Get Title\n"
+        "    Should Be Equal    ${titulo_atual}    Example Domain\n"
+    )
+    cleaned = service._sanitize_robot_output(content)
+    assert "Wait For Elements State    css=h1" not in cleaned
+    assert "Get Title" in cleaned
+    assert "Should Be Equal" in cleaned
+
+
+def test_sanitize_converts_open_browser_and_injects_timeout() -> None:
+    service = TestService(groq_client=DummyGroqClient())
+    content = (
+        "*** Settings ***\n"
+        "Library    Browser\n"
+        "*** Test Cases ***\n"
+        "Caso\n"
+        "    Open Browser    https://example.com    browser=chrome\n"
+    )
+    cleaned = service._sanitize_robot_output(content)
+    assert "New Browser" in cleaned
+    assert "New Context" in cleaned
+    assert "Set Browser Timeout    30s" in cleaned
+    assert "New Page    https://example.com" in cleaned
+    assert "Open Browser" not in cleaned

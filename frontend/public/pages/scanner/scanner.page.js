@@ -224,6 +224,93 @@ export function initScannerPage({ onRecreateRequested }) {
     }
   });
 
+  const EXEC_PHASES = [
+    { id: 'prepare', label: 'Preparando ambiente' },
+    { id: 'heal', label: 'Validando e curando testes (AI)' },
+    { id: 'run', label: 'Executando testes Robot' },
+    { id: 'report', label: 'Gerando relatórios' }
+  ];
+
+  function buildExecTracker() {
+    executionLoading.innerHTML = `
+      <p class="gen-title" id="exec-phase-title">Iniciando execução…</p>
+      <ol class="gen-steps" role="list">
+        ${EXEC_PHASES.map(
+          (p) => `
+          <li class="gen-step gen-step--idle" data-phase="${p.id}">
+            <span class="gen-step-icon" aria-hidden="true"></span>
+            <span class="gen-step-label">${p.label}</span>
+          </li>
+        `
+        ).join('')}
+      </ol>
+    `;
+
+    const phaseTitle = executionLoading.querySelector('#exec-phase-title');
+    const getEl = (id) => executionLoading.querySelector(`[data-phase="${id}"]`);
+
+    return {
+      activate(phaseId) {
+        const phase = EXEC_PHASES.find((p) => p.id === phaseId);
+        if (phaseTitle && phase) phaseTitle.textContent = `${phase.label}…`;
+        let found = false;
+        for (const p of EXEC_PHASES) {
+          const el = getEl(p.id);
+          if (!el) continue;
+          if (p.id === phaseId) {
+            el.className = 'gen-step gen-step--active';
+            found = true;
+          } else if (!found) {
+            el.className = 'gen-step gen-step--done';
+          } else {
+            el.className = 'gen-step gen-step--idle';
+          }
+        }
+      },
+      complete() {
+        for (const p of EXEC_PHASES) {
+          const el = getEl(p.id);
+          if (el) el.className = 'gen-step gen-step--done';
+        }
+        if (phaseTitle) phaseTitle.textContent = 'Execução concluída';
+      },
+      error(phaseId) {
+        const el = getEl(phaseId);
+        if (el) el.className = 'gen-step gen-step--error';
+        if (phaseTitle) phaseTitle.textContent = 'Execução falhou';
+      }
+    };
+  }
+
+  function renderTestCases(data) {
+    const testListEl = document.getElementById('execution-test-list');
+    if (!testListEl) return;
+
+    const cases = data.test_cases;
+    if (!cases?.length) {
+      testListEl.innerHTML = '';
+      return;
+    }
+
+    testListEl.innerHTML = cases
+      .map((tc) => {
+        const st = (tc.status || '').toUpperCase();
+        const cls = st === 'PASS' ? 'pass' : st === 'FAIL' ? 'fail' : 'skip';
+        const icon = st === 'PASS' ? '✅' : st === 'FAIL' ? '❌' : '⏭️';
+        const msg = tc.message ? `<div class="exec-test-item-msg">${tc.message}</div>` : '';
+        return `
+          <div class="exec-test-item exec-test-item--${cls}">
+            <span class="exec-test-item-status">${icon}</span>
+            <div>
+              <div class="exec-test-item-name">${tc.name}</div>
+              ${msg}
+            </div>
+          </div>
+        `;
+      })
+      .join('');
+  }
+
   executeForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
 
@@ -231,19 +318,43 @@ export function initScannerPage({ onRecreateRequested }) {
     const submitButton = executeForm.querySelector('button[type="submit"]');
     const originalLabel = submitButton.textContent;
 
+    let tracker = null;
+    let currentPhase = 'prepare';
+
     try {
       resetExecutionResult();
       submitButton.disabled = true;
-      submitButton.textContent = 'Executando...';
+      submitButton.textContent = 'Executando…';
       executionLoading.classList.remove('hidden');
 
+      tracker = buildExecTracker();
+      tracker.activate('prepare');
+
+      const t1 = setTimeout(() => {
+        currentPhase = 'heal';
+        tracker.activate('heal');
+      }, 3000);
+      const t2 = setTimeout(() => {
+        currentPhase = 'run';
+        tracker.activate('run');
+      }, 8000);
+
       const data = await executeProjectTests(projectId);
+
+      clearTimeout(t1);
+      clearTimeout(t2);
+      currentPhase = 'report';
+      tracker.activate('report');
+      await new Promise((r) => setTimeout(r, 600));
+      tracker.complete();
 
       executionResult.style.display = 'block';
       statTotal.textContent = String(data.total_tests || 0);
       statPassed.textContent = String(data.passed || 0);
       statFailed.textContent = String(data.failed || 0);
       statSkipped.textContent = String(data.skipped || 0);
+
+      renderTestCases(data);
 
       if (data.error_output) {
         executionError.textContent = data.error_output;
@@ -260,12 +371,13 @@ export function initScannerPage({ onRecreateRequested }) {
         data.status === 'failed' || Number(data.failed || 0) > 0 || Boolean(data.error_output);
 
       toast(extractExecutionMessage(data), hasFailure ? 'error' : 'success');
+      setTimeout(() => executionLoading.classList.add('hidden'), 1500);
     } catch (error) {
+      if (tracker) tracker.error(currentPhase);
       toast(error.message, 'error');
     } finally {
       submitButton.disabled = false;
       submitButton.textContent = originalLabel;
-      executionLoading.classList.add('hidden');
     }
   });
 

@@ -112,7 +112,7 @@ async def test_list_projects_route(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_generate_test_route_success(monkeypatch, tmp_path) -> None:
-    async def fake_generate_test(self, session: AsyncSession, project_id: int, prompt: str, context: str | None = None):
+    async def fake_generate_test(self, session: AsyncSession, project_id: int, prompt: str, context: str | None = None, ai_debug: bool = False):
         return GeneratedTest(
             id=1,
             test_request_id=1,
@@ -131,7 +131,7 @@ async def test_generate_test_route_success(monkeypatch, tmp_path) -> None:
 
 @pytest.mark.asyncio
 async def test_generate_test_route_error(monkeypatch) -> None:
-    async def fake_generate_test(self, session: AsyncSession, project_id: int, prompt: str, context: str | None = None):
+    async def fake_generate_test(self, session: AsyncSession, project_id: int, prompt: str, context: str | None = None, ai_debug: bool = False):
         raise ValueError("Project not found")
 
     monkeypatch.setattr(routes.TestService, "generate_test", fake_generate_test)
@@ -264,7 +264,7 @@ async def test_delete_project_route_not_found(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_execute_tests_route_success(monkeypatch) -> None:
-    async def fake_execute_tests(self, session: AsyncSession, project_id: int, test_ids=None):
+    async def fake_execute_tests(self, session: AsyncSession, project_id: int, test_ids=None, ai_debug: bool = False):
         return TestExecution(
             id=1,
             project_id=project_id,
@@ -289,7 +289,7 @@ async def test_execute_tests_route_success(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_execute_tests_route_error(monkeypatch) -> None:
-    async def fake_execute_tests(self, session: AsyncSession, project_id: int, test_ids=None):
+    async def fake_execute_tests(self, session: AsyncSession, project_id: int, test_ids=None, ai_debug: bool = False):
         raise ValueError("Project not found")
 
     monkeypatch.setattr(routes.TestExecutionService, "execute_tests", fake_execute_tests)
@@ -339,7 +339,7 @@ async def test_list_project_tests_route_not_found(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_generate_test_route_llm_unavailable(monkeypatch) -> None:
-    async def fake_generate_test(self, session: AsyncSession, project_id: int, prompt: str, context: str | None = None):
+    async def fake_generate_test(self, session: AsyncSession, project_id: int, prompt: str, context: str | None = None, ai_debug: bool = False):
         raise LLMServiceUnavailableError("upstream unavailable")
 
     monkeypatch.setattr(routes.TestService, "generate_test", fake_generate_test)
@@ -353,7 +353,7 @@ async def test_generate_test_route_llm_unavailable(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_generate_test_route_scan_unavailable(monkeypatch) -> None:
-    async def fake_generate_test(self, session: AsyncSession, project_id: int, prompt: str, context: str | None = None):
+    async def fake_generate_test(self, session: AsyncSession, project_id: int, prompt: str, context: str | None = None, ai_debug: bool = False):
         raise ScanUnavailableError("scan failed")
 
     monkeypatch.setattr(routes.TestService, "generate_test", fake_generate_test)

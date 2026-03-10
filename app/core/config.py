@@ -19,6 +19,13 @@ class Settings(BaseSettings):
     GROQ_INSECURE_SKIP_VERIFY: bool = False
     CACHE_TTL_SECONDS: int = 300
     STATIC_DIR: str = "app/static"
+    AI_VALIDATION_ENABLED: bool = True
+    AI_DEBUG: bool = False
+    AI_DEBUG_LOG_PATH: str = "logs/ai_debug.log"
+    # When True, opens the real page to count locator matches (adds latency).
+    # Set to False in CI or when page access is unavailable.
+    AI_LIVE_CHECK_ENABLED: bool = False
+    AI_LIVE_CHECK_TIMEOUT_SECONDS: int = 15
 
 
 settings = Settings()

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pathlib import Path
 
 from app.api.deps import get_db
+from app.ai_validation.metrics import AIMetricsRegistry
 from app.schemas.generated_test import GeneratedTestOut, GeneratedTestSummaryOut
 from app.schemas.project import ProjectCreate, ProjectOut
 from app.schemas.scan import ScanRequest
@@ -81,6 +82,7 @@ async def generate_test(payload: TestGenerateRequest, session: AsyncSession = De
             project_id=payload.project_id,
             prompt=payload.prompt,
             context=payload.context,
+            ai_debug=payload.ai_debug,
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -167,6 +169,7 @@ async def execute_tests(payload: TestExecutionRequest, session: AsyncSession = D
             session=session,
             project_id=payload.project_id,
             test_ids=payload.test_ids,
+            ai_debug=payload.ai_debug,
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -176,5 +179,10 @@ async def execute_tests(payload: TestExecutionRequest, session: AsyncSession = D
 @router.get("/executions/{execution_id}/report")
 async def get_execution_report(execution_id: int) -> FileResponse:
     """Serve the MkDocs generated report."""
-    # This would need to fetch the execution from database and return the report
     raise HTTPException(status_code=501, detail="Not implemented yet")
+
+
+@router.get("/ai/metrics")
+async def get_ai_metrics() -> dict[str, float | int]:
+    """Return AI self-healing metrics."""
+    return AIMetricsRegistry.instance().as_dict()

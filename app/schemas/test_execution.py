@@ -7,6 +7,13 @@ from pydantic import BaseModel, ConfigDict
 class TestExecutionRequest(BaseModel):
     project_id: int
     test_ids: list[int] | None = None  # Se None, executa todos os testes do projeto
+    ai_debug: bool = False
+
+
+class TestCaseResult(BaseModel):
+    name: str
+    status: str  # PASS, FAIL, SKIP, UNKNOWN
+    message: str | None = None
 
 
 class TestExecutionResult(BaseModel):
@@ -26,3 +33,4 @@ class TestExecutionResult(BaseModel):
     completed_at: datetime | None = None
     error_output: str | None = None
     mkdocs_index: str | None = None
+    test_cases: list[TestCaseResult] = []

@@ -85,18 +85,30 @@ class GroqClient:
             "Objetivo: gerar testes estáveis, executáveis e funcionais no Browser Library. "
             "Regras obrigatórias: "
             "1) NÃO use 'Open Browser'. Use sempre 'New Browser    chromium', 'New Context' e 'New Page'. "
-            "2) Inclua fechamento com 'Close Browser' via teardown (preferencialmente Test Teardown ou Suite Teardown). "
-            "3) Antes de qualquer ação, faça espera explícita com 'Wait For Elements State' (visible/attached) com timeout entre 10-15s. "
-            "4) Use seletores válidos do Browser Library: 'css=#id', 'css=.class', 'css=[attr=\"v\"]', 'xpath=...'. "
-            "5) NÃO use o formato inválido 'id:algo'. "
-            "6) Prefira seletores estáveis: data-testid, role+name, aria-label, name. Use id somente se for único e estável. "
-            "6.1) Evite id genérico/reutilizado (#button, #logo etc.) em sites com Web Components (ex.: YouTube). "
-            "6.2) Quando houver risco de ambiguidade, use seletor mais específico (escopo + atributo), por exemplo: "
+            "2) Após 'New Context', adicione SEMPRE: 'Set Browser Timeout    30s' para definir timeout global. "
+            "3) Inclua fechamento com 'Close Browser' via teardown (preferencialmente Test Teardown ou Suite Teardown). "
+            "4) Antes de interações com elementos DOM (Click, Fill Text, Input Text), use 'Wait For Elements State    <selector>    visible    30s'. "
+            "   EXCEÇÃO IMPORTANTE: NÃO use 'Wait For Elements State' antes de 'Get Title' ou 'Get Url'. "
+            "   Para verificar título da página, use EXATAMENTE este padrão: "
+            "   New Page → (Wait For Load State    load  OU  aguarde algum elemento da página) → Get Title → Should Be Equal. "
+            "   O 'Get Title' lê o <title> do HTML head; não há nenhum elemento DOM a esperar. "
+            "5) Use seletores válidos do Browser Library: 'css=#id', 'css=.class', 'css=[attr=\"v\"]', 'xpath=...'. "
+            "6) NÃO use o formato inválido 'id:algo'. "
+            "7) Prefira seletores estáveis: data-testid, role+name, aria-label, name. Use id somente se for único e estável. "
+            "7.1) Evite id genérico/reutilizado (#button, #logo etc.) em sites com Web Components (ex.: YouTube). "
+            "7.2) Quando houver risco de ambiguidade, use seletor mais específico (escopo + atributo), por exemplo: "
             "'css=ytd-masthead button[aria-label=\"Guia\"]' ou 'css=input[name=\"search_query\"]'. "
-            "7) Para validação de título, use '${titulo}    Get Title' seguido de 'Should Be Equal'. "
-            "8) Mantenha o cenário solicitado pelo usuário, sem inventar passos fora do fluxo principal. "
-            "9) Gere comandos de navegação robustos (ex.: Go Back apenas após página de detalhe estar visível). "
-            "10) Se houver múltiplos casos, mantenha cada caso independente e reprodutível."
+            "8) Para validação de título, use '${titulo}    Get Title' seguido de 'Should Be Equal'. "
+            "9) Mantenha o cenário solicitado pelo usuário, sem inventar passos fora do fluxo principal. "
+            "10) Gere comandos de navegação robustos (ex.: Go Back apenas após página de detalhe estar visível). "
+            "11) Se houver múltiplos casos, mantenha cada caso independente e reprodutível. "
+            "12) Nunca use XPath genérico como '//div', '//a', '//*[@id=...]' sem escopo estável. "
+            "13) Prefira seletores com 'getByRole/getByLabel' representados em Browser selector engine como "
+            "'role=button[name=\"...\"]' quando possível. "
+            "14) Evite estritamente seletores ambíguos; se houver múltiplas correspondências, "
+            "use escopo estável ou '>> nth=0' explicitamente. "
+            "15) NÃO invente seletores como 'css=h1' para verificar o título — o título vem de Get Title, não de um h1 visível. "
+            "    Somente use 'Wait For Elements State    css=h1' se o h1 for um elemento que o usuário precisa interagir ou verificar como texto visível."
         )
         if page_structure:
             system_prompt = (
@@ -119,3 +131,35 @@ class GroqClient:
         content = response.choices[0].message.content
         self._cache.set(cache_key, content)
         return content
+
+    def regenerate_robot_step(
+        self,
+        original_prompt: str,
+        failing_step: str,
+        error_message: str,
+        context: str | None = None,
+    ) -> str:
+        """Regenerate only one Robot step for a failing locator/action."""
+        system_prompt = (
+            "Você corrige apenas UMA linha de step de Robot Framework usando Browser Library. "
+            "Retorne apenas a linha corrigida, sem markdown, sem explicações. "
+            "A linha precisa conter wait explícito ou locator estável, evitando estrito ambíguo."
+        )
+
+        user_content = (
+            f"Prompt original:\n{original_prompt}\n\n"
+            f"Contexto adicional:\n{context or 'N/A'}\n\n"
+            f"Step com falha:\n{failing_step}\n\n"
+            f"Erro:\n{error_message}\n\n"
+            "Gere a linha substituta equivalente e robusta."
+        )
+
+        response = self._client.chat.completions.create(
+            model=settings.GROQ_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content},
+            ],
+        )
+        content = (response.choices[0].message.content or "").strip()
+        return content.splitlines()[0] if content else ""

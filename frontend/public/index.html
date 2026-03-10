@@ -154,9 +154,8 @@
             <button type="submit" class="btn btn-primary">▶️ Executar Testes</button>
           </form>
 
-          <div id="execution-loading" class="execution-loading hidden" aria-live="polite">
-            <span class="spinner" aria-hidden="true"></span>
-            <span>Executando testes... aguarde.</span>
+          <div id="execution-loading" class="gen-progress hidden" aria-live="polite" role="status">
+            <!-- populated dynamically by scanner.page.js -->
           </div>
         </div>
 
@@ -181,6 +180,7 @@
               <span id="stat-skipped">0</span>
             </div>
           </div>
+          <div id="execution-test-list" class="exec-test-list"></div>
           <div class="result-actions">
             <button id="view-report-btn" class="btn btn-primary">📊 Ver Relatório MkDocs</button>
             <button id="view-robot-report-btn" class="btn btn-secondary">🤖 Relatório Robot</button>

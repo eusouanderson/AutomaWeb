@@ -314,7 +314,7 @@ def test_sync_reports_for_static_handles_copy_error(tmp_path, monkeypatch) -> No
 def test_parse_robot_output_missing_file(tmp_path) -> None:
     service = TestExecutionService()
     stats = service._parse_robot_output(tmp_path / "output.xml")
-    assert stats == {"total": 0, "passed": 0, "failed": 0, "skipped": 0}
+    assert stats == {"total": 0, "passed": 0, "failed": 0, "skipped": 0, "test_cases": []}
 
 
 def test_parse_robot_output_success(tmp_path) -> None:
@@ -347,7 +347,7 @@ def test_parse_robot_output_without_stat_returns_zeros(tmp_path) -> None:
 
     stats = service._parse_robot_output(output)
 
-    assert stats == {"total": 0, "passed": 0, "failed": 0, "skipped": 0}
+    assert stats == {"total": 0, "passed": 0, "failed": 0, "skipped": 0, "test_cases": []}
 
 
 def test_parse_robot_output_invalid_xml(tmp_path) -> None:
@@ -357,7 +357,7 @@ def test_parse_robot_output_invalid_xml(tmp_path) -> None:
 
     stats = service._parse_robot_output(output)
 
-    assert stats == {"total": 0, "passed": 0, "failed": 0, "skipped": 0}
+    assert stats == {"total": 0, "passed": 0, "failed": 0, "skipped": 0, "test_cases": []}
 
 
 def test_ensure_rfbrowser_handles_exception(monkeypatch) -> None:

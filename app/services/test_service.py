@@ -7,6 +7,7 @@ from pathlib import Path
 from sqlalchemy.ext.asyncio import AsyncSession
 from tenacity import RetryError
 
+from app.ai_validation.self_healing_service import AITestSelfHealingService
 from app.core.config import settings
 from app.llm.groq_client import GroqClient
 from app.models.generated_test import GeneratedTest
@@ -40,6 +41,7 @@ class TestService:
         self._project_repository = project_repository or ProjectRepository()
         self._groq_client = groq_client or GroqClient()
         self._element_scanner = element_scanner or ElementScannerService()
+        self._self_healing = AITestSelfHealingService()
 
     async def generate_test(
         self,
@@ -47,6 +49,7 @@ class TestService:
         project_id: int,
         prompt: str,
         context: str | None = None,
+        ai_debug: bool = False,
     ) -> GeneratedTest:
         project = await self._project_repository.get(session, project_id)
         if not project:
@@ -88,6 +91,18 @@ class TestService:
             raise
 
         content = self._sanitize_robot_output(content, context=context)
+
+        if settings.AI_VALIDATION_ENABLED:
+            healed = await self._self_healing.heal_test(
+                content=content,
+                page_url=str(project.url) if project.url else None,
+                prompt=prompt,
+                context=context,
+                groq_client=self._groq_client,
+                ai_debug=ai_debug,
+            )
+            content = healed.final_content
+
         test_request.status = "completed"
         await self._test_repository.update_test_request(session, test_request)
 
@@ -211,7 +226,15 @@ class TestService:
                 page_url = parts[1]
                 hardened.append(f"{indent}New Browser    chromium")
                 hardened.append(f"{indent}New Context")
+                hardened.append(f"{indent}Set Browser Timeout    30s")
                 hardened.append(f"{indent}New Page    {page_url}")
+                continue
+
+            if keyword == "New Context":
+                hardened.append(line)
+                # Inject a global 30s timeout right after New Context so every
+                # Wait / interaction uses 30s by default instead of the 10s default.
+                hardened.append(f"{indent}Set Browser Timeout    30s")
                 continue
 
             if keyword in selector_keywords and len(parts) >= 2:
@@ -230,7 +253,38 @@ class TestService:
 
             hardened.append(line)
 
+        # Pass 2: remove Wait For Elements State lines that are immediately
+        # before a Get Title call – those waits are logically wrong because
+        # Get Title reads document.title from <head>, not from a visible element.
+        hardened = self._fix_title_check_waits(hardened)
         return hardened
+
+    def _fix_title_check_waits(self, lines: list[str]) -> list[str]:
+        """Remove Wait For Elements State that appear just before Get Title."""
+        result: list[str] = []
+        skip_next_blank = False
+        i = 0
+        while i < len(lines):
+            stripped = lines[i].strip()
+            parts = re.split(r"\s{2,}", stripped)
+            keyword = parts[0] if parts else ""
+
+            if keyword == "Wait For Elements State":
+                # Look ahead (skip blanks) to find the next real keyword line
+                j = i + 1
+                while j < len(lines) and not lines[j].strip():
+                    j += 1
+                if j < len(lines):
+                    next_stripped = lines[j].strip()
+                    # Matches both "Get Title" and "${var}    Get Title"
+                    if "Get Title" in next_stripped or "Get Url" in next_stripped:
+                        # Drop this Wait – it is unnecessary and often wrong
+                        i += 1
+                        continue
+
+            result.append(lines[i])
+            i += 1
+        return result
 
     def _extract_strict_mode_selectors(self, context: str | None) -> set[str]:
         if not context:

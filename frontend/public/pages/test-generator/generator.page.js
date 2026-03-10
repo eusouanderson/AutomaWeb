@@ -6,6 +6,61 @@ import { loadTemplate, qs, renderHTML } from '../../utils/dom.js';
 
 const TEMPLATE_PATH = '/static/frontend/pages/test-generator/generator.html';
 
+const GEN_STEPS = [
+  { id: 'analyze', label: 'Analyzing page context' },
+  { id: 'generate', label: 'Generating test with AI' },
+  { id: 'validate', label: 'Validating & healing' },
+  { id: 'finalize', label: 'Finalizing' }
+];
+
+function buildProgressTracker(container) {
+  container.innerHTML = `
+    <p class="gen-title">Generating test…</p>
+    <ol class="gen-steps" role="list">
+      ${GEN_STEPS.map((s) => `
+        <li class="gen-step gen-step--idle" data-step="${s.id}">
+          <span class="gen-step-icon" aria-hidden="true"></span>
+          <span class="gen-step-label">${s.label}</span>
+        </li>
+      `).join('')}
+    </ol>
+  `;
+
+  const getEl = (id) => container.querySelector(`[data-step="${id}"]`);
+
+  return {
+    activate(stepId) {
+      let found = false;
+      for (const step of GEN_STEPS) {
+        const el = getEl(step.id);
+        if (!el) continue;
+        if (step.id === stepId) {
+          el.className = 'gen-step gen-step--active';
+          found = true;
+        } else if (!found) {
+          el.className = 'gen-step gen-step--done';
+        } else {
+          el.className = 'gen-step gen-step--idle';
+        }
+      }
+    },
+    complete() {
+      for (const step of GEN_STEPS) {
+        const el = getEl(step.id);
+        if (el) el.className = 'gen-step gen-step--done';
+      }
+      const title = container.querySelector('.gen-title');
+      if (title) title.textContent = 'Test generated';
+    },
+    error(stepId) {
+      const el = getEl(stepId);
+      if (el) el.className = 'gen-step gen-step--error';
+      const title = container.querySelector('.gen-title');
+      if (title) title.textContent = 'Generation failed';
+    }
+  };
+}
+
 export async function mount(root, context) {
   const template = await loadTemplate(TEMPLATE_PATH);
   renderHTML(root, template);
@@ -16,6 +71,7 @@ export async function mount(root, context) {
   const outputActions = qs('#generated-output-actions', root);
   const output = qs('#generated-output', root);
   const codeBlock = qs('#generated-code', root);
+  const progressEl = qs('#generation-progress', root);
 
   const helpModal = createModal({
     title: 'Prompt tips',
@@ -30,7 +86,8 @@ export async function mount(root, context) {
 
   root.appendChild(helpModal.element);
 
-  actions.appendChild(createButton({ label: 'Generate test', type: 'submit', variant: 'primary' }));
+  const submitBtn = createButton({ label: 'Generate test', type: 'submit', variant: 'primary' });
+  actions.appendChild(submitBtn);
   actions.appendChild(
     createButton({ label: 'Prompt tips', variant: 'ghost', onClick: () => helpModal.open() })
   );
@@ -61,6 +118,19 @@ export async function mount(root, context) {
   const onSubmit = async (event) => {
     event.preventDefault();
 
+    submitBtn.disabled = true;
+    output.classList.add('hidden');
+    progressEl.classList.remove('hidden');
+
+    const tracker = buildProgressTracker(progressEl);
+    tracker.activate('analyze');
+
+    let currentStep = 'analyze';
+    const step2Timer = setTimeout(() => {
+      currentStep = 'generate';
+      tracker.activate('generate');
+    }, 2500);
+
     try {
       const result = await generateTestFromPrompt({
         projectId: Number(select.value),
@@ -68,12 +138,24 @@ export async function mount(root, context) {
         context: qs('#generator-context', root).value
       });
 
+      clearTimeout(step2Timer);
+      tracker.activate('validate');
+      await new Promise((r) => setTimeout(r, 500));
+      tracker.activate('finalize');
+      await new Promise((r) => setTimeout(r, 400));
+      tracker.complete();
+
       context.store.setState({ lastGeneratedTest: result });
       codeBlock.textContent = result.content || '';
       output.classList.remove('hidden');
-      toast('Test generated');
+      setTimeout(() => progressEl.classList.add('hidden'), 1200);
+      toast('Test generated successfully');
     } catch (error) {
+      clearTimeout(step2Timer);
+      tracker.error(currentStep);
       toast(error.message, 'error');
+    } finally {
+      submitBtn.disabled = false;
     }
   };
 
@@ -84,4 +166,11 @@ export async function mount(root, context) {
     form.removeEventListener('submit', onSubmit);
     helpModal.element.remove();
   };
+}
+
+export function createLoader(label = 'Loading...') {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'loader';
+  wrapper.innerHTML = `<span class="loader-dot" aria-hidden="true"></span><span>${label}</span>`;
+  return wrapper;
 }

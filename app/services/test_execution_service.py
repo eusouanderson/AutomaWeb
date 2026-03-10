@@ -9,6 +9,7 @@ from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai_validation.self_healing_service import AITestSelfHealingService
 from app.core.config import settings
 from app.models.test_execution import TestExecution
 from app.repositories.project_repository import ProjectRepository
@@ -29,12 +30,14 @@ class TestExecutionService:
     ) -> None:
         self._project_repository = project_repository or ProjectRepository()
         self._test_repository = test_repository or TestRepository()
+        self._self_healing = AITestSelfHealingService()
 
     async def execute_tests(
         self,
         session: AsyncSession,
         project_id: int,
         test_ids: list[int] | None = None,
+        ai_debug: bool = False,
     ) -> TestExecution:
         """Execute Robot Framework tests for a project."""
         project = await self._project_repository.get(session, project_id)
@@ -67,6 +70,13 @@ class TestExecutionService:
 
         if not test_files:
             raise ValueError(f"No test files found in {project_dir}")
+
+        if settings.AI_VALIDATION_ENABLED:
+            test_files = await self._apply_pre_execution_healing(
+                test_files=test_files,
+                page_url=str(project.url) if project.url else None,
+                ai_debug=ai_debug,
+            )
 
         run_id = f"{project_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
@@ -120,6 +130,7 @@ class TestExecutionService:
             execution.passed = stats["passed"]
             execution.failed = stats["failed"]
             execution.skipped = stats["skipped"]
+            execution.test_cases = stats.get("test_cases", [])  # non-persisted, passed to schema
             execution.status = "completed" if result.returncode == 0 else "failed"
             if result.returncode != 0:
                 execution.error_output = (result.stderr or result.stdout or "").strip() or "Test execution failed"
@@ -151,6 +162,32 @@ class TestExecutionService:
         # Save execution record to database (you'll need to create a repository for this)
         # For now, just return the execution object
         return execution
+
+    async def _apply_pre_execution_healing(
+        self,
+        test_files: list[str],
+        page_url: str | None,
+        ai_debug: bool,
+    ) -> list[str]:
+        """Validate and heal generated .robot files before execution."""
+        healed_files: list[str] = []
+        for file_path in test_files:
+            path = Path(file_path)
+            if not path.exists():
+                continue
+
+            content = path.read_text(encoding="utf-8")
+            healed = await self._self_healing.heal_test(
+                content=content,
+                page_url=page_url,
+                ai_debug=ai_debug,
+            )
+            if healed.final_content != content:
+                path.write_text(healed.final_content, encoding="utf-8")
+
+            healed_files.append(str(path))
+
+        return healed_files
 
     def _ensure_rfbrowser(self) -> None:
         """Install Browser dependencies if missing."""
@@ -208,29 +245,45 @@ class TestExecutionService:
         )
 
     def _parse_robot_output(self, output_file: Path) -> dict:
-        """Parse Robot Framework output.xml to extract statistics."""
+        """Parse Robot Framework output.xml to extract statistics and per-test results."""
         import xml.etree.ElementTree as ET
 
+        empty = {"total": 0, "passed": 0, "failed": 0, "skipped": 0, "test_cases": []}
         if not output_file.exists():
-            return {"total": 0, "passed": 0, "failed": 0, "skipped": 0}
+            return empty
 
         try:
             tree = ET.parse(output_file)
             root = tree.getroot()
-            
-            # Find statistics element
+
+            stats = {"total": 0, "passed": 0, "failed": 0, "skipped": 0}
+
+            # Aggregate statistics from the toplevel stat element
             stats_elem = root.find(".//statistics/total/stat")
             if stats_elem is not None:
-                return {
-                    "total": int(stats_elem.get("pass", 0)) + int(stats_elem.get("fail", 0)),
-                    "passed": int(stats_elem.get("pass", 0)),
-                    "failed": int(stats_elem.get("fail", 0)),
-                    "skipped": int(stats_elem.get("skip", 0)),
-                }
+                stats["passed"] = int(stats_elem.get("pass", 0))
+                stats["failed"] = int(stats_elem.get("fail", 0))
+                stats["skipped"] = int(stats_elem.get("skip", 0))
+                stats["total"] = stats["passed"] + stats["failed"] + stats["skipped"]
+
+            # Extract individual test case results
+            test_cases = []
+            for test_elem in root.iter("test"):
+                status_elem = test_elem.find("status")
+                if status_elem is not None:
+                    msg = (status_elem.text or "").strip() or None
+                    test_cases.append({
+                        "name": test_elem.get("name", "Unknown"),
+                        "status": status_elem.get("status", "UNKNOWN"),
+                        "message": msg,
+                    })
+
+            stats["test_cases"] = test_cases
+            return stats
         except Exception as e:
             logger.error(f"Failed to parse output.xml: {e}")
 
-        return {"total": 0, "passed": 0, "failed": 0, "skipped": 0}
+        return empty
 
     async def _generate_mkdocs_report(self, project, output_dir: Path, stats: dict) -> None:
         """Generate MkDocs documentation for test results."""

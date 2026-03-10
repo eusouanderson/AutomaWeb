@@ -5,7 +5,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
-
 class GeneratedTest(Base):
     """Generated test model."""
 
@@ -18,3 +17,4 @@ class GeneratedTest(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     test_request = relationship("TestRequest", back_populates="generated_test")
+
