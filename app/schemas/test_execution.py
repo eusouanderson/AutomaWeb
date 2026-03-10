@@ -6,8 +6,9 @@ from pydantic import BaseModel, ConfigDict
 
 class TestExecutionRequest(BaseModel):
     project_id: int
-    test_ids: list[int] | None = None  # Se None, executa todos os testes do projeto
+    test_ids: list[int] | None = None  # se None, executa todos os testes do projeto
     ai_debug: bool = False
+    headless: bool = True  # True = sem janela (CI), False = abre o navegador
 
 
 class TestCaseResult(BaseModel):

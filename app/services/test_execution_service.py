@@ -2,8 +2,10 @@
 import asyncio
 import logging
 import os
+import re
 import shutil
 import subprocess
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -38,6 +40,7 @@ class TestExecutionService:
         project_id: int,
         test_ids: list[int] | None = None,
         ai_debug: bool = False,
+        headless: bool = True,
     ) -> TestExecution:
         """Execute Robot Framework tests for a project."""
         project = await self._project_repository.get(session, project_id)
@@ -106,6 +109,10 @@ class TestExecutionService:
         # Ensure Browser deps installed
         await asyncio.to_thread(self._ensure_rfbrowser)
 
+        # Prepare temp copies with headless variable injected
+        prepared_files, temp_dir = self._prepare_test_files(test_files, headless)
+        headless_var = "True" if headless else "False"
+
         # Execute Robot Framework tests
         try:
             result = await asyncio.to_thread(
@@ -116,7 +123,8 @@ class TestExecutionService:
                     "--log", "log.html",
                     "--report", "report.html",
                     "--output", "output.xml",
-                    *test_files,
+                    "--variable", f"HEADLESS:{headless_var}",
+                    *prepared_files,
                 ],
                 capture_output=True,
                 text=True,
@@ -159,9 +167,30 @@ class TestExecutionService:
             self._sync_reports_for_static(output_dir, public_output_dir)
             logger.error(f"Test execution failed: {e}")
 
+        # Cleanup temp directory
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
         # Save execution record to database (you'll need to create a repository for this)
         # For now, just return the execution object
         return execution
+
+    def _prepare_test_files(self, test_files: list[str], headless: bool) -> tuple[list[str], Path]:
+        """Copy test files to a temp dir, injecting headless=${HEADLESS} in every New Browser call."""
+        temp_dir = Path(tempfile.mkdtemp(prefix="robot_run_"))
+        prepared: list[str] = []
+        for fp in test_files:
+            src = Path(fp)
+            content = src.read_text(encoding="utf-8")
+            # Add headless=${HEADLESS} to any `New Browser  <browser>` not already specifying headless
+            content = re.sub(
+                r"(New Browser\s+\S+)(?!.*headless=)",
+                r"\1    headless=${HEADLESS}",
+                content,
+            )
+            dst = temp_dir / src.name
+            dst.write_text(content, encoding="utf-8")
+            prepared.append(str(dst))
+        return prepared, temp_dir
 
     async def _apply_pre_execution_healing(
         self,

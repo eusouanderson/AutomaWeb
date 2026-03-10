@@ -64,6 +64,22 @@ export function initScannerPage({ onRecreateRequested }) {
   const recreateButton = document.getElementById('recreate-test-btn');
   const executionFeedback = document.getElementById('execution-feedback');
 
+  const executeTestSelector = document.getElementById('execute-test-selector');
+  const executeTestListCheck = document.getElementById('execute-test-list-check');
+  const execSelectAllBtn = document.getElementById('exec-select-all');
+  const execDeselectAllBtn = document.getElementById('exec-deselect-all');
+  const execHeadlessCheckbox = document.getElementById('exec-headless');
+
+  function getHeadless() {
+    return execHeadlessCheckbox ? execHeadlessCheckbox.checked : true;
+  }
+
+  function getSelectedTestIds() {
+    const checked = executeTestListCheck?.querySelectorAll('.exec-test-check:checked') ?? [];
+    const ids = [...checked].map((cb) => Number(cb.value));
+    return ids;
+  }
+
   function resetExecutionResult() {
     executionResult.style.display = 'none';
     statTotal.textContent = '0';
@@ -191,6 +207,41 @@ export function initScannerPage({ onRecreateRequested }) {
       resetExecutionResult();
     } catch (error) {
       toast(error.message, 'error');
+    }
+  }
+
+  async function loadExecuteTests(projectId) {
+    if (!executeTestSelector || !executeTestListCheck) return;
+
+    if (!projectId) {
+      executeTestSelector.classList.add('hidden');
+      return;
+    }
+
+    executeTestSelector.classList.remove('hidden');
+    executeTestListCheck.innerHTML = '<div class="loading">Carregando testes...</div>';
+
+    try {
+      const tests = await getProjectGeneratedTests(projectId);
+      if (!tests.length) {
+        executeTestListCheck.innerHTML =
+          '<div class="empty">Nenhum teste gerado para este projeto.</div>';
+        return;
+      }
+
+      executeTestListCheck.innerHTML = tests
+        .map(
+          (t) => `
+          <label class="test-check-row">
+            <input type="checkbox" class="exec-test-check" value="${t.id}" checked />
+            <span class="test-check-name">${t.file_path.split('/').pop()}</span>
+            <span class="test-check-id">#${t.id}</span>
+          </label>
+        `
+        )
+        .join('');
+    } catch (_) {
+      executeTestListCheck.innerHTML = '<div class="empty">Erro ao carregar testes.</div>';
     }
   }
 
@@ -339,7 +390,7 @@ export function initScannerPage({ onRecreateRequested }) {
         tracker.activate('run');
       }, 8000);
 
-      const data = await executeProjectTests(projectId);
+      const data = await executeProjectTests(projectId, getSelectedTestIds(), getHeadless());
 
       clearTimeout(t1);
       clearTimeout(t2);
@@ -383,6 +434,18 @@ export function initScannerPage({ onRecreateRequested }) {
 
   executeProjectSelect?.addEventListener('change', () => {
     resetExecutionResult();
+    const projectId = Number.parseInt(executeProjectSelect.value, 10);
+    loadExecuteTests(projectId);
+  });
+
+  execSelectAllBtn?.addEventListener('click', () => {
+    executeTestListCheck?.querySelectorAll('.exec-test-check').forEach((cb) => (cb.checked = true));
+  });
+
+  execDeselectAllBtn?.addEventListener('click', () => {
+    executeTestListCheck
+      ?.querySelectorAll('.exec-test-check')
+      .forEach((cb) => (cb.checked = false));
   });
 
   recreateButton?.addEventListener('click', async () => {

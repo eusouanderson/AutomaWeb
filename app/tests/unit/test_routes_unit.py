@@ -264,7 +264,7 @@ async def test_delete_project_route_not_found(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_execute_tests_route_success(monkeypatch) -> None:
-    async def fake_execute_tests(self, session: AsyncSession, project_id: int, test_ids=None, ai_debug: bool = False):
+    async def fake_execute_tests(self, session: AsyncSession, project_id: int, test_ids=None, ai_debug: bool = False, headless: bool = True):
         return TestExecution(
             id=1,
             project_id=project_id,
@@ -289,7 +289,7 @@ async def test_execute_tests_route_success(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_execute_tests_route_error(monkeypatch) -> None:
-    async def fake_execute_tests(self, session: AsyncSession, project_id: int, test_ids=None, ai_debug: bool = False):
+    async def fake_execute_tests(self, session: AsyncSession, project_id: int, test_ids=None, ai_debug: bool = False, headless: bool = True):
         raise ValueError("Project not found")
 
     monkeypatch.setattr(routes.TestExecutionService, "execute_tests", fake_execute_tests)

@@ -170,6 +170,7 @@ async def execute_tests(payload: TestExecutionRequest, session: AsyncSession = D
             project_id=payload.project_id,
             test_ids=payload.test_ids,
             ai_debug=payload.ai_debug,
+            headless=payload.headless,
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

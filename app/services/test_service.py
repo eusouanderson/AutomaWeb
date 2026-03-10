@@ -224,7 +224,7 @@ class TestService:
 
             if keyword == "Open Browser" and len(parts) >= 2:
                 page_url = parts[1]
-                hardened.append(f"{indent}New Browser    chromium")
+                hardened.append(f"{indent}New Browser    chromium    headless=${{HEADLESS}}")
                 hardened.append(f"{indent}New Context")
                 hardened.append(f"{indent}Set Browser Timeout    30s")
                 hardened.append(f"{indent}New Page    {page_url}")

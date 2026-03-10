@@ -46,12 +46,16 @@ export async function generateTestFromPrompt({ projectId, prompt, context }) {
   });
 }
 
-export async function executeProjectTests(projectId) {
+export async function executeProjectTests(projectId, testIds = null, headless = true) {
   if (!projectId) {
     throw new Error('Project is required for execution');
   }
 
-  return runTests({ project_id: projectId, test_ids: null });
+  return runTests({
+    project_id: projectId,
+    test_ids: testIds?.length ? testIds : null,
+    headless
+  });
 }
 
 export async function getProjectGeneratedTests(projectId) {

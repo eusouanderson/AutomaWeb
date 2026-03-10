@@ -151,7 +151,33 @@
                 <option value="">Selecione um projeto...</option>
               </select>
             </div>
+
+            <div id="execute-test-selector" class="test-selector hidden">
+              <div class="test-selector-head">
+                <span class="test-selector-title">Testes disponíveis</span>
+                <div class="test-selector-actions">
+                  <button type="button" id="exec-select-all" class="btn btn-ghost">
+                    Selecionar todos
+                  </button>
+                  <button type="button" id="exec-deselect-all" class="btn btn-ghost">
+                    Limpar seleção
+                  </button>
+                </div>
+              </div>
+              <div id="execute-test-list-check" class="test-selector-list">
+                <div class="loading">Carregando testes...</div>
+              </div>
+              <p class="test-selector-hint">
+                Deixe todos desmarcados para executar todos os testes do projeto.
+              </p>
+            </div>
+
             <button type="submit" class="btn btn-primary">▶️ Executar Testes</button>
+
+            <label class="headless-toggle">
+              <input type="checkbox" id="exec-headless" checked />
+              <span>Modo silencioso (sem abrir o navegador)</span>
+            </label>
           </form>
 
           <div id="execution-loading" class="gen-progress hidden" aria-live="polite" role="status">
