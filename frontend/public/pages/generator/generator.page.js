@@ -2,6 +2,9 @@ import { toast } from '../../components/toast.js';
 import { runProjectScan } from '../../services/scan.service.js';
 import { generateTestFromPrompt, getProjects } from '../../services/test.service.js';
 
+const GEN_STORAGE_PROMPT = 'gen_prompt';
+const GEN_STORAGE_CONTEXT = 'gen_context';
+
 export function initGeneratorPage({ store }) {
   const form = document.getElementById('generate-test-form');
   const projectSelect = document.getElementById('test-project');
@@ -31,6 +34,18 @@ export function initGeneratorPage({ store }) {
       generateFromExecutionFeedback: async () => {}
     };
   }
+
+  // Restore saved values from localStorage
+  if (promptInput) promptInput.value = localStorage.getItem(GEN_STORAGE_PROMPT) || '';
+  if (contextInput) contextInput.value = localStorage.getItem(GEN_STORAGE_CONTEXT) || '';
+
+  // Persist values on each keystroke
+  promptInput?.addEventListener('input', () => {
+    localStorage.setItem(GEN_STORAGE_PROMPT, promptInput.value);
+  });
+  contextInput?.addEventListener('input', () => {
+    localStorage.setItem(GEN_STORAGE_CONTEXT, contextInput.value);
+  });
 
   function resetScanPanel() {
     scanPanel?.classList.add('hidden');

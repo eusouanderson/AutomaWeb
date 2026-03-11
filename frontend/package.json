@@ -7,13 +7,16 @@
     "dev": "echo 'Frontend servido pelo FastAPI'",
     "build": "echo 'No build step needed for vanilla JS'",
     "test": "vitest run",
-    "test:unit": "vitest"
+    "test:unit": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "axios": "^1.6.0",
     "toastify-js": "^1.12.0"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^2.1.9",
+    "jsdom": "^28.1.0",
     "vitest": "^2.1.9"
   }
 }

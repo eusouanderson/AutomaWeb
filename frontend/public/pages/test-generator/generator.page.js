@@ -17,12 +17,14 @@ function buildProgressTracker(container) {
   container.innerHTML = `
     <p class="gen-title">Generating test…</p>
     <ol class="gen-steps" role="list">
-      ${GEN_STEPS.map((s) => `
+      ${GEN_STEPS.map(
+        (s) => `
         <li class="gen-step gen-step--idle" data-step="${s.id}">
           <span class="gen-step-icon" aria-hidden="true"></span>
           <span class="gen-step-label">${s.label}</span>
         </li>
-      `).join('')}
+      `
+      ).join('')}
     </ol>
   `;
 
@@ -61,6 +63,9 @@ function buildProgressTracker(container) {
   };
 }
 
+const STORAGE_KEY_PROMPT = 'generator_prompt';
+const STORAGE_KEY_CONTEXT = 'generator_context';
+
 export async function mount(root, context) {
   const template = await loadTemplate(TEMPLATE_PATH);
   renderHTML(root, template);
@@ -72,6 +77,21 @@ export async function mount(root, context) {
   const output = qs('#generated-output', root);
   const codeBlock = qs('#generated-code', root);
   const progressEl = qs('#generation-progress', root);
+
+  const promptInput = qs('#generator-prompt', root);
+  const contextInput = qs('#generator-context', root);
+
+  // Restore saved values from localStorage
+  if (promptInput) promptInput.value = localStorage.getItem(STORAGE_KEY_PROMPT) || '';
+  if (contextInput) contextInput.value = localStorage.getItem(STORAGE_KEY_CONTEXT) || '';
+
+  // Persist values on each keystroke
+  promptInput?.addEventListener('input', () => {
+    localStorage.setItem(STORAGE_KEY_PROMPT, promptInput.value);
+  });
+  contextInput?.addEventListener('input', () => {
+    localStorage.setItem(STORAGE_KEY_CONTEXT, contextInput.value);
+  });
 
   const helpModal = createModal({
     title: 'Prompt tips',
@@ -134,8 +154,8 @@ export async function mount(root, context) {
     try {
       const result = await generateTestFromPrompt({
         projectId: Number(select.value),
-        prompt: qs('#generator-prompt', root).value,
-        context: qs('#generator-context', root).value
+        prompt: promptInput.value,
+        context: contextInput.value
       });
 
       clearTimeout(step2Timer);

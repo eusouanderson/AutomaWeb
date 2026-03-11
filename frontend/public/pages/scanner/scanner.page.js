@@ -7,6 +7,8 @@ import {
 } from '../../services/test.service.js';
 import { formatDate } from '../../utils/helpers.js';
 
+const SCANNER_STORAGE_FEEDBACK = 'scanner_feedback';
+
 function buildExecutionFeedback(data) {
   let lines = [
     'A execucao dos testes apresentou falhas. Recrie o teste Robot Framework corrigindo os problemas abaixo.',
@@ -63,6 +65,14 @@ export function initScannerPage({ onRecreateRequested }) {
   const recreatePanel = document.getElementById('recreate-panel');
   const recreateButton = document.getElementById('recreate-test-btn');
   const executionFeedback = document.getElementById('execution-feedback');
+
+  // Restore feedback textarea from localStorage
+  if (executionFeedback) {
+    executionFeedback.value = localStorage.getItem(SCANNER_STORAGE_FEEDBACK) || '';
+  }
+  executionFeedback?.addEventListener('input', () => {
+    localStorage.setItem(SCANNER_STORAGE_FEEDBACK, executionFeedback.value);
+  });
 
   const executeTestSelector = document.getElementById('execute-test-selector');
   const executeTestListCheck = document.getElementById('execute-test-list-check');

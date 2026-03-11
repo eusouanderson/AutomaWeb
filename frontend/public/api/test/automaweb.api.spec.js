@@ -1,12 +1,24 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../client.js', () => ({
   request: vi.fn(),
   streamPost: vi.fn()
 }));
 
-import { createProject, generateRobotTest, listProjects, scanProject } from '../automaweb.api.js';
+import {
+  createProject,
+  deleteGeneratedTest,
+  deleteProject,
+  generateRobotTest,
+  listGeneratedTests,
+  listProjectExecutions,
+  listProjects,
+  runTests,
+  scanProject
+} from '../automaweb.api.js';
 import { request, streamPost } from '../client.js';
+
+beforeEach(() => vi.clearAllMocks());
 
 describe('automaweb.api', () => {
   it('delegates listProjects to request()', async () => {
@@ -22,11 +34,47 @@ describe('automaweb.api', () => {
     expect(request).toHaveBeenCalledWith({ method: 'POST', url: '/projects', data: payload });
   });
 
+  it('delegates deleteProject to request()', async () => {
+    request.mockResolvedValueOnce(undefined);
+    await deleteProject(7);
+    expect(request).toHaveBeenCalledWith({ method: 'DELETE', url: '/projects/7' });
+  });
+
+  it('delegates listGeneratedTests to request()', async () => {
+    request.mockResolvedValueOnce([]);
+    await listGeneratedTests(3);
+    expect(request).toHaveBeenCalledWith({ method: 'GET', url: '/projects/3/tests' });
+  });
+
+  it('delegates deleteGeneratedTest to request()', async () => {
+    request.mockResolvedValueOnce(undefined);
+    await deleteGeneratedTest(99);
+    expect(request).toHaveBeenCalledWith({ method: 'DELETE', url: '/tests/99' });
+  });
+
   it('delegates generateRobotTest to request()', async () => {
     const payload = { project_id: 1, prompt: 'create login test' };
     request.mockResolvedValueOnce({ id: 11 });
     await generateRobotTest(payload);
     expect(request).toHaveBeenCalledWith({ method: 'POST', url: '/tests/generate', data: payload });
+  });
+
+  it('delegates runTests to request() with long timeout', async () => {
+    const payload = { project_id: 1 };
+    request.mockResolvedValueOnce({ status: 'ok' });
+    await runTests(payload);
+    expect(request).toHaveBeenCalledWith({
+      method: 'POST',
+      url: '/executions/run',
+      data: payload,
+      timeout: 600000
+    });
+  });
+
+  it('delegates listProjectExecutions to request()', async () => {
+    request.mockResolvedValueOnce([]);
+    await listProjectExecutions(5);
+    expect(request).toHaveBeenCalledWith({ method: 'GET', url: '/projects/5/executions' });
   });
 
   it('delegates scanProject to streamPost()', async () => {
