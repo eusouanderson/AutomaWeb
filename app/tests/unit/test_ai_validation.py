@@ -1,6 +1,7 @@
 """Tests for the AI Test Self-Healing / Validation Layer."""
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from pathlib import Path
@@ -356,6 +357,52 @@ Foo
         missing_waits = [i for i in report.issues if i.issue_type == "missing_wait" and i.locator == "css=#a"]
         assert len(missing_waits) == 0
 
+    @pytest.mark.asyncio
+    async def test_live_check_timeout_falls_back_to_empty_counts(self, monkeypatch):
+        """Lines 111-115: asyncio.TimeoutError in live-check is caught and counts set to {}."""
+        async def _bulk_timeout(self_la, page_url, locators, navigation_timeout_ms=10000):
+            raise asyncio.TimeoutError()
+
+        monkeypatch.setattr(LocatorAnalyzer, "count_matches_bulk", _bulk_timeout)
+        monkeypatch.setattr(
+            "app.ai_validation.test_validator.settings",
+            type("S", (), {"AI_LIVE_CHECK_ENABLED": True, "AI_LIVE_CHECK_TIMEOUT_SECONDS": 15})(),
+        )
+
+        report = await self.validator.validate(BASIC_ROBOT, page_url="http://example.com")
+        live_issues = [i for i in report.issues if i.issue_type in {"element_not_found", "strict_mode_violation"}]
+        assert live_issues == []
+
+    @pytest.mark.asyncio
+    async def test_live_check_skips_when_count_is_none(self, monkeypatch):
+        """Line 120: continue when locator is absent from the counts dict (count is None)."""
+        async def _bulk_empty(self_la, page_url, locators, navigation_timeout_ms=10000):
+            return {}  # all counts will be None
+
+        monkeypatch.setattr(LocatorAnalyzer, "count_matches_bulk", _bulk_empty)
+        monkeypatch.setattr(
+            "app.ai_validation.test_validator.settings",
+            type("S", (), {"AI_LIVE_CHECK_ENABLED": True, "AI_LIVE_CHECK_TIMEOUT_SECONDS": 15})(),
+        )
+
+        report = await self.validator.validate(BASIC_ROBOT, page_url="http://example.com")
+        live_issues = [i for i in report.issues if i.issue_type in {"element_not_found", "strict_mode_violation"}]
+        assert live_issues == []
+
+    @pytest.mark.asyncio
+    async def test_has_wait_before_skips_empty_line_in_lookback(self):
+        """Line 153: empty line within the lookback window is skipped (stripped == '' → continue)."""
+        content = (
+            "*** Test Cases ***\n"
+            "Foo\n"
+            "\n"  # empty line that falls inside the 2-line lookback
+            "    Wait For Elements State    css=#a    visible    timeout=10s\n"
+            "    Click    css=#a\n"
+        )
+        report = await self.validator.validate(content)
+        missing_waits = [i for i in report.issues if i.issue_type == "missing_wait" and i.locator == "css=#a"]
+        assert len(missing_waits) == 0
+
 
 # ---------------------------------------------------------------------------
 # TestFixer
@@ -528,6 +575,60 @@ class TestTestFixer:
     def test_line_is_wait_returns_false_for_regular_line(self):
         assert self.fixer._line_is_wait("    Click    css=#x") is False
 
+    @pytest.mark.asyncio
+    async def test_skips_locator_replacement_for_irrelevant_issue_type_with_suggestion(self):
+        """Line 35: continue when issue has suggested_locator but issue_type is not
+        generic_xpath or strict_mode_violation."""
+        content = "*** Test Cases ***\nFoo\n    Click    css=#ghost\n"
+        issue = ValidationIssue(
+            line_number=3,
+            keyword="Click",
+            locator="css=#ghost",
+            issue_type="element_not_found",  # irrelevant type → triggers line 35 continue
+            message="not found",
+            suggested_locator="css=#real",
+        )
+        result = await self.fixer.apply_fixes(content, [issue])
+        assert "css=#ghost" in result.content
+        assert not any("locator refinado" in f for f in result.applied_fixes)
+
+    @pytest.mark.asyncio
+    async def test_skips_missing_wait_when_target_index_out_of_bounds(self):
+        """Line 48: continue when target_index >= len(lines) for a missing_wait issue."""
+        content = "*** Test Cases ***\nFoo\n"
+        issue = ValidationIssue(
+            line_number=10,  # beyond the 2 lines in content
+            keyword="Click",
+            locator="css=#btn",
+            issue_type="missing_wait",
+            message="no wait",
+        )
+        result = await self.fixer.apply_fixes(content, [issue])
+        assert result.applied_fixes == []
+
+    @pytest.mark.asyncio
+    async def test_skips_groq_regen_when_element_not_found_line_out_of_bounds(self):
+        """Line 63: continue when line_idx >= len(lines) for element_not_found
+        even when groq_client and prompt are provided."""
+        content = "*** Test Cases ***\nFoo\n"
+        issue = ValidationIssue(
+            line_number=99,  # way out of bounds
+            keyword="Click",
+            locator="css=#ghost",
+            issue_type="element_not_found",
+            message="not found",
+        )
+        mock_groq = MagicMock()
+        result = await self.fixer.apply_fixes(content, [issue], groq_client=mock_groq, prompt="test")
+        mock_groq.regenerate_robot_step.assert_not_called()
+        assert result.applied_fixes == []
+
+    def test_replace_locator_returns_unchanged_for_single_part_line(self):
+        """Line 82: return line early in _replace_locator when the stripped line
+        has fewer than 2 double-space-separated parts."""
+        result = self.fixer._replace_locator("Click", "css=#new")
+        assert result == "Click"
+
 
 # ---------------------------------------------------------------------------
 # AITestSelfHealingService
@@ -627,6 +728,52 @@ class TestAITestSelfHealingService:
         )
 
         assert not log_file.exists()
+
+    @pytest.mark.asyncio
+    async def test_metrics_inc_failed_when_second_report_has_errors(self):
+        """Line 68 of self_healing_service.py: inc_failed() is called when the
+        second validation report still has errors after the fix attempt."""
+        reg = AIMetricsRegistry()
+
+        call_count = 0
+
+        async def _mock_validate(content, page_url=None):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                # First pass: return a warning-only issue to trigger the fixer.
+                return ValidationReport(
+                    issues=[
+                        ValidationIssue(
+                            line_number=1,
+                            keyword="Click",
+                            locator="css=#x",
+                            issue_type="missing_wait",
+                            message="no wait",
+                            severity="warning",
+                        )
+                    ]
+                )
+            # Second pass: report an error so inc_failed() is called.
+            return ValidationReport(
+                issues=[
+                    ValidationIssue(
+                        line_number=1,
+                        keyword="Click",
+                        locator="css=#x",
+                        issue_type="element_not_found",
+                        message="not found",
+                        severity="error",
+                    )
+                ]
+            )
+
+        mock_validator = MagicMock()
+        mock_validator.validate = _mock_validate
+
+        service = AITestSelfHealingService(validator=mock_validator, metrics=reg)
+        await service.heal_test(content="*** Test Cases ***\nFoo\n    Click    css=#x\n")
+        assert reg.snapshot().tests_failed == 1
 
 
 # ---------------------------------------------------------------------------

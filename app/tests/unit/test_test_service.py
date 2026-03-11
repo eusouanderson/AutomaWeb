@@ -486,3 +486,102 @@ def test_sanitize_converts_open_browser_and_injects_timeout() -> None:
     assert "Set Browser Timeout    30s" in cleaned
     assert "New Page    https://example.com" in cleaned
     assert "Open Browser" not in cleaned
+
+
+# ---------------------------------------------------------------------------
+# _sanitize_robot_output – line 276 (blank line between Wait and Get Title)
+# ---------------------------------------------------------------------------
+
+
+def test_sanitize_removes_wait_before_get_title_with_blank_line_between() -> None:
+    """Line 276: j += 1 inside the blank-line-skip while loop."""
+    service = TestService(groq_client=DummyGroqClient())
+    content = (
+        "*** Settings ***\n"
+        "Library    Browser\n"
+        "*** Test Cases ***\n"
+        "Testar Título\n"
+        "    New Browser    chromium\n"
+        "    New Context\n"
+        "    New Page    https://example.com\n"
+        "    Wait For Elements State    css=h1    visible    10\n"
+        "\n"  # blank line between Wait and Get Title
+        "    ${titulo}    Get Title\n"
+        "    Should Be Equal    ${titulo}    Example Domain\n"
+    )
+    cleaned = service._sanitize_robot_output(content)
+    assert "Wait For Elements State    css=h1" not in cleaned
+    assert "Get Title" in cleaned
+
+
+def test_sanitize_removes_wait_before_get_url_with_blank_line_between() -> None:
+    """Line 276: same blank-line-skip, but for Get Url."""
+    service = TestService(groq_client=DummyGroqClient())
+    content = (
+        "*** Settings ***\n"
+        "Library    Browser\n"
+        "*** Test Cases ***\n"
+        "Check URL\n"
+        "    New Browser    chromium\n"
+        "    New Context\n"
+        "    New Page    https://example.com\n"
+        "    Wait For Elements State    css=body    visible    10\n"
+        "\n"
+        "    ${url}    Get Url\n"
+        "    Should Contain    ${url}    example\n"
+    )
+    cleaned = service._sanitize_robot_output(content)
+    assert "Wait For Elements State    css=body" not in cleaned
+    assert "Get Url" in cleaned
+
+
+# ---------------------------------------------------------------------------
+# _normalize_selector – lines 306/310 (xpath prefix, regex-css match)
+# ---------------------------------------------------------------------------
+
+
+def test_normalize_selector_slash_prefix_yields_xpath() -> None:
+    """Line 306: selector starting with '/' → xpath=..."""
+    service = TestService(groq_client=DummyGroqClient())
+    assert service._normalize_selector("//div[@role='main']") == "xpath=//div[@role='main']"
+
+
+def test_normalize_selector_paren_prefix_yields_xpath() -> None:
+    """Line 306: selector starting with '(' → xpath=..."""
+    service = TestService(groq_client=DummyGroqClient())
+    assert service._normalize_selector("(//a)[1]") == "xpath=(//a)[1]"
+
+
+def test_normalize_selector_plain_tag_yields_css() -> None:
+    """Line 310: plain alphanumeric selector matched by regex → css=..."""
+    service = TestService(groq_client=DummyGroqClient())
+    assert service._normalize_selector("button") == "css=button"
+
+
+def test_normalize_selector_plain_tag_with_attribute_yields_css() -> None:
+    """Line 310: tag with attribute like input[type='text'] → css=..."""
+    service = TestService(groq_client=DummyGroqClient())
+    assert service._normalize_selector("input[type='text']") == "css=input[type='text']"
+
+
+# ---------------------------------------------------------------------------
+# _make_selector_unique – line 327 (#, [, plain CSS match)
+# ---------------------------------------------------------------------------
+
+
+def test_make_selector_unique_hash_prefix() -> None:
+    """Line 327: selector starting with '#' → css=# >> nth=0."""
+    service = TestService(groq_client=DummyGroqClient())
+    assert service._make_selector_unique("#submit-btn") == "css=#submit-btn >> nth=0"
+
+
+def test_make_selector_unique_bracket_prefix() -> None:
+    """Line 327: selector starting with '[' → css=[...] >> nth=0."""
+    service = TestService(groq_client=DummyGroqClient())
+    assert service._make_selector_unique("[data-testid='ok']") == "css=[data-testid='ok'] >> nth=0"
+
+
+def test_make_selector_unique_plain_tag() -> None:
+    """Line 327: plain alphanumeric selector matched by regex → css=... >> nth=0."""
+    service = TestService(groq_client=DummyGroqClient())
+    assert service._make_selector_unique("button") == "css=button >> nth=0"

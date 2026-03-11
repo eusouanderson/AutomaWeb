@@ -29,7 +29,7 @@ class TestExecutionResult(BaseModel):
     log_file: str
     report_file: str
     output_file: str
-    status: str  # running, completed, failed
+    status: str  
     created_at: datetime | None = None
     completed_at: datetime | None = None
     error_output: str | None = None

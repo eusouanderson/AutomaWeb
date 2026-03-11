@@ -457,3 +457,100 @@ async def test_generate_mkdocs_report_handles_error(tmp_path, monkeypatch) -> No
     await service._generate_mkdocs_report(project, output_dir, stats)
 
     assert (output_dir / "mkdocs" / "docs" / "index.md").exists()
+
+
+# ---------------------------------------------------------------------------
+# _apply_pre_execution_healing – line 215
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_apply_pre_execution_healing_writes_when_content_changed(tmp_path) -> None:
+    """Line 215: path.write_text is called when healed content differs from original."""
+    from unittest.mock import AsyncMock, MagicMock
+    from app.ai_validation.self_healing_service import HealedTestResult
+
+    robot_file = tmp_path / "test.robot"
+    original = "*** Test Cases ***\nFoo\n    Click    //a\n"
+    robot_file.write_text(original, encoding="utf-8")
+
+    healed_result = HealedTestResult(
+        original_content=original,
+        final_content="*** Test Cases ***\nFoo\n    Click    css=a\n",
+        issues_found=[],
+        fixes_applied=["L3: locator refinado"],
+    )
+
+    mock_healing = MagicMock()
+    mock_healing.heal_test = AsyncMock(return_value=healed_result)
+
+    service = TestExecutionService()
+    service._self_healing = mock_healing
+
+    result = await service._apply_pre_execution_healing([str(robot_file)], page_url=None, ai_debug=False)
+
+    assert result == [str(robot_file)]
+    assert robot_file.read_text(encoding="utf-8") == healed_result.final_content
+
+
+# ---------------------------------------------------------------------------
+# _parse_robot_output – lines 301-304 (test elements with status children)
+# ---------------------------------------------------------------------------
+
+
+def test_parse_robot_output_with_test_elements(tmp_path) -> None:
+    """Lines 301-304: covers the for-loop body when <test> elements have <status> children."""
+    service = TestExecutionService()
+    xml = """\
+<robot>
+  <statistics>
+    <total>
+      <stat pass="1" fail="1" skip="0"/>
+    </total>
+  </statistics>
+  <suite>
+    <test name="Login Test">
+      <status status="PASS">All steps OK</status>
+    </test>
+    <test name="Logout Test">
+      <status status="FAIL">Element not found</status>
+    </test>
+  </suite>
+</robot>
+"""
+    output = tmp_path / "output.xml"
+    output.write_text(xml)
+
+    stats = service._parse_robot_output(output)
+
+    assert stats["total"] == 2
+    assert stats["passed"] == 1
+    assert stats["failed"] == 1
+    assert len(stats["test_cases"]) == 2
+    names = [tc["name"] for tc in stats["test_cases"]]
+    assert "Login Test" in names
+    assert "Logout Test" in names
+    statuses = {tc["name"]: tc["status"] for tc in stats["test_cases"]}
+    assert statuses["Login Test"] == "PASS"
+    assert statuses["Logout Test"] == "FAIL"
+
+
+def test_parse_robot_output_with_test_element_empty_message(tmp_path) -> None:
+    """msg is None when status element has no text."""
+    service = TestExecutionService()
+    xml = """\
+<robot>
+  <statistics><total><stat pass="1" fail="0" skip="0"/></total></statistics>
+  <suite>
+    <test name="Silent Test">
+      <status status="PASS"></status>
+    </test>
+  </suite>
+</robot>
+"""
+    output = tmp_path / "output.xml"
+    output.write_text(xml)
+
+    stats = service._parse_robot_output(output)
+
+    assert stats["test_cases"][0]["message"] is None
