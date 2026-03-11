@@ -19,3 +19,4 @@ class Project(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     test_requests = relationship("TestRequest", back_populates="project", cascade="all, delete-orphan")
+    test_executions = relationship("TestExecution", back_populates="project", cascade="all, delete-orphan")

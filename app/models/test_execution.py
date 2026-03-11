@@ -27,4 +27,4 @@ class TestExecution(Base):
     error_output: Mapped[str | None] = mapped_column(Text, nullable=True)
     mkdocs_index: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
-    project = relationship("Project", backref="executions")
+    project = relationship("Project", back_populates="test_executions")
