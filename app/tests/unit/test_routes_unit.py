@@ -438,3 +438,42 @@ async def test_scan_page_stream_cancels_running_task_on_close(monkeypatch) -> No
 
     await body_iter.aclose()
     release_scan.set()
+
+
+@pytest.mark.asyncio
+async def test_list_project_executions_route_returns_list(monkeypatch) -> None:
+    execution = TestExecution(
+        id=5,
+        project_id=1,
+        total_tests=3,
+        passed=3,
+        failed=0,
+        skipped=0,
+        log_file="/static/reports/1_20260101_120000/log.html",
+        report_file="/static/reports/1_20260101_120000/report.html",
+        output_file="/static/reports/1_20260101_120000/output.xml",
+        status="completed",
+        created_at=datetime.utcnow(),
+    )
+
+    async def fake_list_executions(self, session, project_id: int):
+        return [execution]
+
+    monkeypatch.setattr(routes.TestExecutionService, "list_executions_by_project", fake_list_executions)
+    result = await routes.list_project_executions(1, session=None)
+
+    assert len(result) == 1
+    assert result[0].id == 5
+    assert result[0].status == "completed"
+    assert result[0].passed == 3
+
+
+@pytest.mark.asyncio
+async def test_list_project_executions_route_returns_empty(monkeypatch) -> None:
+    async def fake_list_executions(self, session, project_id: int):
+        return []
+
+    monkeypatch.setattr(routes.TestExecutionService, "list_executions_by_project", fake_list_executions)
+    result = await routes.list_project_executions(99, session=None)
+
+    assert result == []

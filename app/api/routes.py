@@ -160,6 +160,14 @@ async def download_test(test_id: int, session: AsyncSession = Depends(get_db)) -
     return FileResponse(path=generated.file_path, filename=f"test_{test_id}.robot")
 
 
+@router.get("/projects/{project_id}/executions", response_model=list[TestExecutionResult])
+async def list_project_executions(project_id: int, session: AsyncSession = Depends(get_db)) -> list[TestExecutionResult]:
+    """Return the execution history for a project."""
+    service = TestExecutionService()
+    executions = await service.list_executions_by_project(session, project_id)
+    return [TestExecutionResult.model_validate(e) for e in executions]
+
+
 @router.post("/executions/run", response_model=TestExecutionResult)
 async def execute_tests(payload: TestExecutionRequest, session: AsyncSession = Depends(get_db)) -> TestExecutionResult:
     """Execute Robot Framework tests for a project and generate MkDocs report."""

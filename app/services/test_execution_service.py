@@ -170,9 +170,27 @@ class TestExecutionService:
         # Cleanup temp directory
         shutil.rmtree(temp_dir, ignore_errors=True)
 
-        # Save execution record to database (you'll need to create a repository for this)
-        # For now, just return the execution object
+        # Persist execution record to database
+        if session is not None:
+            session.add(execution)
+            await session.commit()
+            await session.refresh(execution)
+
         return execution
+
+    async def list_executions_by_project(
+        self,
+        session: AsyncSession,
+        project_id: int,
+    ) -> list[TestExecution]:
+        """Return all executions for a project, newest first."""
+        from sqlalchemy import select
+        result = await session.execute(
+            select(TestExecution)
+            .where(TestExecution.project_id == project_id)
+            .order_by(TestExecution.created_at.desc())
+        )
+        return list(result.scalars().all())
 
     def _prepare_test_files(self, test_files: list[str], headless: bool) -> tuple[list[str], Path]:
         """Copy test files to a temp dir, injecting headless=${HEADLESS} in every New Browser call."""

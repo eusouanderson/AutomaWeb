@@ -102,7 +102,6 @@ log.html
 report.html
 playwright-log.txt
 browser/
-**/reports/
 **/browser/
 **/traces/
 **/screenshot/

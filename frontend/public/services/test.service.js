@@ -4,6 +4,7 @@ import {
   deleteProject,
   generateRobotTest,
   listGeneratedTests,
+  listProjectExecutions,
   listProjects,
   runTests
 } from '../api/automaweb.api.js';
@@ -71,4 +72,11 @@ export async function deleteGeneratedTestService(testId) {
   }
 
   return deleteGeneratedTest(testId);
+}
+
+export async function getProjectExecutions(projectId) {
+  if (!projectId) {
+    return [];
+  }
+  return listProjectExecutions(projectId);
 }

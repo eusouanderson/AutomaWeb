@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.project import Project
+from app.models.test_execution import TestExecution
 from app.services.test_execution_service import TestExecutionService
 from app.services.test_service import TestService
 
@@ -554,3 +555,120 @@ def test_parse_robot_output_with_test_element_empty_message(tmp_path) -> None:
     stats = service._parse_robot_output(output)
 
     assert stats["test_cases"][0]["message"] is None
+
+
+# ---------------------------------------------------------------------------
+# execute_tests – DB persist branch (lines 175-177)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_execute_tests_persists_to_db_when_session_provided(tmp_path, monkeypatch) -> None:
+    """Lines 175-177: session.add / commit / refresh are called when session is not None."""
+    settings.STATIC_DIR = str(tmp_path / "static")
+    project = _prepare_project(tmp_path)
+    service = TestExecutionService(
+        project_repository=DummyProjectRepo(project),
+        test_repository=DummyTestRepo(),
+    )
+    _create_robot_file(project)
+
+    def fake_run(*args, **kwargs):
+        class Result:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        return Result()
+
+    async def fake_generate_mkdocs_report(project, output_dir, stats):
+        return None
+
+    monkeypatch.setattr(service, "_ensure_rfbrowser", lambda: None)
+    monkeypatch.setattr(service, "_parse_robot_output", lambda *_: {"total": 1, "passed": 1, "failed": 0, "skipped": 0})
+    monkeypatch.setattr(service, "_generate_mkdocs_report", fake_generate_mkdocs_report)
+    monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
+
+    calls = []
+
+    class FakeSession:
+        def add(self, obj):
+            calls.append(("add", obj))
+
+        async def commit(self):
+            calls.append(("commit",))
+
+        async def refresh(self, obj):
+            calls.append(("refresh", obj))
+
+    execution = await service.execute_tests(session=FakeSession(), project_id=1)
+
+    assert execution.status == "completed"
+    assert any(c[0] == "add" for c in calls)
+    assert any(c[0] == "commit" for c in calls)
+    assert any(c[0] == "refresh" for c in calls)
+
+
+# ---------------------------------------------------------------------------
+# list_executions_by_project (lines 187-193)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_list_executions_by_project_returns_results() -> None:
+    """Lines 187-193: list_executions_by_project queries the DB and returns executions."""
+    from datetime import datetime
+    from unittest.mock import AsyncMock, MagicMock
+
+    service = TestExecutionService()
+
+    expected = [
+        TestExecution(
+            id=1,
+            project_id=42,
+            total_tests=2,
+            passed=2,
+            failed=0,
+            skipped=0,
+            log_file="/static/reports/42_run/log.html",
+            report_file="/static/reports/42_run/report.html",
+            output_file="/static/reports/42_run/output.xml",
+            status="completed",
+            created_at=datetime.utcnow(),
+        )
+    ]
+
+    scalars_mock = MagicMock()
+    scalars_mock.all.return_value = expected
+
+    result_mock = MagicMock()
+    result_mock.scalars.return_value = scalars_mock
+
+    session = MagicMock()
+    session.execute = AsyncMock(return_value=result_mock)
+
+    results = await service.list_executions_by_project(session, project_id=42)
+
+    assert results == expected
+    session.execute.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_list_executions_by_project_returns_empty_list() -> None:
+    """list_executions_by_project returns [] when no executions exist."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    service = TestExecutionService()
+
+    scalars_mock = MagicMock()
+    scalars_mock.all.return_value = []
+
+    result_mock = MagicMock()
+    result_mock.scalars.return_value = scalars_mock
+
+    session = MagicMock()
+    session.execute = AsyncMock(return_value=result_mock)
+
+    results = await service.list_executions_by_project(session, project_id=99)
+
+    assert results == []
