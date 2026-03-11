@@ -105,7 +105,9 @@ browser/
 **/browser/
 **/traces/
 **/screenshot/
-
+**.yml
+**.md
+**.db
 # Logs
 *.log
 logs/
