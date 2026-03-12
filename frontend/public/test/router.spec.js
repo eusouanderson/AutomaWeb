@@ -126,5 +126,20 @@ describe('router', () => {
       await vi.waitFor(() => expect(onTabChange).toHaveBeenCalledTimes(2));
       expect(onTabChange).toHaveBeenLastCalledWith('reports');
     });
+
+    it('getTabFromHash falls back to "projects" when hash is empty during hashchange', async () => {
+      // init with a valid hash so the initRouter guard does not fire
+      globalThis.location.hash = '#generate';
+      const onTabChange = vi.fn().mockResolvedValue(undefined);
+      initRouter({ onTabChange });
+      await vi.waitFor(() => expect(onTabChange).toHaveBeenCalledWith('generate'));
+      onTabChange.mockClear();
+
+      // Set hash to empty so getTabFromHash sees '' and exercises the || branch
+      globalThis.location.hash = '';
+      globalThis.dispatchEvent(new Event('hashchange'));
+
+      await vi.waitFor(() => expect(onTabChange).toHaveBeenCalledWith('projects'));
+    });
   });
 });

@@ -2,6 +2,7 @@ import { toast } from './components/toast.js';
 import { initDashboardPage } from './pages/dashboard/dashboard.page.js';
 import { initGeneratorPage } from './pages/generator/generator.page.js';
 import { initReportsPage } from './pages/reports/reports.page.js';
+import { mount as mountEditorPage } from './pages/robot-editor/editor.page.js';
 import { initScannerPage } from './pages/scanner/scanner.page.js';
 import { initRouter, navigateToTab } from './router.js';
 import { store } from './state/store.js';
@@ -21,6 +22,11 @@ await dashboardPage.loadProjects();
 await generatorPage.loadProjectsDropdown();
 await scannerPage.loadExecuteProjects();
 await reportsPage.loadReportsProjects();
+
+const editorRoot = document.getElementById('editor-tab');
+if (editorRoot) {
+  await mountEditorPage(editorRoot, { store });
+}
 
 initRouter({
   onTabChange: async (tabName) => {

@@ -34,6 +34,10 @@ vi.mock('../pages/reports/reports.page.js', () => ({
   }))
 }));
 
+vi.mock('../pages/robot-editor/editor.page.js', () => ({
+  mount: vi.fn().mockResolvedValue(undefined)
+}));
+
 import { toast } from '../components/toast.js';
 import { initDashboardPage } from '../pages/dashboard/dashboard.page.js';
 import { initGeneratorPage } from '../pages/generator/generator.page.js';

@@ -40,3 +40,11 @@ export function scanProject(url, onMessage) {
 export function listProjectExecutions(projectId) {
   return request({ method: 'GET', url: `/projects/${projectId}/executions` });
 }
+
+export function improveRobotTest(testId, content) {
+  return request({ method: 'POST', url: `/tests/${testId}/improve`, data: { content } });
+}
+
+export function saveRobotTestContent(testId, content) {
+  return request({ method: 'PUT', url: `/tests/${testId}/content`, data: { content } });
+}

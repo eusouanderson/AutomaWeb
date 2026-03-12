@@ -477,3 +477,84 @@ async def test_list_project_executions_route_returns_empty(monkeypatch) -> None:
     result = await routes.list_project_executions(99, session=None)
 
     assert result == []
+
+
+# ── improve_robot_test ────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_improve_robot_test_route_success(monkeypatch) -> None:
+    generated = GeneratedTest(
+        id=1,
+        test_request_id=10,
+        content="*** Test Cases ***",
+        file_path="/tmp/t.robot",
+        created_at=datetime.utcnow(),
+    )
+
+    async def fake_get_generated_test(self, session, test_id: int):
+        return generated
+
+    async def fake_improve_robot_test(self, content: str):
+        return "*** Test Cases ***\nImproved Test\n    Log    improved"
+
+    monkeypatch.setattr(routes.TestService, "get_generated_test", fake_get_generated_test)
+    monkeypatch.setattr(routes.TestService, "improve_robot_test", fake_improve_robot_test)
+
+    payload = routes.RobotImproveRequest(content="*** Test Cases ***\nOld Test")
+    result = await routes.improve_robot_test(1, payload, session=None)
+
+    assert result.content == "*** Test Cases ***\nImproved Test\n    Log    improved"
+
+
+@pytest.mark.asyncio
+async def test_improve_robot_test_route_not_found(monkeypatch) -> None:
+    async def fake_get_generated_test(self, session, test_id: int):
+        return None
+
+    monkeypatch.setattr(routes.TestService, "get_generated_test", fake_get_generated_test)
+
+    payload = routes.RobotImproveRequest(content="*** Test Cases ***")
+    with pytest.raises(HTTPException) as exc:
+        await routes.improve_robot_test(999, payload, session=None)
+
+    assert exc.value.status_code == 404
+    assert exc.value.detail == "Test not found"
+
+
+# ── update_robot_test_content ─────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_update_robot_test_content_route_success(monkeypatch) -> None:
+    updated = GeneratedTest(
+        id=2,
+        test_request_id=20,
+        content="*** Test Cases ***\nEdited",
+        file_path="/tmp/t2.robot",
+        created_at=datetime.utcnow(),
+    )
+
+    async def fake_save_robot_test_content(self, session, test_id: int, content: str):
+        return updated
+
+    monkeypatch.setattr(routes.TestService, "save_robot_test_content", fake_save_robot_test_content)
+
+    payload = routes.RobotImproveRequest(content="*** Test Cases ***\nEdited")
+    result = await routes.update_robot_test_content(2, payload, session=None)
+
+    assert result.id == 2
+    assert result.content == "*** Test Cases ***\nEdited"
+
+
+@pytest.mark.asyncio
+async def test_update_robot_test_content_route_not_found(monkeypatch) -> None:
+    async def fake_save_robot_test_content(self, session, test_id: int, content: str):
+        return None
+
+    monkeypatch.setattr(routes.TestService, "save_robot_test_content", fake_save_robot_test_content)
+
+    payload = routes.RobotImproveRequest(content="*** Test Cases ***")
+    with pytest.raises(HTTPException) as exc:
+        await routes.update_robot_test_content(999, payload, session=None)
+
+    assert exc.value.status_code == 404
+    assert exc.value.detail == "Test not found"

@@ -10,10 +10,12 @@ import {
   deleteGeneratedTest,
   deleteProject,
   generateRobotTest,
+  improveRobotTest,
   listGeneratedTests,
   listProjectExecutions,
   listProjects,
   runTests,
+  saveRobotTestContent,
   scanProject
 } from '../automaweb.api.js';
 import { request, streamPost } from '../client.js';
@@ -81,5 +83,25 @@ describe('automaweb.api', () => {
     const onMessage = vi.fn();
     await scanProject('https://example.com', onMessage);
     expect(streamPost).toHaveBeenCalledWith('/scan', { url: 'https://example.com' }, onMessage);
+  });
+
+  it('delegates improveRobotTest to request()', async () => {
+    request.mockResolvedValueOnce({ content: '*** Test Cases ***' });
+    await improveRobotTest(7, '*** Test Cases ***\nOld');
+    expect(request).toHaveBeenCalledWith({
+      method: 'POST',
+      url: '/tests/7/improve',
+      data: { content: '*** Test Cases ***\nOld' }
+    });
+  });
+
+  it('delegates saveRobotTestContent to request()', async () => {
+    request.mockResolvedValueOnce({ id: 3, content: '*** Test Cases ***' });
+    await saveRobotTestContent(3, '*** Test Cases ***\nEdited');
+    expect(request).toHaveBeenCalledWith({
+      method: 'PUT',
+      url: '/tests/3/content',
+      data: { content: '*** Test Cases ***\nEdited' }
+    });
   });
 });

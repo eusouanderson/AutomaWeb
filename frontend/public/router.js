@@ -1,4 +1,4 @@
-const TAB_IDS = new Set(['projects', 'generate', 'tests', 'execute', 'reports']);
+const TAB_IDS = new Set(['projects', 'generate', 'tests', 'execute', 'editor', 'reports']);
 
 function getTabFromHash() {
   const hash = globalThis.location.hash || '#projects';

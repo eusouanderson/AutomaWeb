@@ -3,6 +3,7 @@ import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from pathlib import Path
 
@@ -195,3 +196,41 @@ async def get_execution_report(execution_id: int) -> FileResponse:
 async def get_ai_metrics() -> dict[str, float | int]:
     """Return AI self-healing metrics."""
     return AIMetricsRegistry.instance().as_dict()
+
+
+class RobotImproveRequest(BaseModel):
+    content: str
+
+
+class RobotImproveResponse(BaseModel):
+    content: str
+
+
+@router.post("/tests/{test_id}/improve", response_model=RobotImproveResponse)
+async def improve_robot_test(
+    test_id: int,
+    payload: RobotImproveRequest,
+    session: AsyncSession = Depends(get_db),
+) -> RobotImproveResponse:
+    """Send current .robot content to the AI and return an improved version."""
+    service = TestService()
+    generated = await service.get_generated_test(session, test_id)
+    if not generated:
+        raise HTTPException(status_code=404, detail="Test not found")
+
+    improved = await service.improve_robot_test(content=payload.content)
+    return RobotImproveResponse(content=improved)
+
+
+@router.put("/tests/{test_id}/content", response_model=GeneratedTestOut)
+async def update_robot_test_content(
+    test_id: int,
+    payload: RobotImproveRequest,
+    session: AsyncSession = Depends(get_db),
+) -> GeneratedTestOut:
+    """Persist edited .robot content back to disk and DB."""
+    service = TestService()
+    generated = await service.save_robot_test_content(session, test_id, payload.content)
+    if not generated:
+        raise HTTPException(status_code=404, detail="Test not found")
+    return GeneratedTestOut.model_validate(generated)

@@ -86,8 +86,6 @@ export function initReportsPage({ store }) {
   }
 
   async function loadReportsProjects() {
-    if (!projectSelect) return;
-
     try {
       let projects = store.getState().projects;
       if (!projects?.length) {

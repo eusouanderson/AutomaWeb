@@ -139,6 +139,44 @@ class TestService:
         await self._test_repository.delete_generated_test(session, generated)
         return True
 
+    async def improve_robot_test(self, content: str) -> str:
+        """Send Robot Framework content to the LLM for improvement and return the result."""
+        improvement_prompt = (
+            "Melhore o teste Robot Framework abaixo. "
+            "Preserve a estrutura das seções (*** Settings ***, *** Variables ***, *** Test Cases ***, *** Keywords ***). "
+            "Corrija problemas de sintaxe, melhore a legibilidade, otimize keywords, "
+            "adicione waits onde necessário e sugira uma estrutura de teste melhor. "
+            "Retorne APENAS código Robot Framework válido, sem explicações ou markdown.\n\n"
+            f"{content}"
+        )
+        try:
+            improved = await asyncio.to_thread(
+                self._groq_client.generate_robot_test,
+                prompt=improvement_prompt,
+                context=None,
+                page_structure=None,
+            )
+        except Exception as exc:
+            error_name = exc.__class__.__name__
+            if "APIConnectionError" in error_name or "APITimeoutError" in error_name or "RetryError" in error_name:
+                raise LLMServiceUnavailableError("LLM provider connection failed") from exc
+            raise
+        return self._sanitize_robot_output(improved)
+
+    async def save_robot_test_content(
+        self, session: AsyncSession, test_id: int, content: str
+    ) -> "GeneratedTest | None":
+        """Persist new content for an existing generated test."""
+        generated = await self._test_repository.get_generated_test(session, test_id)
+        if not generated:
+            return None
+        sanitized = self._sanitize_robot_output(content)
+        file_path = Path(generated.file_path)
+        file_path.write_text(sanitized, encoding="utf-8")
+        generated.content = sanitized
+        await session.flush()
+        return generated
+
     def _write_robot_file(
         self,
         test_request_id: int,

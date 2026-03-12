@@ -109,6 +109,7 @@ browser/
 **.md
 **.db
 frontend/coverage
+frontend/.nyc_output
 # Logs
 *.log
 logs/

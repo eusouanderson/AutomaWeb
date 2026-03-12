@@ -585,3 +585,128 @@ def test_make_selector_unique_plain_tag() -> None:
     """Line 327: plain alphanumeric selector matched by regex → css=... >> nth=0."""
     service = TestService(groq_client=DummyGroqClient())
     assert service._make_selector_unique("button") == "css=button >> nth=0"
+
+
+# ---------------------------------------------------------------------------
+# improve_robot_test – lines 142-164
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_improve_robot_test_returns_sanitized_output() -> None:
+    """improve_robot_test calls the LLM and returns sanitized content."""
+
+    class ImprovingGroqClient:
+        def generate_robot_test(self, prompt, context=None, page_structure=None):
+            return "*** Test Cases ***\nImproved\n    Log    better"
+
+    service = TestService(groq_client=ImprovingGroqClient())
+    result = await service.improve_robot_test("*** Test Cases ***\nOld\n    Log    old")
+    assert "*** Test Cases ***" in result
+    assert "Improved" in result
+
+
+@pytest.mark.asyncio
+async def test_improve_robot_test_raises_llm_unavailable_on_connection_error() -> None:
+    """improve_robot_test wraps APIConnectionError into LLMServiceUnavailableError."""
+
+    class APIConnectionError(Exception):
+        pass
+
+    class ConnFailingGroqClient:
+        def generate_robot_test(self, prompt, context=None, page_structure=None):
+            raise APIConnectionError("down")
+
+    service = TestService(groq_client=ConnFailingGroqClient())
+    with pytest.raises(LLMServiceUnavailableError):
+        await service.improve_robot_test("*** Test Cases ***\nX")
+
+
+@pytest.mark.asyncio
+async def test_improve_robot_test_raises_llm_unavailable_on_timeout_error() -> None:
+    """improve_robot_test wraps APITimeoutError into LLMServiceUnavailableError."""
+
+    class APITimeoutError(Exception):
+        pass
+
+    class TimeoutGroqClient:
+        def generate_robot_test(self, prompt, context=None, page_structure=None):
+            raise APITimeoutError("timeout")
+
+    service = TestService(groq_client=TimeoutGroqClient())
+    with pytest.raises(LLMServiceUnavailableError):
+        await service.improve_robot_test("*** Test Cases ***\nX")
+
+
+@pytest.mark.asyncio
+async def test_improve_robot_test_reraises_unexpected_exceptions() -> None:
+    """improve_robot_test re-raises exceptions that are not LLM connectivity errors."""
+
+    class BoomError(Exception):
+        pass
+
+    class BoomGroqClient:
+        def generate_robot_test(self, prompt, context=None, page_structure=None):
+            raise BoomError("boom")
+
+    service = TestService(groq_client=BoomGroqClient())
+    with pytest.raises(BoomError):
+        await service.improve_robot_test("*** Test Cases ***\nX")
+
+
+# ---------------------------------------------------------------------------
+# save_robot_test_content – lines 166-178
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_save_robot_test_content_returns_none_when_not_found() -> None:
+    """save_robot_test_content returns None when test does not exist."""
+    test_repo = DummyTestRepository()
+    test_repo.generated_to_return = None
+    service = TestService(
+        test_repository=test_repo,
+        project_repository=DummyProjectRepository(None),
+        groq_client=DummyGroqClient(),
+    )
+    result = await service.save_robot_test_content(session=None, test_id=999, content="*** Test Cases ***")
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_save_robot_test_content_writes_file_and_updates_content(tmp_path) -> None:
+    """save_robot_test_content writes sanitized content to disk and updates the model."""
+    from datetime import datetime
+
+    robot_file = tmp_path / "generated_test_1.robot"
+    robot_file.write_text("*** Test Cases ***\nOld\n    Log    old\n", encoding="utf-8")
+
+    class FakeGenerated:
+        id = 1
+        test_request_id = 10
+        content = "*** Test Cases ***\nOld\n    Log    old\n"
+        file_path = str(robot_file)
+        created_at = datetime.utcnow()
+
+    generated = FakeGenerated()
+
+    class FlushableSession:
+        async def flush(self):
+            pass
+
+    test_repo = DummyTestRepository()
+    test_repo.generated_to_return = generated
+    service = TestService(
+        test_repository=test_repo,
+        project_repository=DummyProjectRepository(None),
+        groq_client=DummyGroqClient(),
+    )
+
+    new_content = "*** Test Cases ***\nNew Test\n    Log    new\n"
+    result = await service.save_robot_test_content(
+        session=FlushableSession(), test_id=1, content=new_content
+    )
+
+    assert result is not None
+    assert "New Test" in result.content
+    assert "New Test" in robot_file.read_text(encoding="utf-8")
