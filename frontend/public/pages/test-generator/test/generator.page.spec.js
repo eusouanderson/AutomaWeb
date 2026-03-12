@@ -260,6 +260,42 @@ describe('test-generator page – mount', () => {
       vi.useRealTimers();
     }
   });
+
+  // ── buildProgressTracker.activate: !el continue branch (line 38) ─────────
+
+  it('buildProgressTracker activate skips null step element via continue', async () => {
+    vi.useFakeTimers();
+    try {
+      const context = makeContext([{ id: 1, name: 'Proj' }]);
+      getProjects.mockResolvedValue([{ id: 1, name: 'Proj' }]);
+      let resolveApi;
+      generateTestFromPrompt.mockReturnValue(
+        new Promise((res) => {
+          resolveApi = res;
+        })
+      );
+
+      await mount(root, context);
+
+      root.querySelector('#generator-project').value = '1';
+      root.querySelector('#generator-prompt').value = 'step removal test';
+      root.querySelector('#generator-form').dispatchEvent(new Event('submit', { bubbles: true }));
+
+      // Synchronous submit init is complete; buildProgressTracker has set progressEl innerHTML.
+      // Remove the 'analyze' step element so getEl('analyze') returns null on the next activate().
+      root.querySelector('[data-step="analyze"]')?.remove();
+
+      // Advance past step2Timer (2500ms) → tracker.activate('generate');
+      // for-loop iterates: getEl('analyze') = null → continue  ← covers line 38
+      await vi.advanceTimersByTimeAsync(2600);
+      expect(root.querySelector('[data-step="generate"]')?.className).toContain('gen-step--active');
+
+      resolveApi({ id: 1, content: '' });
+      await vi.runAllTimersAsync();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('createLoader', () => {

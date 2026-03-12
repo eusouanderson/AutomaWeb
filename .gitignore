@@ -108,6 +108,7 @@ browser/
 **.yml
 **.md
 **.db
+frontend/coverage
 # Logs
 *.log
 logs/
@@ -146,3 +147,5 @@ mkdocs/site/
 
 # Backup files
 *~
+frontend/coverage/index.html
+frontend/coverage/index.html

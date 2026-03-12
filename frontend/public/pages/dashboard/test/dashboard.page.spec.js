@@ -185,4 +185,27 @@ describe('dashboard.page – initDashboardPage', () => {
     document.querySelector('[data-project-id="5"]')?.click();
     await vi.waitFor(() => expect(toast).toHaveBeenCalledWith('Server error', 'error'));
   });
+
+  // ── list click: no [data-project-id] target (lines 74-75) ────────────────
+
+  it('does nothing when clicking list content with no delete button ancestor', () => {
+    initDashboardPage({ store: makeStore() });
+    document.getElementById('projects-list').innerHTML =
+      '<div class="plain"><span>some text</span></div>';
+    document
+      .querySelector('#projects-list .plain span')
+      .dispatchEvent(new Event('click', { bubbles: true }));
+    expect(deleteProjectService).not.toHaveBeenCalled();
+    expect(toast).not.toHaveBeenCalled();
+  });
+
+  // ── list click: falsy projectId (lines 79-80) ─────────────────────────────
+
+  it('does nothing when delete button has empty data-project-id', () => {
+    initDashboardPage({ store: makeStore() });
+    document.getElementById('projects-list').innerHTML =
+      '<button data-project-id="">Delete</button>';
+    document.querySelector('[data-project-id]').click();
+    expect(deleteProjectService).not.toHaveBeenCalled();
+  });
 });

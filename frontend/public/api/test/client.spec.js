@@ -46,6 +46,13 @@ describe('client.js', () => {
     await expect(import('../client.js')).rejects.toThrow('Axios global not found');
   });
 
+  // ── response interceptor ─────────────────────────────────────────────────
+
+  it('success interceptor passes response through unchanged', () => {
+    const res = { data: { id: 1 }, status: 200 };
+    expect(capturedSuccessInterceptor(res)).toBe(res);
+  });
+
   // ── error interceptor ─────────────────────────────────────────────────────
 
   it('interceptor normalizes detail from response data', () => {

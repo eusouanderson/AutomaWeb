@@ -123,14 +123,11 @@ describe('project-scan page – mount', () => {
       total_elements: 10,
       summary: { button: 10 }
     });
-
     await mount(root, context);
     const select = root.querySelector('#scan-project');
     select.value = '1';
     select.options[select.selectedIndex]?.setAttribute('data-url', 'https://demo.com');
-
     root.querySelector('#scan-form').dispatchEvent(new Event('submit', { bubbles: true }));
-
     await vi.waitFor(() => expect(toast).toHaveBeenCalledWith('Scan finished'));
     expect(root.querySelector('#scan-summary').textContent).toContain('My Page');
   });
@@ -153,5 +150,123 @@ describe('project-scan page – mount', () => {
     getProjects.mockResolvedValue([]);
     const cleanup = await mount(root, makeContext());
     expect(typeof cleanup).toBe('function');
+  });
+
+  it('returns an unmount cleanup function', async () => {
+    getProjects.mockResolvedValue([]);
+    const cleanup = await mount(root, makeContext());
+    expect(typeof cleanup).toBe('function');
+  });
+
+  // ── onProgress callback (lines 50-52) ────────────────────────────────────
+
+  it('appends a progress line via onProgress callback', async () => {
+    const context = makeContext([{ id: 1, name: 'Demo', url: 'https://demo.com' }]);
+    runProjectScan.mockImplementation((_url, { onProgress }) => {
+      onProgress('element found: button');
+      return Promise.resolve({ title: 'T', total_elements: 1, summary: {} });
+    });
+
+    await mount(root, context);
+    const select = root.querySelector('#scan-project');
+    select.value = '1';
+    select.options[select.selectedIndex]?.setAttribute('data-url', 'https://demo.com');
+    root.querySelector('#scan-form').dispatchEvent(new Event('submit', { bubbles: true }));
+
+    await vi.waitFor(() => expect(toast).toHaveBeenCalledWith('Scan finished'));
+    const lines = root.querySelectorAll('#scan-progress p');
+    expect(lines.length).toBeGreaterThan(0);
+    expect(lines[0].textContent).toContain('element found: button');
+  });
+
+  // ── onError callback (lines 55-56) ───────────────────────────────────────
+
+  it('calls toast with message via onError callback', async () => {
+    const context = makeContext([{ id: 1, name: 'Demo', url: 'https://demo.com' }]);
+    runProjectScan.mockImplementation((_url, { onError }) => {
+      onError('locator failed');
+      return Promise.resolve({ title: 'T', total_elements: 0, summary: {} });
+    });
+
+    await mount(root, context);
+    const select = root.querySelector('#scan-project');
+    select.value = '1';
+    select.options[select.selectedIndex]?.setAttribute('data-url', 'https://demo.com');
+    root.querySelector('#scan-form').dispatchEvent(new Event('submit', { bubbles: true }));
+
+    await vi.waitFor(() => expect(toast).toHaveBeenCalledWith('locator failed', 'error'));
+  });
+
+  it('uses fallback "Scan error" when onError called with empty message', async () => {
+    const context = makeContext([{ id: 1, name: 'Demo', url: 'https://demo.com' }]);
+    runProjectScan.mockImplementation((_url, { onError }) => {
+      onError('');
+      return Promise.resolve({ title: 'T', total_elements: 0, summary: {} });
+    });
+
+    await mount(root, context);
+    const select = root.querySelector('#scan-project');
+    select.value = '1';
+    select.options[select.selectedIndex]?.setAttribute('data-url', 'https://demo.com');
+    root.querySelector('#scan-form').dispatchEvent(new Event('submit', { bubbles: true }));
+
+    await vi.waitFor(() => expect(toast).toHaveBeenCalledWith('Scan error', 'error'));
+  });
+
+  // ── cleanup / unmount (line 80) ───────────────────────────────────────────
+
+  it('cleanup function removes the submit event listener', async () => {
+    getProjects.mockResolvedValue([]);
+    const cleanup = await mount(root, makeContext());
+    const form = root.querySelector('#scan-form');
+    const spy = vi.spyOn(form, 'removeEventListener');
+    cleanup();
+    expect(spy).toHaveBeenCalledWith('submit', expect.any(Function));
+  });
+
+  // ── project.url || '' false branch (line 34) ─────────────────────────────
+
+  it('uses empty string as data-url when project has no url', async () => {
+    const context = makeContext([{ id: 1, name: 'No URL', url: undefined }]);
+    await mount(root, context);
+    const opt = root.querySelector('#scan-project option[value="1"]');
+    expect(opt?.dataset?.url).toBe('');
+  });
+
+  // ── result?.title || '-' and typeSummary || '-' false branches (lines 60, 65) ─
+
+  it('shows "-" for title and elements type when result has no title and empty summary', async () => {
+    const context = makeContext([{ id: 1, name: 'Demo', url: 'https://demo.com' }]);
+    runProjectScan.mockResolvedValue({
+      title: '',
+      total_elements: 0,
+      summary: {}
+    });
+
+    await mount(root, context);
+    const select = root.querySelector('#scan-project');
+    select.value = '1';
+    select.options[select.selectedIndex]?.setAttribute('data-url', 'https://demo.com');
+    root.querySelector('#scan-form').dispatchEvent(new Event('submit', { bubbles: true }));
+
+    await vi.waitFor(() => expect(toast).toHaveBeenCalledWith('Scan finished'));
+    const summaryText = root.querySelector('#scan-summary').innerHTML;
+    expect(summaryText).toContain('-');
+  });
+
+  // ── result?.title: ?. false branch when result is null (line 60) ──────────
+
+  it('shows "-" for title when result is null', async () => {
+    const context = makeContext([{ id: 1, name: 'Demo', url: 'https://demo.com' }]);
+    runProjectScan.mockResolvedValue(null);
+
+    await mount(root, context);
+    const select = root.querySelector('#scan-project');
+    select.value = '1';
+    select.options[select.selectedIndex]?.setAttribute('data-url', 'https://demo.com');
+    root.querySelector('#scan-form').dispatchEvent(new Event('submit', { bubbles: true }));
+
+    await vi.waitFor(() => expect(toast).toHaveBeenCalledWith('Scan finished'));
+    expect(root.querySelector('#scan-summary').innerHTML).toContain('-');
   });
 });

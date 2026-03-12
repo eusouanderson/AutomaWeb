@@ -236,4 +236,197 @@ describe('generator page (legacy) – initGeneratorPage', () => {
     document.getElementById('test-project').dispatchEvent(new Event('change', { bubbles: true }));
     expect(document.getElementById('scan-panel').classList.contains('hidden')).toBe(true);
   });
+
+  // ── appendScanProgress: early return when scanProgress absent (lines 71-72) ─
+
+  it('appendScanProgress returns early when scan-progress element is absent', async () => {
+    document.getElementById('scan-progress').remove();
+    runProjectScan.mockResolvedValue({ title: 'T', total_elements: 1, summary: {} });
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document.getElementById('scan-page-btn').click();
+    // scan proceeds without throwing despite missing scanProgress
+    await vi.waitFor(() => expect(runProjectScan).toHaveBeenCalledTimes(1));
+  });
+
+  // ── isScanning guard: second click ignored (lines 117-118) ────────────────
+
+  it('ignores scan button click while already scanning', async () => {
+    let resolvesScan;
+    runProjectScan.mockImplementation(
+      () =>
+        new Promise((res) => {
+          resolvesScan = res;
+        })
+    );
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+
+    // First click: starts the scan; synchronously sets isScanning=true and disabled=true
+    document.getElementById('scan-page-btn').click();
+
+    // .click() is a no-op on a disabled button in jsdom — use dispatchEvent to bypass
+    // and exercise the isScanning early-return branch (lines 117-118)
+    document
+      .getElementById('scan-page-btn')
+      .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    await Promise.resolve();
+    expect(runProjectScan).toHaveBeenCalledTimes(1);
+    resolvesScan({ title: 'T', total_elements: 0, summary: {} });
+  });
+
+  // ── onError callback (lines 146-148) ──────────────────────────────────────
+
+  it('invokes onError callback when scan service calls it', async () => {
+    runProjectScan.mockImplementation((_url, { onError }) => {
+      onError('element not found');
+      return Promise.resolve(null);
+    });
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document.getElementById('scan-page-btn').click();
+    await vi.waitFor(() => expect(toast).toHaveBeenCalledWith('element not found', 'error'));
+    expect(document.getElementById('scan-progress').textContent).toContain(
+      'Erro: element not found'
+    );
+  });
+
+  it('uses fallback toast message when onError called with empty message', async () => {
+    runProjectScan.mockImplementation((_url, { onError }) => {
+      onError('');
+      return Promise.resolve(null);
+    });
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document.getElementById('scan-page-btn').click();
+    await vi.waitFor(() => expect(toast).toHaveBeenCalledWith('Erro no scan', 'error'));
+  });
+
+  // ── copy button (lines 216-217) ────────────────────────────────────────────
+
+  it('copy button writes code to clipboard and shows toast', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { clipboard: { writeText } });
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-code').textContent = '*** Test Cases ***';
+    document.getElementById('copy-test-btn').click();
+
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith('*** Test Cases ***'));
+    expect(toast).toHaveBeenCalledWith('Código copiado!');
+    vi.unstubAllGlobals();
+  });
+
+  // ── download button (lines 221-225) ───────────────────────────────────────
+
+  it('download button opens download URL when testId is set', () => {
+    const openMock = vi.fn();
+    vi.stubGlobal('open', openMock);
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('download-test-btn').dataset.testId = '42';
+    document.getElementById('download-test-btn').click();
+
+    expect(openMock).toHaveBeenCalledWith('/tests/42/download', '_blank');
+    vi.unstubAllGlobals();
+  });
+
+  it('download button returns early when testId is empty', () => {
+    const openMock = vi.fn();
+    vi.stubGlobal('open', openMock);
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('download-test-btn').dataset.testId = '';
+    document.getElementById('download-test-btn').click();
+
+    expect(openMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  // ── loadProjectsDropdown: project.url || '' false branch (line 91) ────────
+
+  it('renders empty data-url when project has no url', async () => {
+    getProjects.mockResolvedValue([{ id: 5, name: 'No URL', url: undefined }]);
+    const page = initGeneratorPage({ store: makeStore() });
+    await page.loadProjectsDropdown();
+    const opt = document.querySelector('#test-project option[value="5"]');
+    expect(opt?.dataset?.url).toBe('');
+  });
+
+  // ── generateFromExecutionFeedback: result.content || '' false branch (line 108) ─
+
+  it('uses empty string for code when result.content is falsy', async () => {
+    generateTestFromPrompt.mockResolvedValue({ id: 9, content: null });
+    const page = initGeneratorPage({ store: makeStore() });
+    await page.generateFromExecutionFeedback(1, 'feedback');
+    expect(document.getElementById('test-code').textContent).toBe('');
+  });
+
+  // ── generateFromExecutionFeedback: result.id || '' false branch (line 108 area) ─
+
+  it('uses empty string for testId when result.id is falsy', async () => {
+    generateTestFromPrompt.mockResolvedValue({ id: null, content: 'code' });
+    const page = initGeneratorPage({ store: makeStore() });
+    await page.generateFromExecutionFeedback(1, 'feedback');
+    expect(document.getElementById('download-test-btn').dataset.testId).toBe('');
+  });
+
+  // ── scan result: title || '-' false branch (line 159) ─────────────────────
+
+  it('shows "-" for scan title when result has no title', async () => {
+    runProjectScan.mockResolvedValue({ title: '', total_elements: 3, summary: { btn: 3 } });
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document.getElementById('scan-page-btn').click();
+    await vi.waitFor(() => expect(document.getElementById('scan-title').textContent).toBe('-'));
+  });
+
+  // ── scan result: typeSummary || '-' false branch (line 166) ───────────────
+
+  it('shows "-" for scan types when summary is empty', async () => {
+    runProjectScan.mockResolvedValue({ title: 'T', total_elements: 0, summary: {} });
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document.getElementById('scan-page-btn').click();
+    await vi.waitFor(() => expect(document.getElementById('scan-types').textContent).toBe('-'));
+  });
+
+  // ── form submit: result.content || '' and result.id || '' (lines 206-208) ─
+
+  it('handles null result.content and result.id gracefully on form submit', async () => {
+    generateTestFromPrompt.mockResolvedValue({ id: null, content: null });
+    const store = makeStore({ lastScanResult: { title: 'x' }, activeProjectId: 1 });
+    initGeneratorPage({ store });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('generate-test-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+    await vi.waitFor(() => expect(document.getElementById('test-code').textContent).toBe(''));
+    expect(document.getElementById('download-test-btn').dataset.testId).toBe('');
+  });
+
+  // ── scan result: result.summary || {} right-side branch (line 166) ─────────
+
+  it('shows "-" for scan types when summary is null', async () => {
+    runProjectScan.mockResolvedValue({ title: 'T', total_elements: 0, summary: null });
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document.getElementById('scan-page-btn').click();
+    await vi.waitFor(() => expect(document.getElementById('scan-types').textContent).toBe('-'));
+  });
+
+  // ── copyButton: codeElement.textContent || '' false branch (line 216) ─────
+
+  it('copy button writes empty string when code element is empty', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { clipboard: { writeText } });
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-code').textContent = '';
+    document.getElementById('copy-test-btn').click();
+
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith(''));
+    vi.unstubAllGlobals();
+  });
 });

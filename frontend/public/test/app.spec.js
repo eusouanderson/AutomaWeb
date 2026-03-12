@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-// All vi.mock calls are hoisted before imports by vitest
 vi.mock('../state/store.js', () => ({ store: {} }));
-
 vi.mock('../components/toast.js', () => ({ toast: vi.fn() }));
 
 vi.mock('../router.js', () => ({
@@ -23,16 +21,16 @@ vi.mock('../pages/generator/generator.page.js', () => ({
   }))
 }));
 
-vi.mock('../pages/reports/reports.page.js', () => ({
-  initReportsPage: vi.fn(() => ({
-    loadReportsProjects: vi.fn().mockResolvedValue(undefined)
-  }))
-}));
-
 vi.mock('../pages/scanner/scanner.page.js', () => ({
   initScannerPage: vi.fn(() => ({
     loadTestsProjects: vi.fn().mockResolvedValue(undefined),
     loadExecuteProjects: vi.fn().mockResolvedValue(undefined)
+  }))
+}));
+
+vi.mock('../pages/reports/reports.page.js', () => ({
+  initReportsPage: vi.fn(() => ({
+    loadReportsProjects: vi.fn().mockResolvedValue(undefined)
   }))
 }));
 

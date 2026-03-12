@@ -205,4 +205,132 @@ describe('reports page – initReportsPage', () => {
     document.querySelector('[data-open]')?.click();
     expect(globalThis.open).toHaveBeenCalledWith('/reports/1/index.html', '_blank');
   });
+
+  // ── report_file and log_file buttons rendered (lines 61-62 true branches) ─
+
+  it('renders report_file and log_file buttons when present', async () => {
+    getProjectExecutions.mockResolvedValue([
+      {
+        id: 2,
+        status: 'completed',
+        total_tests: 1,
+        passed: 1,
+        failed: 0,
+        skipped: 0,
+        created_at: '2024',
+        mkdocs_index: null,
+        report_file: '/reports/2/report.html',
+        log_file: '/reports/2/log.html'
+      }
+    ]);
+    initReportsPage({ store: makeStore() });
+    const select = document.getElementById('reports-project');
+    const opt = document.createElement('option');
+    opt.value = '2';
+    select.appendChild(opt);
+    select.value = '2';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await vi.waitFor(() => expect(document.querySelectorAll('[data-open]').length).toBe(2));
+
+    const buttons = [...document.querySelectorAll('[data-open]')];
+    const paths = buttons.map((b) => b.dataset.open);
+    expect(paths).toContain('/reports/2/report.html');
+    expect(paths).toContain('/reports/2/log.html');
+  });
+
+  // ── error_output details block rendered (line 60 true branch) ────────────
+
+  it('renders error details block when execution has error_output', async () => {
+    getProjectExecutions.mockResolvedValue([
+      {
+        id: 3,
+        status: 'failed',
+        total_tests: 1,
+        passed: 0,
+        failed: 1,
+        skipped: 0,
+        created_at: '2024',
+        error_output: 'Robot error: something went wrong',
+        mkdocs_index: null,
+        report_file: null,
+        log_file: null
+      }
+    ]);
+    initReportsPage({ store: makeStore() });
+    const select = document.getElementById('reports-project');
+    const opt = document.createElement('option');
+    opt.value = '3';
+    select.appendChild(opt);
+    select.value = '3';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await vi.waitFor(() => expect(document.querySelector('.report-error-details')).not.toBeNull());
+    expect(document.querySelector('.report-error-pre').textContent).toContain(
+      'Robot error: something went wrong'
+    );
+  });
+
+  // ── statusBadge: unknown status fallback (line 19 || right side) ──────────
+
+  it('renders unknown status as a badge with the raw status label', async () => {
+    getProjectExecutions.mockResolvedValue([
+      {
+        id: 4,
+        status: 'pending',
+        total_tests: 0,
+        passed: 0,
+        failed: 0,
+        skipped: 0,
+        created_at: '2024',
+        error_output: null,
+        mkdocs_index: null,
+        report_file: null,
+        log_file: null
+      }
+    ]);
+    initReportsPage({ store: makeStore() });
+    const select = document.getElementById('reports-project');
+    const opt = document.createElement('option');
+    opt.value = '4';
+    select.appendChild(opt);
+    select.value = '4';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await vi.waitFor(() => expect(document.querySelector('.exec-badge')).not.toBeNull());
+    expect(document.querySelector('.exec-badge').textContent).toBe('pending');
+  });
+
+  // ── renderExecutions: ?? 0 fallback for null stats (lines 42-54) ─────────
+
+  it('renders 0 for null total_tests, passed, failed, skipped values', async () => {
+    getProjectExecutions.mockResolvedValue([
+      {
+        id: 5,
+        status: 'completed',
+        total_tests: null,
+        passed: null,
+        failed: null,
+        skipped: null,
+        created_at: '2024',
+        error_output: null,
+        mkdocs_index: null,
+        report_file: null,
+        log_file: null
+      }
+    ]);
+    initReportsPage({ store: makeStore() });
+    const select = document.getElementById('reports-project');
+    const opt = document.createElement('option');
+    opt.value = '5';
+    select.appendChild(opt);
+    select.value = '5';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await vi.waitFor(() => expect(document.querySelector('.report-item')).not.toBeNull());
+    const statValues = [...document.querySelectorAll('.stat-item span:last-child')].map(
+      (el) => el.textContent
+    );
+    expect(statValues.every((v) => v === '0')).toBe(true);
+  });
 });
