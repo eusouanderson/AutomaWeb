@@ -12,8 +12,8 @@ const generatorPage = initGeneratorPage({ store });
 const reportsPage = initReportsPage({ store });
 const scannerPage = initScannerPage({
   store,
-  onRecreateRequested: async ({ projectId, feedback }) => {
-    await generatorPage.generateFromExecutionFeedback(projectId, feedback);
+  onRecreateRequested: async ({ projectId, feedback, testIds }) => {
+    await generatorPage.generateFromExecutionFeedback(projectId, feedback, testIds);
     navigateToTab('generate');
   }
 });

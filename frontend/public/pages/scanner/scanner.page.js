@@ -11,21 +11,36 @@ const SCANNER_STORAGE_FEEDBACK = 'scanner_feedback';
 
 function buildExecutionFeedback(data) {
   let lines = [
-    'A execucao dos testes apresentou falhas. Recrie o teste Robot Framework corrigindo os problemas abaixo.',
+    'A execucao dos testes apresentou falhas. Corrija APENAS os test cases que falharam, mantendo INTACTOS todos os test cases que passaram.',
     '',
     `Resumo: total=${data.total_tests}, passed=${data.passed}, failed=${data.failed}, skipped=${data.skipped}`
   ];
 
+  const failedCases = (data.test_cases || []).filter(
+    (tc) => (tc.status || '').toUpperCase() === 'FAIL'
+  );
+
+  if (failedCases.length > 0) {
+    lines = lines.concat(['', 'Test cases que falharam:']);
+    for (const tc of failedCases) {
+      lines.push(`  - "${tc.name}": ${tc.message || 'sem mensagem de erro'}`);
+    }
+  }
+
   if (data.error_output) {
-    lines = lines.concat(['', 'Saida de erro da execucao:', data.error_output]);
+    lines = lines.concat(['', 'Saida de erro completa:', data.error_output]);
   }
 
   lines = lines.concat([
     '',
-    'Objetivo: Corrigir os testes Robot Framework com base nos erros de execucao.'
+    'INSTRUCOES IMPORTANTES:',
+    '1. Retorne o arquivo Robot Framework COMPLETO, com TODOS os test cases originais.',
+    '2. Corrija apenas os test cases listados acima.',
+    '3. NAO remova test cases que passaram.',
+    '4. Mantenha a estrutura de Settings, Variables, Keywords intacta.'
   ]);
 
-  return lines.join('\n').slice(0, 6000);
+  return lines.join('\n').slice(0, 8000);
 }
 
 function extractExecutionMessage(data) {
@@ -109,19 +124,21 @@ export function initScannerPage({ onRecreateRequested }) {
     recreateButton.dataset.projectId = '';
   }
 
-  function setRecreatePanel(data, projectId) {
+  function setRecreatePanel(data, projectId, testIds) {
     const hasFailure = Number(data.failed || 0) > 0 || Boolean(data.error_output);
 
     if (!hasFailure) {
       recreatePanel.classList.add('hidden');
       executionFeedback.value = '';
       recreateButton.dataset.projectId = '';
+      recreateButton.dataset.testIds = '';
       return;
     }
 
     recreatePanel.classList.remove('hidden');
     executionFeedback.value = buildExecutionFeedback(data);
     recreateButton.dataset.projectId = String(projectId);
+    recreateButton.dataset.testIds = JSON.stringify(testIds || []);
   }
 
   async function loadGeneratedTests(projectId) {
@@ -426,7 +443,7 @@ export function initScannerPage({ onRecreateRequested }) {
       robotReportButton.dataset.reportPath = data.report_file || '';
       logButton.dataset.logPath = data.log_file || '';
 
-      setRecreatePanel(data, projectId);
+      setRecreatePanel(data, projectId, getSelectedTestIds());
 
       const hasFailure =
         data.status === 'failed' || Number(data.failed || 0) > 0 || Boolean(data.error_output);
@@ -461,6 +478,7 @@ export function initScannerPage({ onRecreateRequested }) {
   recreateButton?.addEventListener('click', async () => {
     const projectId = Number.parseInt(recreateButton.dataset.projectId, 10);
     const feedback = executionFeedback.value;
+    const testIds = JSON.parse(recreateButton.dataset.testIds || '[]');
 
     if (!projectId) {
       toast('Nao foi possivel identificar o projeto da execucao.', 'error');
@@ -476,7 +494,7 @@ export function initScannerPage({ onRecreateRequested }) {
     try {
       recreateButton.disabled = true;
       recreateButton.textContent = 'Recriando...';
-      await onRecreateRequested?.({ projectId, feedback });
+      await onRecreateRequested?.({ projectId, feedback, testIds });
     } catch (error) {
       toast(error.message, 'error');
     } finally {

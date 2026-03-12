@@ -3,6 +3,7 @@ import {
   deleteGeneratedTest,
   deleteProject,
   generateRobotTest,
+  getTestById,
   listGeneratedTests,
   listProjectExecutions,
   listProjects,
@@ -72,6 +73,12 @@ export async function deleteGeneratedTestService(testId) {
   }
 
   return deleteGeneratedTest(testId);
+}
+
+export async function getTestContent(testId) {
+  if (!testId) return null;
+  const test = await getTestById(testId);
+  return test?.content ?? null;
 }
 
 export async function getProjectExecutions(projectId) {

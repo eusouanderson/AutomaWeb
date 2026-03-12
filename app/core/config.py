@@ -12,12 +12,13 @@ class Settings(BaseSettings):
     APP_NAME: str = "AutomaWeb"
     DATABASE_URL: str = "sqlite+aiosqlite:///./app.db"
     GROQ_API_KEY: str = ""
-    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    GROQ_MODEL: str = "openai/gpt-oss-120b"
     GROQ_TIMEOUT_SECONDS: int = 30
     GROQ_MAX_RETRIES: int = 3
     GROQ_CA_BUNDLE: str | None = None
     GROQ_INSECURE_SKIP_VERIFY: bool = False
     CACHE_TTL_SECONDS: int = 300
+    SCAN_CACHE_TTL_SECONDS: int = 3600
     STATIC_DIR: str = "app/static"
     AI_VALIDATION_ENABLED: bool = True
     AI_DEBUG: bool = False

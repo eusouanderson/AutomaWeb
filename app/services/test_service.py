@@ -1,7 +1,9 @@
+import json
 import logging
 import os
 import re
 import asyncio
+from datetime import datetime
 from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -68,6 +70,10 @@ class TestService:
                 logger.error("Failed to scan project URL before generating test: %s", exc)
                 raise ScanUnavailableError(str(exc)) from exc
             page_structure = scan_result.model_dump()
+            # Persist scan in project cache
+            project.scan_cache = json.dumps(page_structure, ensure_ascii=False)
+            project.scan_cached_at = datetime.utcnow()
+            await session.flush()
 
         try:
             content = await asyncio.to_thread(
@@ -139,8 +145,20 @@ class TestService:
         await self._test_repository.delete_generated_test(session, generated)
         return True
 
-    async def improve_robot_test(self, content: str) -> str:
-        """Send Robot Framework content to the LLM for improvement and return the result."""
+    async def improve_robot_test(self, session: AsyncSession, test_id: int, content: str) -> str | None:
+        """Send Robot Framework content to the AI (with page scan context) and return improved version."""
+        generated = await self._test_repository.get_generated_test(session, test_id)
+        if not generated:
+            return None
+
+        # Resolve project to get scan context
+        test_request = await self._test_repository.get_test_request(session, generated.test_request_id)
+        project = await self._project_repository.get(session, test_request.project_id) if test_request else None
+
+        page_structure: dict | None = None
+        if project and project.url:
+            page_structure = await self._get_or_refresh_scan(session, project)
+
         improvement_prompt = (
             "Melhore o teste Robot Framework abaixo. "
             "Preserve a estrutura das seções (*** Settings ***, *** Variables ***, *** Test Cases ***, *** Keywords ***). "
@@ -154,7 +172,7 @@ class TestService:
                 self._groq_client.generate_robot_test,
                 prompt=improvement_prompt,
                 context=None,
-                page_structure=None,
+                page_structure=page_structure,
             )
         except Exception as exc:
             error_name = exc.__class__.__name__
@@ -162,6 +180,31 @@ class TestService:
                 raise LLMServiceUnavailableError("LLM provider connection failed") from exc
             raise
         return self._sanitize_robot_output(improved)
+
+    async def _get_or_refresh_scan(self, session: AsyncSession, project) -> dict | None:
+        """Return cached page scan if fresh, otherwise re-scan and update cache. Returns None on failure."""
+        now = datetime.utcnow()
+        ttl = settings.SCAN_CACHE_TTL_SECONDS
+
+        if (
+            project.scan_cache
+            and project.scan_cached_at
+            and (now - project.scan_cached_at).total_seconds() < ttl
+        ):
+            logger.info("Using cached page scan for project %s", project.id)
+            return json.loads(project.scan_cache)
+
+        try:
+            scan_result = await self._element_scanner.scan_url(str(project.url))
+        except ElementScannerError as exc:
+            logger.warning("Could not scan project URL for AI improve: %s", exc)
+            return None
+
+        data = scan_result.model_dump()
+        project.scan_cache = json.dumps(data, ensure_ascii=False)
+        project.scan_cached_at = now
+        await session.flush()
+        return data
 
     async def save_robot_test_content(
         self, session: AsyncSession, test_id: int, content: str

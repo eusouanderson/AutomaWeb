@@ -483,21 +483,9 @@ async def test_list_project_executions_route_returns_empty(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_improve_robot_test_route_success(monkeypatch) -> None:
-    generated = GeneratedTest(
-        id=1,
-        test_request_id=10,
-        content="*** Test Cases ***",
-        file_path="/tmp/t.robot",
-        created_at=datetime.utcnow(),
-    )
-
-    async def fake_get_generated_test(self, session, test_id: int):
-        return generated
-
-    async def fake_improve_robot_test(self, content: str):
+    async def fake_improve_robot_test(self, session, test_id: int, content: str):
         return "*** Test Cases ***\nImproved Test\n    Log    improved"
 
-    monkeypatch.setattr(routes.TestService, "get_generated_test", fake_get_generated_test)
     monkeypatch.setattr(routes.TestService, "improve_robot_test", fake_improve_robot_test)
 
     payload = routes.RobotImproveRequest(content="*** Test Cases ***\nOld Test")
@@ -508,10 +496,10 @@ async def test_improve_robot_test_route_success(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_improve_robot_test_route_not_found(monkeypatch) -> None:
-    async def fake_get_generated_test(self, session, test_id: int):
+    async def fake_improve_robot_test(self, session, test_id: int, content: str):
         return None
 
-    monkeypatch.setattr(routes.TestService, "get_generated_test", fake_get_generated_test)
+    monkeypatch.setattr(routes.TestService, "improve_robot_test", fake_improve_robot_test)
 
     payload = routes.RobotImproveRequest(content="*** Test Cases ***")
     with pytest.raises(HTTPException) as exc:

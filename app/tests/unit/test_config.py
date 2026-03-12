@@ -5,7 +5,7 @@ def test_settings_defaults() -> None:
     settings = Settings(GROQ_API_KEY="test")
     assert settings.APP_NAME == "AutomaWeb"
     assert settings.DATABASE_URL == "sqlite+aiosqlite:///./app.db"
-    assert settings.GROQ_MODEL == "llama-3.3-70b-versatile"
+    assert settings.GROQ_MODEL == "openai/gpt-oss-120b"
     assert settings.GROQ_TIMEOUT_SECONDS == 30
     assert settings.GROQ_MAX_RETRIES == 3
     assert settings.CACHE_TTL_SECONDS == 300

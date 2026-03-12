@@ -15,6 +15,7 @@ async def init_db(db_engine: AsyncEngine | None = None) -> None:
         await conn.run_sync(_ensure_project_test_directory_column)
         await conn.run_sync(_ensure_project_url_column)
         await conn.run_sync(_ensure_test_execution_columns)
+        await conn.run_sync(_ensure_project_scan_cache_columns)
 
 
 def _ensure_project_test_directory_column(sync_conn) -> None:
@@ -52,3 +53,14 @@ def _ensure_project_url_column(sync_conn) -> None:
     sync_conn.execute(
         text("ALTER TABLE projects ADD COLUMN url VARCHAR(1000)")
     )
+
+
+def _ensure_project_scan_cache_columns(sync_conn) -> None:
+    inspector = inspect(sync_conn)
+    columns = {col["name"] for col in inspector.get_columns("projects")}
+
+    if "scan_cache" not in columns:
+        sync_conn.execute(text("ALTER TABLE projects ADD COLUMN scan_cache TEXT"))
+
+    if "scan_cached_at" not in columns:
+        sync_conn.execute(text("ALTER TABLE projects ADD COLUMN scan_cached_at DATETIME"))

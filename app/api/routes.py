@@ -212,13 +212,11 @@ async def improve_robot_test(
     payload: RobotImproveRequest,
     session: AsyncSession = Depends(get_db),
 ) -> RobotImproveResponse:
-    """Send current .robot content to the AI and return an improved version."""
+    """Send current .robot content to the AI (with page scan context) and return an improved version."""
     service = TestService()
-    generated = await service.get_generated_test(session, test_id)
-    if not generated:
+    improved = await service.improve_robot_test(session=session, test_id=test_id, content=payload.content)
+    if improved is None:
         raise HTTPException(status_code=404, detail="Test not found")
-
-    improved = await service.improve_robot_test(content=payload.content)
     return RobotImproveResponse(content=improved)
 
 

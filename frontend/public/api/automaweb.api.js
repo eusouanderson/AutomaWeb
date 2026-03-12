@@ -20,6 +20,10 @@ export function deleteGeneratedTest(testId) {
   return request({ method: 'DELETE', url: `/tests/${testId}` });
 }
 
+export function getTestById(testId) {
+  return request({ method: 'GET', url: `/tests/${testId}` });
+}
+
 export function generateRobotTest(payload) {
   return request({ method: 'POST', url: '/tests/generate', data: payload });
 }

@@ -6,6 +6,7 @@ from tenacity import RetryError
 from app.core.config import settings
 from app.db.base import Base
 from app.models.project import Project
+from app.models.test_execution import TestExecution  # noqa: F401 — registers mapper
 from app.services.element_scanner import ElementScannerError
 from app.services.test_service import LLMServiceUnavailableError, ScanUnavailableError, TestService
 
@@ -63,6 +64,12 @@ class DummyTestRepository:
 
     async def get_generated_test(self, session, test_id):
         return self.generated_to_return
+
+    async def get_test_request(self, session, test_request_id):
+        from app.models.test_request import TestRequest
+        tr = TestRequest(id=test_request_id, project_id=1, prompt="p", status="completed")
+        tr.id = test_request_id
+        return tr
 
     async def delete_generated_test(self, session, generated):
         self.deleted_item = generated
@@ -217,7 +224,10 @@ async def test_generate_test_uses_scanned_page_structure(tmp_path) -> None:
         element_scanner=SuccessfulScanService(),
     )
 
-    generated = await service.generate_test(session=None, project_id=1, prompt="Gerar teste")
+    class _Session:
+        async def flush(self): pass
+
+    generated = await service.generate_test(session=_Session(), project_id=1, prompt="Gerar teste")
 
     assert generated.id == 99
     assert groq_client.captured_page_structure == {"title": "Page"}
@@ -588,8 +598,51 @@ def test_make_selector_unique_plain_tag() -> None:
 
 
 # ---------------------------------------------------------------------------
-# improve_robot_test – lines 142-164
+# improve_robot_test – new signature: (session, test_id, content)
 # ---------------------------------------------------------------------------
+
+class _FakeSession:
+    """Minimal async session stub for improve_robot_test unit tests."""
+    async def flush(self):
+        pass
+
+
+def _make_improve_service(groq_client, project=None, generated=None):
+    """Build a TestService with a fake generated test and project for improve tests."""
+    from app.models.generated_test import GeneratedTest as GT
+    from app.models.project import Project
+    from datetime import datetime as dt
+
+    fake_gen = GT(
+        id=1,
+        test_request_id=10,
+        content="*** Test Cases ***",
+        file_path="/tmp/t.robot",
+        created_at=dt.utcnow(),
+    )
+    if generated is not None:
+        fake_gen = generated
+
+    fake_project = Project(
+        id=1,
+        name="Proj",
+        url=None,
+        created_at=dt.utcnow(),
+    )
+    if project is not None:
+        fake_project = project
+
+    class _Repo(DummyTestRepository):
+        def __init__(self):
+            super().__init__()
+            self.generated_to_return = fake_gen
+
+    return TestService(
+        test_repository=_Repo(),
+        project_repository=DummyProjectRepository(fake_project),
+        groq_client=groq_client,
+        element_scanner=SuccessfulScanService(),
+    )
 
 
 @pytest.mark.asyncio
@@ -600,10 +653,25 @@ async def test_improve_robot_test_returns_sanitized_output() -> None:
         def generate_robot_test(self, prompt, context=None, page_structure=None):
             return "*** Test Cases ***\nImproved\n    Log    better"
 
-    service = TestService(groq_client=ImprovingGroqClient())
-    result = await service.improve_robot_test("*** Test Cases ***\nOld\n    Log    old")
+    service = _make_improve_service(ImprovingGroqClient())
+    result = await service.improve_robot_test(_FakeSession(), test_id=1, content="*** Test Cases ***\nOld\n    Log    old")
+    assert result is not None
     assert "*** Test Cases ***" in result
     assert "Improved" in result
+
+
+@pytest.mark.asyncio
+async def test_improve_robot_test_returns_none_when_test_not_found() -> None:
+    """improve_robot_test returns None when the generated test does not exist."""
+
+    class AnyGroqClient:
+        def generate_robot_test(self, prompt, context=None, page_structure=None):
+            return "*** Test Cases ***"
+
+    service = _make_improve_service(AnyGroqClient(), generated=None)
+    service._test_repository.generated_to_return = None
+    result = await service.improve_robot_test(_FakeSession(), test_id=999, content="x")
+    assert result is None
 
 
 @pytest.mark.asyncio
@@ -617,9 +685,9 @@ async def test_improve_robot_test_raises_llm_unavailable_on_connection_error() -
         def generate_robot_test(self, prompt, context=None, page_structure=None):
             raise APIConnectionError("down")
 
-    service = TestService(groq_client=ConnFailingGroqClient())
+    service = _make_improve_service(ConnFailingGroqClient())
     with pytest.raises(LLMServiceUnavailableError):
-        await service.improve_robot_test("*** Test Cases ***\nX")
+        await service.improve_robot_test(_FakeSession(), test_id=1, content="*** Test Cases ***\nX")
 
 
 @pytest.mark.asyncio
@@ -633,9 +701,9 @@ async def test_improve_robot_test_raises_llm_unavailable_on_timeout_error() -> N
         def generate_robot_test(self, prompt, context=None, page_structure=None):
             raise APITimeoutError("timeout")
 
-    service = TestService(groq_client=TimeoutGroqClient())
+    service = _make_improve_service(TimeoutGroqClient())
     with pytest.raises(LLMServiceUnavailableError):
-        await service.improve_robot_test("*** Test Cases ***\nX")
+        await service.improve_robot_test(_FakeSession(), test_id=1, content="*** Test Cases ***\nX")
 
 
 @pytest.mark.asyncio
@@ -649,9 +717,66 @@ async def test_improve_robot_test_reraises_unexpected_exceptions() -> None:
         def generate_robot_test(self, prompt, context=None, page_structure=None):
             raise BoomError("boom")
 
-    service = TestService(groq_client=BoomGroqClient())
+    service = _make_improve_service(BoomGroqClient())
     with pytest.raises(BoomError):
-        await service.improve_robot_test("*** Test Cases ***\nX")
+        await service.improve_robot_test(_FakeSession(), test_id=1, content="*** Test Cases ***\nX")
+
+
+@pytest.mark.asyncio
+async def test_improve_robot_test_uses_page_scan_when_project_has_url() -> None:
+    """improve_robot_test passes page_structure to LLM when project has a URL."""
+    from app.models.project import Project
+    from datetime import datetime as dt
+
+    received_structures = []
+
+    class CapturingGroqClient:
+        def generate_robot_test(self, prompt, context=None, page_structure=None):
+            received_structures.append(page_structure)
+            return "*** Test Cases ***\nWith Scan\n    Log    ok"
+
+    project_with_url = Project(id=1, name="P", url="http://example.com", created_at=dt.utcnow())
+    service = _make_improve_service(CapturingGroqClient(), project=project_with_url)
+
+    result = await service.improve_robot_test(_FakeSession(), test_id=1, content="*** Test Cases ***\nOld")
+    assert result is not None
+    assert received_structures[0] is not None
+    assert received_structures[0]["title"] == "Page"
+
+
+@pytest.mark.asyncio
+async def test_improve_robot_test_uses_cached_scan_when_fresh() -> None:
+    """improve_robot_test uses cached scan_cache when it is within TTL."""
+    import json
+    from app.models.project import Project
+    from datetime import datetime as dt
+
+    received_structures = []
+
+    class CapturingGroqClient:
+        def generate_robot_test(self, prompt, context=None, page_structure=None):
+            received_structures.append(page_structure)
+            return "*** Test Cases ***\nCached\n    Log    ok"
+
+    cached_data = {"title": "Cached", "elements": [], "total_elements": 0, "summary": {}, "url": "http://x.com"}
+    project_with_cache = Project(
+        id=1,
+        name="P",
+        url="http://x.com",
+        scan_cache=json.dumps(cached_data),
+        scan_cached_at=dt.utcnow(),
+        created_at=dt.utcnow(),
+    )
+
+    class NeverScanService:
+        async def scan_url(self, _url):
+            raise AssertionError("Should not re-scan when cache is fresh")
+
+    service = _make_improve_service(CapturingGroqClient(), project=project_with_cache)
+    service._element_scanner = NeverScanService()
+    result = await service.improve_robot_test(_FakeSession(), test_id=1, content="*** Test Cases ***\nX")
+    assert result is not None
+    assert received_structures[0]["title"] == "Cached"
 
 
 # ---------------------------------------------------------------------------

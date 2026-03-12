@@ -121,4 +121,5 @@ async def test_init_db_runs_all_sync_steps() -> None:
         "_ensure_project_test_directory_column",
         "_ensure_project_url_column",
         "_ensure_test_execution_columns",
+        "_ensure_project_scan_cache_columns",
     ]

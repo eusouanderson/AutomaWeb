@@ -1,6 +1,11 @@
 import { toast } from '../../components/toast.js';
 import { runProjectScan } from '../../services/scan.service.js';
-import { generateTestFromPrompt, getProjects } from '../../services/test.service.js';
+import {
+  generateTestFromPrompt,
+  getProjectGeneratedTests,
+  getProjects,
+  getTestContent
+} from '../../services/test.service.js';
 
 const GEN_STORAGE_PROMPT = 'gen_prompt';
 const GEN_STORAGE_CONTEXT = 'gen_context';
@@ -96,20 +101,42 @@ export function initGeneratorPage({ store }) {
     }
   }
 
-  async function generateFromExecutionFeedback(projectId, feedbackText) {
-    const result = await generateTestFromPrompt({
-      projectId,
-      prompt: 'Recriar teste com base no feedback da execução (falhas/erros).',
-      context: feedbackText
-    });
+  async function generateFromExecutionFeedback(projectId, feedbackText, testIds) {
+    // Load original test content so the AI can fix it instead of rewriting from scratch
+    let originalContent = null;
+
+    const idsToLoad = Array.isArray(testIds) && testIds.length ? testIds : [];
+
+    if (idsToLoad.length > 0) {
+      // Load content of the first executed test (the one with errors)
+      originalContent = await getTestContent(idsToLoad[0]).catch(() => null);
+    }
+
+    if (!originalContent) {
+      // Fallback: load the most recent test of the project
+      const tests = await getProjectGeneratedTests(projectId).catch(() => []);
+      if (tests.length > 0) {
+        originalContent = await getTestContent(tests[0].id).catch(() => null);
+      }
+    }
+
+    const prompt = originalContent
+      ? 'Corrija os test cases com falha no arquivo Robot Framework abaixo. Mantenha TODOS os test cases que passaram exatamente como estao. Retorne o arquivo completo e corrigido.'
+      : 'Recriar teste com base no feedback da execucao (falhas/erros).';
+
+    const context = originalContent
+      ? `${feedbackText}\n\n--- CODIGO ROBOT FRAMEWORK ORIGINAL ---\n${originalContent}`
+      : feedbackText;
+
+    const result = await generateTestFromPrompt({ projectId, prompt, context });
 
     codeElement.textContent = result.content || '';
     resultSection.classList.remove('hidden');
     downloadButton.dataset.testId = String(result.id || '');
     projectSelect.value = String(projectId);
-    promptInput.value = 'Recriar teste com base no feedback da execução (falhas/erros).';
-    contextInput.value = feedbackText;
-    toast('Novo teste gerado com base no feedback da execução!');
+    promptInput.value = prompt;
+    contextInput.value = context;
+    toast('Teste corrigido com base nos erros da execucao!');
   }
 
   scanButton?.addEventListener('click', async () => {
