@@ -106,6 +106,13 @@ describe('router', () => {
       expect(globalThis.location.hash).toBe('#execute');
     });
 
+    it('sets hash to "projects" when location.hash is empty on init', async () => {
+      globalThis.location.hash = '';
+      const onTabChange = vi.fn().mockResolvedValue(undefined);
+      initRouter({ onTabChange });
+      await vi.waitFor(() => expect(globalThis.location.hash).toBe('#projects'));
+    });
+
     it('fires onTabChange again when hashchange event is dispatched', async () => {
       globalThis.location.hash = '#projects';
       const onTabChange = vi.fn().mockResolvedValue(undefined);

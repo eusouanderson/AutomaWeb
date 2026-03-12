@@ -4,17 +4,20 @@ describe('client.js', () => {
   let request;
   let streamPost;
   let mockHttp;
+  let capturedSuccessInterceptor;
   let capturedErrorInterceptor;
 
   beforeEach(async () => {
     vi.resetModules();
+    capturedSuccessInterceptor = null;
     capturedErrorInterceptor = null;
 
     mockHttp = {
       request: vi.fn(),
       interceptors: {
         response: {
-          use: vi.fn((_ok, err) => {
+          use: vi.fn((ok, err) => {
+            capturedSuccessInterceptor = ok;
             capturedErrorInterceptor = err;
           })
         }
@@ -158,6 +161,36 @@ describe('client.js', () => {
     await streamPost('/stream', {}, onMessage);
 
     expect(onMessage).toHaveBeenCalledTimes(2);
+  });
+
+  it('streamPost skips event blocks without a data: line', async () => {
+    const encoder = new TextEncoder();
+    // A chunk with an empty block followed by a real data event.
+    // After split('\n\n'): ['', 'data: {"ok":true}', ''] → pop removes ''
+    // forEach sees '' (no data: line → return early) then 'data: {"ok":true}'
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        body: {
+          getReader: () => ({
+            read: vi
+              .fn()
+              .mockResolvedValueOnce({
+                done: false,
+                value: encoder.encode('\n\ndata: {"ok":true}\n\n')
+              })
+              .mockResolvedValueOnce({ done: true })
+          })
+        }
+      })
+    );
+
+    const onMessage = vi.fn();
+    await streamPost('/stream', {}, onMessage);
+
+    expect(onMessage).toHaveBeenCalledTimes(1);
+    expect(onMessage).toHaveBeenCalledWith({ ok: true });
   });
 
   it('streamPost throws when response is not ok', async () => {

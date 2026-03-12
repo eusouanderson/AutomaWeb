@@ -112,12 +112,44 @@ describe('app.js bootstrap', () => {
     expect(page.loadExecuteProjects.mock.calls.length).toBe(callsBefore + 1);
   });
 
+  it('router onTabChange triggers generator.loadProjectsDropdown for "generate" tab', async () => {
+    const { onTabChange } = initRouter.mock.calls[0][0];
+    const page = initGeneratorPage.mock.results[0].value;
+    const callsBefore = page.loadProjectsDropdown.mock.calls.length;
+    await onTabChange('generate');
+    expect(page.loadProjectsDropdown.mock.calls.length).toBe(callsBefore + 1);
+  });
+
+  it('router onTabChange triggers reports.loadReportsProjects for "reports" tab', async () => {
+    const { onTabChange } = initRouter.mock.calls[0][0];
+    const page = initReportsPage.mock.results[0].value;
+    const callsBefore = page.loadReportsProjects.mock.calls.length;
+    await onTabChange('reports');
+    expect(page.loadReportsProjects.mock.calls.length).toBe(callsBefore + 1);
+  });
+
   it('router onTabChange triggers dashboard.loadProjects for "projects" tab', async () => {
     const { onTabChange } = initRouter.mock.calls[0][0];
     const page = initDashboardPage.mock.results[0].value;
     const callsBefore = page.loadProjects.mock.calls.length;
     await onTabChange('projects');
     expect(page.loadProjects.mock.calls.length).toBe(callsBefore + 1);
+  });
+
+  it('router onTabChange triggers generator.loadProjectsDropdown for "generate" tab', async () => {
+    const { onTabChange } = initRouter.mock.calls[0][0];
+    const page = initGeneratorPage.mock.results[0].value;
+    const callsBefore = page.loadProjectsDropdown.mock.calls.length;
+    await onTabChange('generate');
+    expect(page.loadProjectsDropdown.mock.calls.length).toBe(callsBefore + 1);
+  });
+
+  it('router onTabChange triggers reports.loadReportsProjects for "reports" tab', async () => {
+    const { onTabChange } = initRouter.mock.calls[0][0];
+    const page = initReportsPage.mock.results[0].value;
+    const callsBefore = page.loadReportsProjects.mock.calls.length;
+    await onTabChange('reports');
+    expect(page.loadReportsProjects.mock.calls.length).toBe(callsBefore + 1);
   });
 
   it('onRecreateRequested calls generateFromExecutionFeedback and navigateToTab', async () => {
