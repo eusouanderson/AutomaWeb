@@ -30,8 +30,12 @@ export function initGeneratorPage({ store }) {
   const codeElement = document.getElementById('test-code');
   const copyButton = document.getElementById('copy-test-btn');
   const downloadButton = document.getElementById('download-test-btn');
+  const genScanCacheNotice = document.getElementById('gen-scan-cache-notice');
+  const genScanCacheDate = document.getElementById('gen-scan-cache-date');
+  const genRescanBtn = document.getElementById('gen-rescan-btn');
 
   let isScanning = false;
+  let forceRescan = false;
 
   if (!form || !projectSelect) {
     return {
@@ -50,6 +54,24 @@ export function initGeneratorPage({ store }) {
   });
   contextInput?.addEventListener('input', () => {
     localStorage.setItem(GEN_STORAGE_CONTEXT, contextInput.value);
+  });
+
+  function updateCacheState() {
+    const selected = projectSelect.selectedOptions[0];
+    const cachedAt = selected?.dataset?.cachedAt;
+    if (cachedAt) {
+      if (genScanCacheDate)
+        genScanCacheDate.textContent = new Date(cachedAt).toLocaleString('pt-BR');
+      genScanCacheNotice?.classList.remove('hidden');
+    } else {
+      genScanCacheNotice?.classList.add('hidden');
+    }
+  }
+
+  genRescanBtn?.addEventListener('click', () => {
+    forceRescan = true;
+    genRescanBtn.textContent = '↻ Scan será refeito';
+    genRescanBtn.classList.add('btn-warning');
   });
 
   function resetScanPanel() {
@@ -93,9 +115,10 @@ export function initGeneratorPage({ store }) {
         projects
           .map(
             (project) =>
-              `<option value="${project.id}" data-url="${project.url || ''}">${project.name}</option>`
+              `<option value="${project.id}" data-url="${project.url || ''}" data-cached-at="${project.scan_cached_at || ''}">${project.name}</option>`
           )
           .join('');
+      updateCacheState();
     } catch (error) {
       toast(error.message, 'error');
     }
@@ -167,7 +190,7 @@ export function initGeneratorPage({ store }) {
     appendScanProgress('Iniciando escaneamento...');
 
     try {
-      const result = await runProjectScan(projectUrl, {
+      const result = await runProjectScan(projectUrl, projectId, {
         onProgress: (message) => appendScanProgress(message),
         onError: (message) => {
           appendScanProgress(`Erro: ${message}`);
@@ -198,6 +221,17 @@ export function initGeneratorPage({ store }) {
         scanReadyMessage?.classList.remove('hidden');
         appendScanProgress('Dados estruturados prontos para geração de teste.');
         toast('Scan concluído com sucesso!');
+
+        // Update cache notice with the new scan date
+        const selectedOption = projectSelect.options[projectSelect.selectedIndex];
+        const now = new Date().toISOString();
+        if (selectedOption) selectedOption.dataset.cachedAt = now;
+        forceRescan = false;
+        if (genRescanBtn) {
+          genRescanBtn.textContent = '↻ Refazer scan';
+          genRescanBtn.classList.remove('btn-warning');
+        }
+        updateCacheState();
       }
     } catch (error) {
       toast(error.message, 'error');
@@ -210,6 +244,12 @@ export function initGeneratorPage({ store }) {
 
   projectSelect.addEventListener('change', () => {
     resetScanPanel();
+    forceRescan = false;
+    if (genRescanBtn) {
+      genRescanBtn.textContent = '↻ Refazer scan';
+      genRescanBtn.classList.remove('btn-warning');
+    }
+    updateCacheState();
   });
 
   form.addEventListener('submit', async (event) => {
@@ -222,14 +262,18 @@ export function initGeneratorPage({ store }) {
     resultSection.classList.add('hidden');
 
     const state = store.getState();
-    if (!state.lastScanResult || state.activeProjectId !== projectId) {
+    const selectedOption = projectSelect.options[projectSelect.selectedIndex];
+    const hasCachedScan = !!selectedOption?.dataset?.cachedAt;
+    const hasFreshScan = state.lastScanResult && state.activeProjectId === projectId;
+
+    if (!hasFreshScan && !hasCachedScan) {
       toast('Execute o scan da página antes de gerar o teste.', 'error');
       return;
     }
 
     try {
       toast('Gerando teste... Aguarde.', 'info');
-      const result = await generateTestFromPrompt({ projectId, prompt, context });
+      const result = await generateTestFromPrompt({ projectId, prompt, context, forceRescan });
       codeElement.textContent = result.content || '';
       resultSection.classList.remove('hidden');
       downloadButton.dataset.testId = String(result.id || '');

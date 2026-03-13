@@ -1,13 +1,13 @@
 import { scanProject } from '../api/automaweb.api.js';
 import { isValidUrl } from '../utils/validators.js';
 
-export async function runProjectScan(projectUrl, handlers = {}) {
+export async function runProjectScan(projectUrl, projectId = null, handlers = {}) {
   if (!isValidUrl(projectUrl)) {
     throw new Error('A valid project URL is required to scan');
   }
 
   let scanResult = null;
-  await scanProject(projectUrl, (message) => {
+  await scanProject(projectUrl, projectId, (message) => {
     if (message.type === 'progress') {
       handlers.onProgress?.(message.message);
       return;

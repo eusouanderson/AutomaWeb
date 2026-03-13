@@ -194,3 +194,25 @@ async def test_list_generated_tests_by_ids_for_project_returns_empty_on_empty_id
     selected = await repo.list_generated_tests_by_ids_for_project(session, project_id=1, test_ids=[])
 
     assert selected == []
+
+
+async def test_get_test_request_found(session: AsyncSession) -> None:
+    project = Project(name="Projeto GetReq")
+    session.add(project)
+    await session.commit()
+    await session.refresh(project)
+
+    repo = TestRepository()
+    test_request = TestRequest(project_id=project.id, prompt="Find me", status="pending")
+    created = await repo.create_test_request(session, test_request)
+
+    found = await repo.get_test_request(session, created.id)
+    assert found is not None
+    assert found.id == created.id
+    assert found.prompt == "Find me"
+
+
+async def test_get_test_request_not_found(session: AsyncSession) -> None:
+    repo = TestRepository()
+    found = await repo.get_test_request(session, 99999)
+    assert found is None

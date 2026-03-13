@@ -8,6 +8,7 @@ class TestGenerateRequest(BaseModel):
     prompt: str = Field(..., min_length=5)
     context: str | None = None
     ai_debug: bool = False
+    force_rescan: bool = False
 
 
 class TestRequestOut(BaseModel):

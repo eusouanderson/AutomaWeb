@@ -159,9 +159,9 @@ describe('app.js bootstrap', () => {
     const { onRecreateRequested } = initScannerPage.mock.calls[0][0];
     const genPage = initGeneratorPage.mock.results[0].value;
 
-    await onRecreateRequested({ projectId: 2, feedback: 'fix this' });
+    await onRecreateRequested({ projectId: 2, feedback: 'fix this', testIds: [1] });
 
-    expect(genPage.generateFromExecutionFeedback).toHaveBeenCalledWith(2, 'fix this');
+    expect(genPage.generateFromExecutionFeedback).toHaveBeenCalledWith(2, 'fix this', [1]);
     expect(navigateToTab).toHaveBeenCalledWith('generate');
   });
 });

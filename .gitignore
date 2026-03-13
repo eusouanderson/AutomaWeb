@@ -111,6 +111,8 @@ browser/
 frontend/coverage
 frontend/.nyc_output
 # Logs
+
+*.pyc
 *.log
 logs/
 *.out

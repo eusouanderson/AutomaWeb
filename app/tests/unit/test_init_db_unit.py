@@ -6,6 +6,7 @@ from app.db.init_db import (
     _ensure_project_test_directory_column,
     _ensure_project_url_column,
     _ensure_test_execution_columns,
+    _ensure_project_scan_cache_columns,
 )
 
 
@@ -123,3 +124,32 @@ async def test_init_db_runs_all_sync_steps() -> None:
         "_ensure_test_execution_columns",
         "_ensure_project_scan_cache_columns",
     ]
+
+
+def test_ensure_project_scan_cache_columns_adds_missing_columns() -> None:
+    engine = create_engine("sqlite:///:memory:")
+    with engine.begin() as conn:
+        conn.execute(text("CREATE TABLE projects (id INTEGER PRIMARY KEY, name VARCHAR(150))"))
+        _ensure_project_scan_cache_columns(conn)
+        columns = {col["name"] for col in inspect(conn).get_columns("projects")}
+        assert "scan_cache" in columns
+        assert "scan_cached_at" in columns
+
+
+def test_ensure_project_scan_cache_columns_noop_when_exist() -> None:
+    engine = create_engine("sqlite:///:memory:")
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "CREATE TABLE projects ("
+                "id INTEGER PRIMARY KEY, "
+                "name VARCHAR(150), "
+                "scan_cache TEXT, "
+                "scan_cached_at DATETIME"
+                ")"
+            )
+        )
+        _ensure_project_scan_cache_columns(conn)
+        columns = {col["name"] for col in inspect(conn).get_columns("projects")}
+        assert "scan_cache" in columns
+        assert "scan_cached_at" in columns

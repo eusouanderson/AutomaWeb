@@ -99,7 +99,8 @@ describe('generateTestFromPrompt', () => {
     expect(generateRobotTest).toHaveBeenCalledWith({
       project_id: 1,
       prompt: 'Login flow test',
-      context: 'some ctx'
+      context: 'some ctx',
+      force_rescan: false
     });
   });
 

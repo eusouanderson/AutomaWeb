@@ -33,7 +33,7 @@ export async function deleteProjectService(projectId) {
   return deleteProject(projectId);
 }
 
-export async function generateTestFromPrompt({ projectId, prompt, context }) {
+export async function generateTestFromPrompt({ projectId, prompt, context, forceRescan = false }) {
   if (!projectId) {
     throw new Error('Project is required');
   }
@@ -44,7 +44,8 @@ export async function generateTestFromPrompt({ projectId, prompt, context }) {
   return generateRobotTest({
     project_id: projectId,
     prompt,
-    context: context?.trim() || null
+    context: context?.trim() || null,
+    force_rescan: forceRescan
   });
 }
 

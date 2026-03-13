@@ -779,9 +779,67 @@ async def test_improve_robot_test_uses_cached_scan_when_fresh() -> None:
     assert received_structures[0]["title"] == "Cached"
 
 
-# ---------------------------------------------------------------------------
-# save_robot_test_content – lines 166-178
-# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_generate_test_uses_cached_scan_without_rescan(tmp_path) -> None:
+    """generate_test reuses project.scan_cache when force_rescan=False (covers lines 68-69)."""
+    import json
+    from datetime import datetime as dt
+
+    settings.STATIC_DIR = str(tmp_path)
+    cached_data = {"title": "Cached", "elements": [], "total_elements": 0, "summary": {}, "url": "https://example.com"}
+    project = Project(
+        id=1,
+        name="Proj",
+        description="Desc",
+        test_directory=str(tmp_path),
+        url="https://example.com",
+        scan_cache=json.dumps(cached_data),
+        scan_cached_at=dt.utcnow(),
+    )
+
+    class NeverScanService:
+        async def scan_url(self, _url):
+            raise AssertionError("Scanner should not be called when cache is available")
+
+    groq_client = CapturingGroqClient()
+    service = TestService(
+        test_repository=DummyTestRepository(),
+        project_repository=DummyProjectRepository(project),
+        groq_client=groq_client,
+        element_scanner=NeverScanService(),
+    )
+
+    class _Session:
+        async def flush(self): pass
+
+    generated = await service.generate_test(
+        session=_Session(), project_id=1, prompt="Gerar teste", force_rescan=False
+    )
+    assert generated.id == 99
+    assert groq_client.captured_page_structure == cached_data
+
+
+@pytest.mark.asyncio
+async def test_get_or_refresh_scan_returns_none_on_scanner_error() -> None:
+    """_get_or_refresh_scan catches ElementScannerError and returns None (covers lines 209-211)."""
+    from datetime import datetime as dt
+    from datetime import timedelta
+
+    project_stale = Project(
+        id=1,
+        name="P",
+        url="http://x.com",
+        scan_cache=None,
+        scan_cached_at=None,
+        created_at=dt.utcnow(),
+    )
+
+    service = _make_improve_service(DummyGroqClient(), project=project_stale)
+    service._element_scanner = FailingScanService()
+
+    result = await service._get_or_refresh_scan(_FakeSession(), project_stale)
+    assert result is None
+
 
 
 @pytest.mark.asyncio

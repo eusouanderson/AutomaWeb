@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../services/test.service.js', () => ({
   getProjects: vi.fn(),
-  generateTestFromPrompt: vi.fn()
+  generateTestFromPrompt: vi.fn(),
+  getProjectGeneratedTests: vi.fn().mockResolvedValue([]),
+  getTestContent: vi.fn().mockResolvedValue(null)
 }));
 vi.mock('../../../services/scan.service.js', () => ({ runProjectScan: vi.fn() }));
 vi.mock('../../../components/toast.js', () => ({ toast: vi.fn() }));
@@ -21,6 +23,8 @@ function buildDOM() {
       </select>
       <textarea id="test-prompt"></textarea>
       <textarea id="test-context"></textarea>
+      <div id="gen-scan-cache-notice" class="hidden"><span id="gen-scan-cache-date"></span></div>
+      <button id="gen-rescan-btn">Refazer scan</button>
       <button id="scan-page-btn">Scan</button>
       <button id="copy-test-btn">Copy</button>
       <button id="download-test-btn" data-test-id="">Download</button>
@@ -127,7 +131,7 @@ describe('generator page (legacy) – initGeneratorPage', () => {
     generateTestFromPrompt.mockResolvedValue({ id: 8, content: '' });
     const page = initGeneratorPage({ store: makeStore() });
     await page.generateFromExecutionFeedback(1, 'fb');
-    expect(toast).toHaveBeenCalledWith('Novo teste gerado com base no feedback da execução!');
+    expect(toast).toHaveBeenCalledWith('Teste corrigido com base nos erros da execucao!');
   });
 
   // ── form submit ───────────────────────────────────────────────────────────
@@ -279,7 +283,7 @@ describe('generator page (legacy) – initGeneratorPage', () => {
   // ── onError callback (lines 146-148) ──────────────────────────────────────
 
   it('invokes onError callback when scan service calls it', async () => {
-    runProjectScan.mockImplementation((_url, { onError }) => {
+    runProjectScan.mockImplementation((_url, _projectId, { onError }) => {
       onError('element not found');
       return Promise.resolve(null);
     });
@@ -293,7 +297,7 @@ describe('generator page (legacy) – initGeneratorPage', () => {
   });
 
   it('uses fallback toast message when onError called with empty message', async () => {
-    runProjectScan.mockImplementation((_url, { onError }) => {
+    runProjectScan.mockImplementation((_url, _projectId, { onError }) => {
       onError('');
       return Promise.resolve(null);
     });

@@ -37,8 +37,8 @@ export function runTests(payload) {
   });
 }
 
-export function scanProject(url, onMessage) {
-  return streamPost('/scan', { url }, onMessage);
+export function scanProject(url, projectId, onMessage) {
+  return streamPost('/scan', { url, project_id: projectId ?? null }, onMessage);
 }
 
 export function listProjectExecutions(projectId) {

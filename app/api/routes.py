@@ -1,6 +1,8 @@
 import json
 import asyncio
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
@@ -9,6 +11,7 @@ from pathlib import Path
 
 from app.api.deps import get_db
 from app.ai_validation.metrics import AIMetricsRegistry
+from app.repositories.project_repository import ProjectRepository
 from app.schemas.generated_test import GeneratedTestOut, GeneratedTestSummaryOut
 from app.schemas.project import ProjectCreate, ProjectOut
 from app.schemas.scan import ScanRequest
@@ -84,6 +87,7 @@ async def generate_test(payload: TestGenerateRequest, session: AsyncSession = De
             prompt=payload.prompt,
             context=payload.context,
             ai_debug=payload.ai_debug,
+            force_rescan=payload.force_rescan,
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -101,7 +105,7 @@ async def generate_test(payload: TestGenerateRequest, session: AsyncSession = De
 
 
 @router.post("/scan")
-async def scan_page(payload: ScanRequest) -> StreamingResponse:
+async def scan_page(payload: ScanRequest, session: AsyncSession = Depends(get_db)) -> StreamingResponse:
     scanner = ElementScannerService()
 
     async def event_stream():
@@ -113,7 +117,15 @@ async def scan_page(payload: ScanRequest) -> StreamingResponse:
         async def run_scan() -> None:
             try:
                 result = await scanner.scan_url(str(payload.url), progress_callback=on_progress)
-                await queue.put({"type": "result", "data": result.model_dump()})
+                scan_data = result.model_dump()
+                # Persist scan cache in the project if project_id was provided
+                if payload.project_id is not None:
+                    project = await ProjectRepository().get(session, payload.project_id)
+                    if project:
+                        project.scan_cache = json.dumps(scan_data, ensure_ascii=False)
+                        project.scan_cached_at = datetime.utcnow()
+                        await session.commit()
+                await queue.put({"type": "result", "data": scan_data})
             except ElementScannerError as exc:
                 await queue.put({"type": "error", "message": str(exc)})
             finally:

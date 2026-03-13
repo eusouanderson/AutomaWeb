@@ -81,8 +81,12 @@ describe('automaweb.api', () => {
 
   it('delegates scanProject to streamPost()', async () => {
     const onMessage = vi.fn();
-    await scanProject('https://example.com', onMessage);
-    expect(streamPost).toHaveBeenCalledWith('/scan', { url: 'https://example.com' }, onMessage);
+    await scanProject('https://example.com', 5, onMessage);
+    expect(streamPost).toHaveBeenCalledWith(
+      '/scan',
+      { url: 'https://example.com', project_id: 5 },
+      onMessage
+    );
   });
 
   it('delegates improveRobotTest to request()', async () => {

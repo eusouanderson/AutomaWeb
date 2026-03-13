@@ -313,7 +313,8 @@ describe('scanner page – initScannerPage', () => {
     await vi.waitFor(() =>
       expect(onRecreate).toHaveBeenCalledWith({
         projectId: 7,
-        feedback: 'Fix the login test'
+        feedback: 'Fix the login test',
+        testIds: expect.any(Array)
       })
     );
   });

@@ -24,10 +24,16 @@ describe('runProjectScan', () => {
     await expect(runProjectScan('not-a-url')).rejects.toThrow('valid project URL is required');
   });
 
-  it('calls scanProject with the given URL', async () => {
+  it('calls scanProject with the given URL and projectId', async () => {
+    scanProject.mockResolvedValue(undefined);
+    await runProjectScan('https://example.com', 42);
+    expect(scanProject).toHaveBeenCalledWith('https://example.com', 42, expect.any(Function));
+  });
+
+  it('calls scanProject with null projectId when not provided', async () => {
     scanProject.mockResolvedValue(undefined);
     await runProjectScan('https://example.com');
-    expect(scanProject).toHaveBeenCalledWith('https://example.com', expect.any(Function));
+    expect(scanProject).toHaveBeenCalledWith('https://example.com', null, expect.any(Function));
   });
 
   it('returns null when no result message is received', async () => {
@@ -37,7 +43,7 @@ describe('runProjectScan', () => {
   });
 
   it('returns the result data from a "result" message', async () => {
-    scanProject.mockImplementation(async (_url, onMessage) => {
+    scanProject.mockImplementation(async (_url, _projectId, onMessage) => {
       onMessage({ type: 'result', data: { title: 'My Page', total_elements: 5 } });
     });
     const result = await runProjectScan('https://example.com');
@@ -45,55 +51,55 @@ describe('runProjectScan', () => {
   });
 
   it('calls handlers.onProgress for "progress" messages', async () => {
-    scanProject.mockImplementation(async (_url, onMessage) => {
+    scanProject.mockImplementation(async (_url, _projectId, onMessage) => {
       onMessage({ type: 'progress', message: 'Scanning...' });
     });
     const onProgress = vi.fn();
-    await runProjectScan('https://example.com', { onProgress });
+    await runProjectScan('https://example.com', null, { onProgress });
     expect(onProgress).toHaveBeenCalledWith('Scanning...');
   });
 
   it('calls handlers.onResult for "result" messages', async () => {
     const data = { title: 'X', total_elements: 1 };
-    scanProject.mockImplementation(async (_url, onMessage) => {
+    scanProject.mockImplementation(async (_url, _projectId, onMessage) => {
       onMessage({ type: 'result', data });
     });
     const onResult = vi.fn();
-    await runProjectScan('https://example.com', { onResult });
+    await runProjectScan('https://example.com', null, { onResult });
     expect(onResult).toHaveBeenCalledWith(data);
   });
 
   it('calls handlers.onError for "error" messages', async () => {
-    scanProject.mockImplementation(async (_url, onMessage) => {
+    scanProject.mockImplementation(async (_url, _projectId, onMessage) => {
       onMessage({ type: 'error', message: 'Timeout' });
     });
     const onError = vi.fn();
-    await runProjectScan('https://example.com', { onError });
+    await runProjectScan('https://example.com', null, { onError });
     expect(onError).toHaveBeenCalledWith('Timeout');
   });
 
   it('handles multiple message types in sequence', async () => {
     const data = { title: 'Z', total_elements: 3 };
-    scanProject.mockImplementation(async (_url, onMessage) => {
+    scanProject.mockImplementation(async (_url, _projectId, onMessage) => {
       onMessage({ type: 'progress', message: 'step 1' });
       onMessage({ type: 'progress', message: 'step 2' });
       onMessage({ type: 'result', data });
     });
     const onProgress = vi.fn();
-    const result = await runProjectScan('https://example.com', { onProgress });
+    const result = await runProjectScan('https://example.com', null, { onProgress });
     expect(onProgress).toHaveBeenCalledTimes(2);
     expect(result).toEqual(data);
   });
 
   it('ignores unknown message types without throwing', async () => {
-    scanProject.mockImplementation(async (_url, onMessage) => {
+    scanProject.mockImplementation(async (_url, _projectId, onMessage) => {
       onMessage({ type: 'unknown', message: 'ignore me' });
     });
     await expect(runProjectScan('https://example.com')).resolves.toBeNull();
   });
 
   it('works without passing handlers', async () => {
-    scanProject.mockImplementation(async (_url, onMessage) => {
+    scanProject.mockImplementation(async (_url, _projectId, onMessage) => {
       onMessage({ type: 'progress', message: 'x' });
       onMessage({ type: 'error', message: 'oops' });
     });

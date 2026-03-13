@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field, HttpUrl
 
 class ScanRequest(BaseModel):
     url: HttpUrl
+    project_id: int | None = None
 
 
 class ScannedElement(BaseModel):

@@ -52,6 +52,7 @@ class TestService:
         prompt: str,
         context: str | None = None,
         ai_debug: bool = False,
+        force_rescan: bool = False,
     ) -> GeneratedTest:
         project = await self._project_repository.get(session, project_id)
         if not project:
@@ -62,18 +63,27 @@ class TestService:
 
         page_structure: dict | None = None
         if project.url:
-            try:
-                scan_result = await self._element_scanner.scan_url(str(project.url))
-            except ElementScannerError as exc:
-                test_request.status = "failed"
-                await self._test_repository.update_test_request(session, test_request)
-                logger.error("Failed to scan project URL before generating test: %s", exc)
-                raise ScanUnavailableError(str(exc)) from exc
-            page_structure = scan_result.model_dump()
-            # Persist scan in project cache
-            project.scan_cache = json.dumps(page_structure, ensure_ascii=False)
-            project.scan_cached_at = datetime.utcnow()
-            await session.flush()
+            if project.scan_cache and not force_rescan:
+                # Reuse cached scan — no need to hit the page again
+                page_structure = json.loads(project.scan_cache)
+                logger.info(
+                    "Reusing cached scan for project %s (cached at %s)",
+                    project_id,
+                    project.scan_cached_at,
+                )
+            else:
+                try:
+                    scan_result = await self._element_scanner.scan_url(str(project.url))
+                except ElementScannerError as exc:
+                    test_request.status = "failed"
+                    await self._test_repository.update_test_request(session, test_request)
+                    logger.error("Failed to scan project URL before generating test: %s", exc)
+                    raise ScanUnavailableError(str(exc)) from exc
+                page_structure = scan_result.model_dump()
+                # Persist updated scan in project cache
+                project.scan_cache = json.dumps(page_structure, ensure_ascii=False)
+                project.scan_cached_at = datetime.utcnow()
+                await session.flush()
 
         try:
             content = await asyncio.to_thread(

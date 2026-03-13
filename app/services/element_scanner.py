@@ -415,7 +415,7 @@ class ElementScannerService:
         progress_callback: ProgressCallback | None = None,
     ) -> ScanResult:
         # --- Fast path (lxml) ---
-        await self._progress(progress_callback, "Buscando página (escaneamento rápido)...")
+        await self._progress(progress_callback, "Buscando página...")
         try:
             loop = asyncio.get_running_loop()
             title, raw_elements = await loop.run_in_executor(
@@ -438,7 +438,7 @@ class ElementScannerService:
                 )
                 await self._progress(
                     progress_callback,
-                    f"Página parece ser uma SPA ({len(raw_elements)} elementos estáticos). "
+                    f"Encontrados  ({len(raw_elements)} elementos estáticos). "
                     "Iniciando navegador para escaneamento completo do DOM...",
                 )
                 title, raw_elements = await self._playwright_scan(url, progress_callback, title)
@@ -494,14 +494,14 @@ class ElementScannerService:
                 except PlaywrightTimeoutError:
                     await self._progress(progress_callback, "Timeout de rede ociosa — continuando escaneamento...")
 
-                await self._progress(progress_callback, "Extraindo elementos do DOM ao vivo...")
+                await self._progress(progress_callback, "Extraindo elementos do DOM...")
                 raw_elements: list[dict] = await page.evaluate(_playwright_scan_script())
                 title = (await page.title()) or fallback_title
             finally:
                 await context.close()
         except ElementScannerError:
             raise
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  
             raise ElementScannerError(f"Browser scan failed: {exc}") from exc
 
         return title, raw_elements

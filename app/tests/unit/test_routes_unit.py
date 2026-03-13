@@ -112,7 +112,7 @@ async def test_list_projects_route(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_generate_test_route_success(monkeypatch, tmp_path) -> None:
-    async def fake_generate_test(self, session: AsyncSession, project_id: int, prompt: str, context: str | None = None, ai_debug: bool = False):
+    async def fake_generate_test(self, session: AsyncSession, project_id: int, prompt: str, context: str | None = None, ai_debug: bool = False, force_rescan: bool = False):
         return GeneratedTest(
             id=1,
             test_request_id=1,
@@ -131,7 +131,7 @@ async def test_generate_test_route_success(monkeypatch, tmp_path) -> None:
 
 @pytest.mark.asyncio
 async def test_generate_test_route_error(monkeypatch) -> None:
-    async def fake_generate_test(self, session: AsyncSession, project_id: int, prompt: str, context: str | None = None, ai_debug: bool = False):
+    async def fake_generate_test(self, session: AsyncSession, project_id: int, prompt: str, context: str | None = None, ai_debug: bool = False, force_rescan: bool = False):
         raise ValueError("Project not found")
 
     monkeypatch.setattr(routes.TestService, "generate_test", fake_generate_test)
@@ -339,7 +339,7 @@ async def test_list_project_tests_route_not_found(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_generate_test_route_llm_unavailable(monkeypatch) -> None:
-    async def fake_generate_test(self, session: AsyncSession, project_id: int, prompt: str, context: str | None = None, ai_debug: bool = False):
+    async def fake_generate_test(self, session: AsyncSession, project_id: int, prompt: str, context: str | None = None, ai_debug: bool = False, force_rescan: bool = False):
         raise LLMServiceUnavailableError("upstream unavailable")
 
     monkeypatch.setattr(routes.TestService, "generate_test", fake_generate_test)
@@ -353,7 +353,7 @@ async def test_generate_test_route_llm_unavailable(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_generate_test_route_scan_unavailable(monkeypatch) -> None:
-    async def fake_generate_test(self, session: AsyncSession, project_id: int, prompt: str, context: str | None = None, ai_debug: bool = False):
+    async def fake_generate_test(self, session: AsyncSession, project_id: int, prompt: str, context: str | None = None, ai_debug: bool = False, force_rescan: bool = False):
         raise ScanUnavailableError("scan failed")
 
     monkeypatch.setattr(routes.TestService, "generate_test", fake_generate_test)
@@ -405,7 +405,7 @@ async def test_scan_page_stream_error(monkeypatch) -> None:
 
     monkeypatch.setattr(routes, "ElementScannerService", lambda: DummyScanner())
 
-    response = await routes.scan_page(routes.ScanRequest(url="https://example.com"))
+    response = await routes.scan_page(routes.ScanRequest(url="https://example.com"), session=None)
     body_iter = response.body_iterator
     event = await anext(body_iter)
     payload = json.loads(event.removeprefix("data: ").strip())
@@ -429,7 +429,7 @@ async def test_scan_page_stream_cancels_running_task_on_close(monkeypatch) -> No
 
     monkeypatch.setattr(routes, "ElementScannerService", lambda: DummyScanner())
 
-    response = await routes.scan_page(routes.ScanRequest(url="https://example.com"))
+    response = await routes.scan_page(routes.ScanRequest(url="https://example.com"), session=None)
     body_iter = response.body_iterator
 
     first = await anext(body_iter)
