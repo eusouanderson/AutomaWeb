@@ -11,13 +11,18 @@ vi.mock('../../../utils/helpers.js', () => ({
   formatDate: (v) => (v ? String(v) : '-')
 }));
 
+vi.mock('../../../utils/dom.js', async () => {
+  const actual = await vi.importActual('../../../utils/dom.js');
+  return { ...actual, loadTemplate: vi.fn().mockResolvedValue('') };
+});
+
 import { toast } from '../../../components/toast.js';
 import {
   createProjectService,
   deleteProjectService,
   getProjects
 } from '../../../services/test.service.js';
-import { initDashboardPage } from '../dashboard.page.js';
+import { initDashboardPage, mount } from '../dashboard.page.js';
 
 function buildDOM() {
   document.body.innerHTML = `
@@ -207,5 +212,15 @@ describe('dashboard.page – initDashboardPage', () => {
       '<button data-project-id="">Delete</button>';
     document.querySelector('[data-project-id]').click();
     expect(deleteProjectService).not.toHaveBeenCalled();
+  });
+
+  // ── mount (lines 13-16) ───────────────────────────────────────────────────
+
+  it('mount loads the template and returns a page with loadProjects', async () => {
+    const root = document.createElement('div');
+    document.body.appendChild(root);
+    const page = await mount(root, { store: makeStore() });
+    expect(typeof page.loadProjects).toBe('function');
+    root.remove();
   });
 });

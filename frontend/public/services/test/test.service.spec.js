@@ -8,6 +8,7 @@ vi.mock('../../api/automaweb.api.js', () => ({
   runTests: vi.fn(),
   listGeneratedTests: vi.fn(),
   deleteGeneratedTest: vi.fn(),
+  getTestById: vi.fn(),
   listProjectExecutions: vi.fn()
 }));
 
@@ -16,6 +17,7 @@ import {
   deleteGeneratedTest,
   deleteProject,
   generateRobotTest,
+  getTestById,
   listGeneratedTests,
   listProjectExecutions,
   listProjects,
@@ -30,7 +32,8 @@ import {
   generateTestFromPrompt,
   getProjectExecutions,
   getProjectGeneratedTests,
-  getProjects
+  getProjects,
+  getTestContent
 } from '../test.service.js';
 
 beforeEach(() => vi.clearAllMocks());
@@ -206,5 +209,26 @@ describe('getProjectExecutions', () => {
     listProjectExecutions.mockResolvedValue([{ id: 1 }]);
     await getProjectExecutions(5);
     expect(listProjectExecutions).toHaveBeenCalledWith(5);
+  });
+});
+
+// ── getTestContent ────────────────────────────────────────────────────────────
+
+describe('getTestContent', () => {
+  it('returns null when testId is falsy', async () => {
+    expect(await getTestContent(0)).toBeNull();
+    expect(getTestById).not.toHaveBeenCalled();
+  });
+
+  it('returns content when getTestById resolves with content', async () => {
+    getTestById.mockResolvedValue({ id: 5, content: '*** Test Cases ***\nLogin\n    Log  ok' });
+    const result = await getTestContent(5);
+    expect(getTestById).toHaveBeenCalledWith(5);
+    expect(result).toBe('*** Test Cases ***\nLogin\n    Log  ok');
+  });
+
+  it('returns null when getTestById resolves with no content', async () => {
+    getTestById.mockResolvedValue({ id: 6, content: null });
+    expect(await getTestContent(6)).toBeNull();
   });
 });

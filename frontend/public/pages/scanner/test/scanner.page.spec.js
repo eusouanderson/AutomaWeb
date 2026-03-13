@@ -13,6 +13,11 @@ vi.mock('../../../utils/helpers.js', () => ({
   formatDate: vi.fn((v) => (v ? String(v) : '-'))
 }));
 
+vi.mock('../../../utils/dom.js', async () => {
+  const actual = await vi.importActual('../../../utils/dom.js');
+  return { ...actual, loadTemplate: vi.fn().mockResolvedValue('') };
+});
+
 // ── imports ───────────────────────────────────────────────────────────────────
 import { toast } from '../../../components/toast.js';
 import {

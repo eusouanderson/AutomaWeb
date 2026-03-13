@@ -9,10 +9,20 @@ vi.mock('../../../services/test.service.js', () => ({
 vi.mock('../../../services/scan.service.js', () => ({ runProjectScan: vi.fn() }));
 vi.mock('../../../components/toast.js', () => ({ toast: vi.fn() }));
 
+vi.mock('../../../utils/dom.js', async () => {
+  const actual = await vi.importActual('../../../utils/dom.js');
+  return { ...actual, loadTemplate: vi.fn().mockResolvedValue('') };
+});
+
 import { toast } from '../../../components/toast.js';
 import { runProjectScan } from '../../../services/scan.service.js';
-import { generateTestFromPrompt, getProjects } from '../../../services/test.service.js';
-import { initGeneratorPage } from '../generator.page.js';
+import {
+  generateTestFromPrompt,
+  getProjectGeneratedTests,
+  getProjects,
+  getTestContent
+} from '../../../services/test.service.js';
+import { initGeneratorPage, mount } from '../generator.page.js';
 
 function buildDOM() {
   document.body.innerHTML = `
@@ -432,5 +442,51 @@ describe('generator page (legacy) – initGeneratorPage', () => {
 
     await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith(''));
     vi.unstubAllGlobals();
+  });
+
+  // ── mount (lines 13-17) ───────────────────────────────────────────────────
+
+  it('mount loads the template and returns a page with loadProjectsDropdown', async () => {
+    const root = document.createElement('div');
+    document.body.appendChild(root);
+    const page = await mount(root, { store: makeStore() });
+    expect(typeof page.loadProjectsDropdown).toBe('function');
+    expect(typeof page.generateFromExecutionFeedback).toBe('function');
+    root.remove();
+  });
+
+  // ── genRescanBtn click (line 83) ──────────────────────────────────────────
+
+  it('genRescanBtn click sets forceRescan flag and updates button text and class', () => {
+    initGeneratorPage({ store: makeStore() });
+    const btn = document.getElementById('gen-rescan-btn');
+    btn.click();
+    expect(btn.textContent).toBe('↻ Scan será refeito');
+    expect(btn.classList.contains('btn-warning')).toBe(true);
+  });
+
+  // ── generateFromExecutionFeedback: testIds branch (lines 143-145) ─────────
+
+  it('generateFromExecutionFeedback loads content from testIds when provided', async () => {
+    getTestContent.mockResolvedValueOnce('*** Test Cases ***\nOriginal');
+    generateTestFromPrompt.mockResolvedValue({ id: 50, content: '*** Test Cases ***\nFixed' });
+    const page = initGeneratorPage({ store: makeStore() });
+    await page.generateFromExecutionFeedback(1, 'fix this', [42]);
+    expect(getTestContent).toHaveBeenCalledWith(42);
+    expect(generateTestFromPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ context: expect.stringContaining('fix this') })
+    );
+  });
+
+  // ── generateFromExecutionFeedback: fallback to project tests (lines 151-152)
+
+  it('generateFromExecutionFeedback falls back to first project test when no testIds', async () => {
+    getProjectGeneratedTests.mockResolvedValueOnce([{ id: 7 }]);
+    getTestContent.mockResolvedValueOnce('*** Test Cases ***\nExisting');
+    generateTestFromPrompt.mockResolvedValue({ id: 51, content: '*** Test Cases ***\nImproved' });
+    const page = initGeneratorPage({ store: makeStore() });
+    await page.generateFromExecutionFeedback(1, 'feedback text', []);
+    expect(getProjectGeneratedTests).toHaveBeenCalledWith(1);
+    expect(getTestContent).toHaveBeenCalledWith(7);
   });
 });
