@@ -26,7 +26,7 @@ import {
   getProjectGeneratedTests,
   getProjects
 } from '../../../services/test.service.js';
-import { initScannerPage } from '../scanner.page.js';
+import { initScannerPage, mount } from '../scanner.page.js';
 
 // ── DOM fixture builder ───────────────────────────────────────────────────────
 function buildDOM() {
@@ -923,6 +923,86 @@ describe('scanner page – initScannerPage', () => {
     // null status → tc.status || '' → st = '' → cls = 'skip'
     expect(document.getElementById('execution-test-list').innerHTML).toContain(
       'exec-test-item--skip'
+    );
+  });
+
+  // ── mount (lines 15-22) ───────────────────────────────────────────────────
+
+  it('mount loads both templates and returns the page object', async () => {
+    const testsRoot = document.createElement('div');
+    const executeRoot = document.createElement('div');
+    testsRoot.innerHTML = `
+      <select id="tests-project"></select>
+      <div id="tests-list"></div>
+    `;
+    executeRoot.innerHTML = `
+      <select id="execute-project"></select>
+      <form id="execute-tests-form"><button type="submit">Run</button></form>
+      <div id="execution-test-list"></div>
+    `;
+    document.body.appendChild(testsRoot);
+    document.body.appendChild(executeRoot);
+
+    const page = await mount({ testsRoot, executeRoot }, { onRecreateRequested: vi.fn() });
+
+    expect(typeof page.loadTestsProjects).toBe('function');
+    expect(typeof page.loadExecuteProjects).toBe('function');
+
+    testsRoot.remove();
+    executeRoot.remove();
+  });
+
+  // ── buildExecutionFeedback: null tc.status branch (line 34) ─────────────────
+
+  it("buildExecutionFeedback handles null tc.status via submit (status || ''  branch)", async () => {
+    getProjects.mockResolvedValue([{ id: 1, name: 'Proj' }]);
+    getProjectGeneratedTests.mockResolvedValue([]);
+    executeProjectTests.mockResolvedValue({
+      total_tests: 1,
+      passed: 0,
+      failed: 1,
+      skipped: 0,
+      error_output: null,
+      test_cases: [{ name: 'Null Status Test', status: null, message: 'err' }]
+    });
+
+    const { loadExecuteProjects } = initScannerPage({ onRecreateRequested: vi.fn() });
+    await loadExecuteProjects();
+
+    document.getElementById('execute-project').value = '1';
+    document
+      .getElementById('execute-tests-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+
+    await vi.waitFor(() =>
+      expect(document.getElementById('recreate-panel').classList.contains('hidden')).toBe(false)
+    );
+  });
+
+  // ── buildExecutionFeedback: null tc.message fallback (line 40) ───────────────
+
+  it("buildExecutionFeedback uses 'sem mensagem de erro' when tc.message is null", async () => {
+    getProjects.mockResolvedValue([{ id: 1, name: 'Proj' }]);
+    getProjectGeneratedTests.mockResolvedValue([]);
+    executeProjectTests.mockResolvedValue({
+      total_tests: 1,
+      passed: 0,
+      failed: 1,
+      skipped: 0,
+      error_output: null,
+      test_cases: [{ name: 'No Message Test', status: 'FAIL', message: null }]
+    });
+
+    const { loadExecuteProjects } = initScannerPage({ onRecreateRequested: vi.fn() });
+    await loadExecuteProjects();
+
+    document.getElementById('execute-project').value = '1';
+    document
+      .getElementById('execute-tests-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+
+    await vi.waitFor(() =>
+      expect(document.getElementById('execution-feedback').value).toContain('sem mensagem de erro')
     );
   });
 });

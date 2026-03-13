@@ -456,4 +456,91 @@ describe('robot-editor page – mount', () => {
       expect(saveEditorContent).toHaveBeenCalledWith(7, expect.stringContaining('*** Settings ***'))
     );
   });
+
+  // ── getEditorText: SPAN/BR branch (lines 35-37) ────────────────────────────
+
+  it('reads content from a BR child node in the editor (SPAN/BR branch)', async () => {
+    getProjects.mockResolvedValue([]);
+    loadRobotTestContent.mockResolvedValue({
+      id: 8,
+      file_path: '/t.robot',
+      content: '*** Test Cases ***'
+    });
+    saveEditorContent.mockResolvedValue({ id: 8 });
+    await mount(root, makeContext());
+
+    const testSelect = root.querySelector('#editor-test');
+    testSelect.innerHTML = '<option value="8">t.robot</option>';
+    testSelect.value = '8';
+    testSelect.dispatchEvent(new Event('change'));
+    await vi.waitFor(() => expect(loadRobotTestContent).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 0));
+
+    // Replace editor content with a BR node — exercises the SPAN/BR else-if branch
+    const editorEl = root.querySelector('#robot-editor');
+    while (editorEl.firstChild) editorEl.removeChild(editorEl.firstChild);
+    editorEl.appendChild(document.createElement('br'));
+
+    const saveBtn2 = Array.from(root.querySelectorAll('button')).find(
+      (b) => b.textContent === 'Save'
+    );
+    saveBtn2.click();
+    await vi.waitFor(() => expect(saveEditorContent).toHaveBeenCalledWith(8, expect.any(String)));
+  });
+
+  // ── getEditorText: fallback when lines is empty (line 41) ──────────────────
+
+  it('falls back to textContent when editor has no matchable child nodes', async () => {
+    getProjects.mockResolvedValue([]);
+    loadRobotTestContent.mockResolvedValue({
+      id: 9,
+      file_path: '/t.robot',
+      content: ''
+    });
+    saveEditorContent.mockResolvedValue({ id: 9 });
+    await mount(root, makeContext());
+
+    const testSelect = root.querySelector('#editor-test');
+    testSelect.innerHTML = '<option value="9">t.robot</option>';
+    testSelect.value = '9';
+    testSelect.dispatchEvent(new Event('change'));
+    await vi.waitFor(() => expect(loadRobotTestContent).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 0));
+
+    // Empty editor → childNodes empty → lines stays [] → fallback path
+    const editorEl = root.querySelector('#robot-editor');
+    while (editorEl.firstChild) editorEl.removeChild(editorEl.firstChild);
+
+    const saveBtn3 = Array.from(root.querySelectorAll('button')).find(
+      (b) => b.textContent === 'Save'
+    );
+    saveBtn3.click();
+    await vi.waitFor(() => expect(saveEditorContent).toHaveBeenCalledWith(9, ''));
+  });
+
+  // ── save early return when no test loaded (line 119) ───────────────────────
+
+  it('save button does nothing when no test is loaded', async () => {
+    getProjects.mockResolvedValue([]);
+    await mount(root, makeContext());
+    const saveBtn4 = Array.from(root.querySelectorAll('button')).find(
+      (b) => b.textContent === 'Save'
+    );
+    saveBtn4.click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(saveEditorContent).not.toHaveBeenCalled();
+  });
+
+  // ── AI button early return when no test loaded (line 137) ──────────────────
+
+  it('AI button does nothing when no test is loaded', async () => {
+    getProjects.mockResolvedValue([]);
+    await mount(root, makeContext());
+    const aiBtn = Array.from(root.querySelectorAll('button')).find(
+      (b) => b.textContent === 'Edit with AI'
+    );
+    aiBtn.click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(improveWithAI).not.toHaveBeenCalled();
+  });
 });

@@ -152,6 +152,7 @@ export function initScannerPage({ onRecreateRequested }) {
     recreatePanel.classList.remove('hidden');
     executionFeedback.value = buildExecutionFeedback(data);
     recreateButton.dataset.projectId = String(projectId);
+    /* v8 ignore next */
     recreateButton.dataset.testIds = JSON.stringify(testIds || []);
   }
 

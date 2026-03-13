@@ -17,7 +17,7 @@ vi.mock('../../../utils/dom.js', async () => {
 
 import { toast } from '../../../components/toast.js';
 import { getProjectExecutions, getProjects } from '../../../services/test.service.js';
-import { initReportsPage } from '../reports.page.js';
+import { initReportsPage, mount } from '../reports.page.js';
 
 function buildDOM() {
   document.body.innerHTML = `
@@ -337,5 +337,15 @@ describe('reports page – initReportsPage', () => {
       (el) => el.textContent
     );
     expect(statValues.every((v) => v === '0')).toBe(true);
+  });
+
+  // ── mount (lines 9-12) ────────────────────────────────────────────────────
+
+  it('mount loads the template and returns a page with loadReportsProjects', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const page = await mount(container, { store: makeStore() });
+    expect(typeof page.loadReportsProjects).toBe('function');
+    container.remove();
   });
 });
