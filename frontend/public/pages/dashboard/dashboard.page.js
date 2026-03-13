@@ -4,7 +4,16 @@ import {
   deleteProjectService,
   getProjects
 } from '../../services/test.service.js';
+import { loadTemplate, renderHTML } from '../../utils/dom.js';
 import { escapeHtml, formatDate } from '../../utils/helpers.js';
+
+const TEMPLATE_PATH = '/static/frontend/pages/dashboard/dashboard.html';
+
+export async function mount(root, { store }) {
+  const html = await loadTemplate(TEMPLATE_PATH);
+  renderHTML(root, html);
+  return initDashboardPage({ store });
+}
 
 export function initDashboardPage({ store }) {
   const form = document.getElementById('create-project-form');

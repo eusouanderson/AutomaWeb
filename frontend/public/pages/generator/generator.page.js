@@ -6,6 +6,15 @@ import {
   getProjects,
   getTestContent
 } from '../../services/test.service.js';
+import { loadTemplate, renderHTML } from '../../utils/dom.js';
+
+const TEMPLATE_PATH = '/static/frontend/pages/generator/generator.html';
+
+export async function mount(root, { store }) {
+  const html = await loadTemplate(TEMPLATE_PATH);
+  renderHTML(root, html);
+  return initGeneratorPage({ store });
+}
 
 const GEN_STORAGE_PROMPT = 'gen_prompt';
 const GEN_STORAGE_CONTEXT = 'gen_context';

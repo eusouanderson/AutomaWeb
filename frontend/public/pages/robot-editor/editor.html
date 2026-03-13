@@ -1,22 +1,19 @@
-<section class="panel">
-  <header class="panel-head">
-    <h2>Robot Test Editor</h2>
-    <p>Open and edit Robot Framework test files with optional AI assistance.</p>
-  </header>
+<div class="section">
+  <h2>Editor Robot Framework</h2>
+  <p class="muted">Edite os arquivos de teste do Robot Framework com assistência opcional de IA.</p>
 
-  <div class="form-grid">
-    <label>
-      Project
-      <select id="editor-project" required>
-        <option value="">Select project</option>
-      </select>
-    </label>
-    <label>
-      Test file
-      <select id="editor-test" disabled>
-        <option value="">Select a project first</option>
-      </select>
-    </label>
+  <div class="form-group">
+    <label for="editor-project">Projeto</label>
+    <select id="editor-project" required>
+      <option value="">Selecione um projeto</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label for="editor-test">Arquivo de teste</label>
+    <select id="editor-test" disabled>
+      <option value="">Selecione um projeto primeiro</option>
+    </select>
   </div>
 
   <div id="editor-toolbar" class="editor-toolbar hidden">
@@ -31,7 +28,7 @@
   <div id="editor-wrap" class="editor-wrap hidden">
     <div id="editor-file-info" class="editor-file-info">
       <span id="editor-filename" class="editor-filename"></span>
-      <span id="editor-dirty-badge" class="editor-dirty-badge hidden">unsaved changes</span>
+      <span id="editor-dirty-badge" class="editor-dirty-badge hidden">alterações não salvas</span>
     </div>
     <div
       id="robot-editor"
@@ -40,11 +37,11 @@
       spellcheck="false"
       autocorrect="off"
       autocapitalize="none"
-      aria-label="Robot Framework editor"
+      aria-label="Editor do Robot Framework"
       aria-multiline="true"
       role="textbox"
     ></div>
   </div>
 
   <div id="editor-status" class="editor-status" aria-live="polite"></div>
-</section>
+</div>

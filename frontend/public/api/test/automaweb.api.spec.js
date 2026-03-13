@@ -10,6 +10,7 @@ import {
   deleteGeneratedTest,
   deleteProject,
   generateRobotTest,
+  getTestById,
   improveRobotTest,
   listGeneratedTests,
   listProjectExecutions,
@@ -107,5 +108,11 @@ describe('automaweb.api', () => {
       url: '/tests/3/content',
       data: { content: '*** Test Cases ***\nEdited' }
     });
+  });
+
+  it('delegates getTestById to request()', async () => {
+    request.mockResolvedValueOnce({ id: 42, content: '*** Test Cases ***' });
+    await getTestById(42);
+    expect(request).toHaveBeenCalledWith({ method: 'GET', url: '/tests/42' });
   });
 });

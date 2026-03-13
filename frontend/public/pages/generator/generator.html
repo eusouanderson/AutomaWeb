@@ -1,0 +1,66 @@
+<div class="section">
+  <h2>Gerar Teste Robot Framework</h2>
+  <p class="muted">
+    Gere testes automatizados para o Robot Framework com base em prompts e contexto fornecidos.
+  </p>
+
+  <form id="generate-test-form">
+    <div class="form-group">
+      <label for="test-project">Projeto</label>
+      <select id="test-project" required>
+        <option value="">Selecione um projeto</option>
+      </select>
+    </div>
+    <div id="gen-scan-cache-notice" class="scan-cache-notice hidden">
+      <span>✅ Scan em cache — <span id="gen-scan-cache-date"></span></span>
+      <button type="button" id="gen-rescan-btn" class="btn btn-ghost btn-sm">↻ Refazer scan</button>
+    </div>
+    <div class="form-group">
+      <button type="button" id="scan-page-btn" class="btn btn-secondary">Escanear Página</button>
+    </div>
+    <div id="scan-panel" class="scan-panel hidden">
+      <h3>Scanner de Elementos</h3>
+      <div id="scan-live-status" class="scan-live-status hidden" aria-live="polite">
+        <span id="scan-live-text">Escaneando</span>
+        <span class="scan-dots" aria-hidden="true">
+          <span>.</span><span>.</span><span>.</span>
+        </span>
+      </div>
+      <div id="scan-progress" class="scan-progress"></div>
+      <div id="scan-ready-message" class="scan-ready hidden">Página pronta para o prompt.</div>
+      <div id="scan-summary" class="scan-summary hidden">
+        <p><strong>Título:</strong> <span id="scan-title">-</span></p>
+        <p><strong>Total de Elementos:</strong> <span id="scan-total">0</span></p>
+        <p><strong>Resumo:</strong> <span id="scan-types">-</span></p>
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="test-prompt">Prompt (o que deseja testar)</label>
+      <textarea
+        id="test-prompt"
+        rows="4"
+        required
+        minlength="5"
+        placeholder="Ex: Testar login no sistema com usuário válido e inválido"
+      ></textarea>
+    </div>
+    <div class="form-group">
+      <label for="test-context">Contexto Adicional (opcional)</label>
+      <textarea
+        id="test-context"
+        rows="3"
+        placeholder="Ex: URL: https://example.com, Seletores específicos, etc."
+      ></textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">Gerar Teste</button>
+  </form>
+</div>
+
+<div id="generated-result" class="section hidden">
+  <h2>Teste Gerado</h2>
+  <div class="result-actions">
+    <button id="copy-test-btn" class="btn btn-secondary">Copiar Código</button>
+    <button id="download-test-btn" class="btn btn-secondary">Download .robot</button>
+  </div>
+  <pre><code id="test-code"></code></pre>
+</div>

@@ -21,22 +21,24 @@ describe('app.js – editor page mount when editor-tab is present', () => {
       navigateToTab: vi.fn()
     }));
     vi.doMock('../pages/dashboard/dashboard.page.js', () => ({
-      initDashboardPage: vi.fn(() => ({ loadProjects: vi.fn().mockResolvedValue(undefined) }))
+      mount: vi.fn().mockResolvedValue({ loadProjects: vi.fn().mockResolvedValue(undefined) })
     }));
     vi.doMock('../pages/generator/generator.page.js', () => ({
-      initGeneratorPage: vi.fn(() => ({
+      mount: vi.fn().mockResolvedValue({
         loadProjectsDropdown: vi.fn().mockResolvedValue(undefined),
         generateFromExecutionFeedback: vi.fn().mockResolvedValue(undefined)
-      }))
+      })
     }));
     vi.doMock('../pages/scanner/scanner.page.js', () => ({
-      initScannerPage: vi.fn(() => ({
+      mount: vi.fn().mockResolvedValue({
         loadTestsProjects: vi.fn().mockResolvedValue(undefined),
         loadExecuteProjects: vi.fn().mockResolvedValue(undefined)
-      }))
+      })
     }));
     vi.doMock('../pages/reports/reports.page.js', () => ({
-      initReportsPage: vi.fn(() => ({ loadReportsProjects: vi.fn().mockResolvedValue(undefined) }))
+      mount: vi
+        .fn()
+        .mockResolvedValue({ loadReportsProjects: vi.fn().mockResolvedValue(undefined) })
     }));
 
     mountEditorPage = vi.fn().mockResolvedValue(undefined);

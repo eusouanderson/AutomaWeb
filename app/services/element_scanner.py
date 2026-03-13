@@ -1,24 +1,23 @@
 from __future__ import annotations
 
 import asyncio
-import functools
 import logging
 from collections import Counter
 from typing import Any, Awaitable, Callable
 
-import requests
-from lxml import html
+import httpx
+from selectolax.parser import HTMLParser, Node
 
 try:
     from playwright.async_api import TimeoutError as PlaywrightTimeoutError
     from playwright.async_api import async_playwright
     _PLAYWRIGHT_AVAILABLE = True
 except ModuleNotFoundError:
-    PlaywrightTimeoutError = TimeoutError  # type: ignore[misc,assignment]
+    PlaywrightTimeoutError = TimeoutError 
     async_playwright = None
     _PLAYWRIGHT_AVAILABLE = False
 
-from app.schemas.scan import ScanResult
+from app.schemas.scan import FormContext, ScanResult
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +27,7 @@ _ELEMENT_CAP = 120
 _MAX_TEXT_LEN = 120
 _MAX_XPATH = 80
 
-# If lxml returns fewer elements than this, the page is likely a SPA
+# If selectolax returns fewer elements than this, the page is likely a SPA
 # and a Playwright browser-based scan will be attempted automatically.
 _SPA_THRESHOLD = 30
 
@@ -41,19 +40,45 @@ _TYPE_CAPS: dict[str, int] = {
     "label": 20,
 }
 
-# XPath queries in priority traversal order
-_XPATH_QUERIES: dict[str, str] = {
-    "input": "//input",
-    "button": "//button",
-    "link": "//a[@href]",
-    "select": "//select",
-    "textarea": "//textarea",
-    "label": "//label",
-}
+# CSS selector used for a single-pass DOM traversal (replaces 6 separate XPath queries)
+_CSS_QUERY = "input, button, a[href], select, textarea, label"
+
+# Early SPA detection: presence of any of these attributes/tags strongly suggests
+# the page is JavaScript-rendered and will need Playwright.
+_SPA_INDICATORS = (
+    'data-reactroot', 'data-reactid',  # React
+    '__NEXT_DATA__',                    # Next.js (script tag id)
+    'data-v-',                          # Vue single-file components
+    'ng-version',                       # Angular
+    'data-svelte',                      # Svelte
+)
+
+# Reusable async HTTP client (created once, shared across all scan_url calls)
+_http_client: httpx.AsyncClient | None = None
+_http_client_lock = asyncio.Lock()
 
 
 class ElementScannerError(Exception):
     """Raised when page scan fails."""
+
+
+# ---------------------------------------------------------------------------
+# Reusable HTTP client
+# ---------------------------------------------------------------------------
+
+async def _get_http_client() -> httpx.AsyncClient:
+    global _http_client
+    if _http_client is not None and not _http_client.is_closed:
+        return _http_client
+    async with _http_client_lock:
+        if _http_client is None or _http_client.is_closed:
+            _http_client = httpx.AsyncClient(
+                timeout=httpx.Timeout(15.0, connect=5.0),
+                headers={"User-Agent": "AutomaWeb-Scanner/2.0"},
+                follow_redirects=True,
+                verify=False,
+            )
+        return _http_client
 
 
 # ---------------------------------------------------------------------------
@@ -69,45 +94,50 @@ def _normalize(value: str | None, max_len: int = _MAX_TEXT_LEN) -> str | None:
     return text[:max_len] + "…" if len(text) > max_len else text
 
 
-def _css_selector(el: html.HtmlElement) -> str:
+def _css_selector(node: Node) -> str:
     """Build a CSS selector with priority: id > data-testid > name > tag+class."""
-    el_id = el.get("id")
+    el_id = node.attributes.get("id")
     if el_id:
         return f"#{el_id}"
 
-    data_testid = el.get("data-testid")
+    data_testid = node.attributes.get("data-testid")
     if data_testid:
         return f'[data-testid="{data_testid}"]'
 
-    name = el.get("name")
+    name = node.attributes.get("name")
     if name:
-        return f'{el.tag}[name="{name}"]'
+        return f'{node.tag}[name="{name}"]'
 
-    first_class = (el.get("class") or "").split()
+    first_class = (node.attributes.get("class") or "").split()
     if first_class:
-        return f"{el.tag}.{first_class[0]}"
+        return f"{node.tag}.{first_class[0]}"
 
-    return el.tag
+    return node.tag
 
 
-def _xpath_for(el: html.HtmlElement) -> str | None:
+def _xpath_for(node: Node) -> str | None:
     """Build an absolute XPath for the element via ancestor traversal."""
-    el_id = el.get("id")
+    el_id = node.attributes.get("id")
     if el_id:
         return f'//*[@id="{el_id}"]'
 
     parts: list[str] = []
-    current = el
+    current: Node | None = node
     while current is not None:
         tag = current.tag
-        if not isinstance(tag, str):  # skip Comment / PI nodes
+        if not tag or not isinstance(tag, str):
             break
-        parent = current.getparent()
-        if parent is None:
+        parent = current.parent
+        if parent is None or not parent.tag:
             parts.append(tag)
             break
-        siblings = [s for s in parent if s.tag == tag]
-        index = siblings.index(current) + 1
+        # Count preceding siblings with the same tag
+        index = 1
+        sibling = current.prev
+        while sibling is not None:
+            if sibling.tag == tag:
+                index += 1
+            sibling = sibling.prev
         parts.append(f"{tag}[{index}]")
         current = parent
 
@@ -117,92 +147,172 @@ def _xpath_for(el: html.HtmlElement) -> str | None:
     return "/" + "/".join(parts)
 
 
-def _element_type(el: html.HtmlElement) -> str | None:
-    tag = el.tag
+def _element_type(node: Node) -> str | None:
+    tag = node.tag
     if tag == "input":
-        input_type = (el.get("type") or "text").lower()
+        input_type = (node.attributes.get("type") or "text").lower()
         if input_type in ("hidden", "file"):
             return None
         if input_type in ("submit", "button", "reset"):
             return "button"
         return "input"
-    mapping = {"button": "button", "a": "link", "select": "select", "textarea": "textarea", "label": "label"}
+    mapping = {
+        "button": "button",
+        "a": "link",
+        "select": "select",
+        "textarea": "textarea",
+        "label": "label",
+    }
     return mapping.get(tag)
 
 
-def _element_meta(el: html.HtmlElement, el_type: str, include_xpath: bool) -> dict:
+def _element_meta(node: Node, el_type: str, include_xpath: bool) -> dict:
+    attrs = node.attributes
     return {
         "type": el_type,
-        "selector": _css_selector(el),
-        "xpath": _xpath_for(el) if include_xpath else None,
-        "text": _normalize(el.text_content()),
-        "name": _normalize(el.get("name")),
-        "id": _normalize(el.get("id")),
-        "placeholder": _normalize(el.get("placeholder")),
-        "required": True if el.get("required") is not None else None,
-        "classes": _normalize(el.get("class")),
-        "href": _normalize(el.get("href")),
-        "aria_label": _normalize(el.get("aria-label")),
-        "aria_role": _normalize(el.get("role")),
-        "data_testid": _normalize(el.get("data-testid")),
+        "selector": _css_selector(node),
+        "xpath": _xpath_for(node) if include_xpath else None,
+        "text": _normalize(node.text(deep=True)),
+        "name": _normalize(attrs.get("name")),
+        "id": _normalize(attrs.get("id")),
+        "placeholder": _normalize(attrs.get("placeholder")),
+        "required": True if "required" in attrs else None,
+        "classes": _normalize(attrs.get("class")),
+        "href": _normalize(attrs.get("href")),
+        "aria_label": _normalize(attrs.get("aria-label")),
+        "aria_role": _normalize(attrs.get("role")),
+        "data_testid": _normalize(attrs.get("data-testid")),
     }
 
 
 # ---------------------------------------------------------------------------
-# lxml fast path — single HTTP request, no browser
+# Early SPA detection
 # ---------------------------------------------------------------------------
 
-def _fetch_and_parse(url: str, timeout: float) -> tuple[str, list[dict]]:
-    """Fetch *url* and extract UI elements via lxml. Returns (title, elements)."""
+def _is_likely_spa(html_bytes: bytes) -> bool:
+    """
+    Quick early-exit check: scan the raw HTML bytes for known SPA fingerprints
+    before building a full DOM tree. This avoids the full parse cost for obvious
+    SPA pages (Next.js, React, Vue, Angular, Svelte).
+    """
+    sample = html_bytes[:8_000]
+    return any(indicator.encode() in sample for indicator in _SPA_INDICATORS)
+
+
+# ---------------------------------------------------------------------------
+# Form-context extraction — enriches output for better LLM test generation
+# ---------------------------------------------------------------------------
+
+def _extract_form_contexts(tree: HTMLParser) -> list[dict]:
+    """
+    Walk every <form> in the parsed tree and collect:
+    - form_selector: the form's id/class/tag
+    - inputs: selectors of interactive fields inside the form
+    - submit: selector of the submit button, if present
+
+    This structural grouping lets the LLM understand which inputs belong
+    together and which button submits the form, enabling it to generate
+    complete test flows (e.g. Fill Form → Click Submit → Assert Result).
+    """
+    contexts: list[dict] = []
+    for form in tree.css("form"):
+        form_attrs = form.attributes
+        if form_attrs.get("id"):
+            form_sel = f'#{form_attrs["id"]}'
+        elif form_attrs.get("class"):
+            form_sel = f'form.{form_attrs["class"].split()[0]}'
+        else:
+            form_sel = "form"
+
+        inputs: list[str] = []
+        submit_sel: str | None = None
+
+        for child in form.css("input, textarea, select, button"):
+            child_attrs = child.attributes
+            tag = child.tag
+            input_type = (child_attrs.get("type") or "text").lower()
+
+            # Skip hidden/file
+            if tag == "input" and input_type in ("hidden", "file"):
+                continue
+
+            selector = _css_selector(child)
+
+            # Identify submit button
+            if tag == "button" or (tag == "input" and input_type in ("submit", "button", "reset")):
+                if submit_sel is None:
+                    submit_sel = selector
+            else:
+                inputs.append(selector)
+
+        if inputs or submit_sel:
+            contexts.append({
+                "form_selector": form_sel,
+                "inputs": inputs,
+                "submit": submit_sel,
+            })
+
+    return contexts
+
+
+
+
+async def _fetch_and_parse(url: str) -> tuple[str, list[dict], bool, list[dict]]:
+    """
+    Fetch *url* asynchronously with httpx and extract UI elements via a single
+    CSS-selector pass using selectolax.
+    Returns (title, elements, is_spa_hint, form_contexts).
+    """
     try:
-        response = requests.get(
-            url,
-            timeout=timeout,
-            headers={"User-Agent": "AutomaWeb-Scanner/1.0"},
-        )
+        client = await _get_http_client()
+        response = await client.get(url)
         response.raise_for_status()
-    except requests.exceptions.RequestException as exc:
+    except httpx.HTTPError as exc:
         raise ElementScannerError(f"HTTP request failed: {exc}") from exc
 
-    tree = html.fromstring(response.content)
+    content = response.content
 
-    title_nodes = tree.xpath("//title/text()")
-    title = _normalize(title_nodes[0]) if title_nodes else "Untitled"
+    # Fast SPA fingerprint check before parsing
+    spa_hint = _is_likely_spa(content)
+
+    tree = HTMLParser(content)
+
+    title_node = tree.css_first("title")
+    title = _normalize(title_node.text()) if title_node else "Untitled"
 
     type_counts: dict[str, int] = {t: 0 for t in _TYPE_CAPS}
     seen: set[tuple] = set()
     raw_elements: list[dict] = []
     xpath_count = 0
 
-    for el_type, xpath_expr in _XPATH_QUERIES.items():
+    # Single-pass: one CSS query instead of 6 separate XPath traversals
+    for node in tree.css(_CSS_QUERY):
         if len(raw_elements) >= _ELEMENT_CAP:
             break
-        cap = _TYPE_CAPS[el_type]
 
-        for el in tree.xpath(xpath_expr):
-            if len(raw_elements) >= _ELEMENT_CAP:
-                break
-            if type_counts[el_type] >= cap:
-                break
+        el_type = _element_type(node)
+        if el_type is None:
+            continue
 
-            actual_type = _element_type(el)
-            if actual_type is None:
-                continue
+        cap = _TYPE_CAPS.get(el_type, 0)
+        if type_counts.get(el_type, 0) >= cap:
+            continue
 
-            include_xpath = xpath_count < _MAX_XPATH
-            meta = _element_meta(el, actual_type, include_xpath)
-            if include_xpath:
-                xpath_count += 1
+        include_xpath = xpath_count < _MAX_XPATH
+        meta = _element_meta(node, el_type, include_xpath)
+        if include_xpath:
+            xpath_count += 1
 
-            dedup_key = (actual_type, meta["selector"], meta["xpath"])
-            if dedup_key in seen:
-                continue
-            seen.add(dedup_key)
+        dedup_key = (el_type, meta["selector"], meta["xpath"])
+        if dedup_key in seen:
+            continue
+        seen.add(dedup_key)
 
-            raw_elements.append(meta)
-            type_counts[el_type] += 1
+        raw_elements.append(meta)
+        type_counts[el_type] = type_counts.get(el_type, 0) + 1
 
-    return title or "Untitled", raw_elements
+    form_contexts = _extract_form_contexts(tree)
+    return title or "Untitled", raw_elements, spa_hint, form_contexts
 
 
 # ---------------------------------------------------------------------------
@@ -350,7 +460,7 @@ def _playwright_scan_script() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Public service class — hybrid lxml + Playwright
+# Public service class — hybrid selectolax + Playwright
 # ---------------------------------------------------------------------------
 
 class ElementScannerService:
@@ -358,9 +468,12 @@ class ElementScannerService:
     Hybrid UI element scanner.
 
     Strategy:
-    1. Fast path: fetch page with ``requests`` + parse with ``lxml`` (no browser, <500 ms).
-    2. SPA fallback: if the fast path returns fewer than ``spa_threshold`` elements
-       (the page is JavaScript-rendered), launch a Playwright browser, wait for the
+    1. Fast path: fetch page async with ``httpx`` + parse with ``selectolax``
+       via a single CSS-selector pass (no blocking I/O, no run_in_executor).
+    2. Early SPA detection: raw-byte fingerprint check for React/Next/Vue/Angular/
+       Svelte markers before the full DOM parse.
+    3. SPA fallback: if the fast path returns fewer than ``spa_threshold`` elements
+       OR the early SPA hint fires, launch a Playwright browser, wait for the
        real DOM to settle, and extract elements via JavaScript evaluation.
 
     The Playwright browser instance is shared across calls and lives for the
@@ -372,7 +485,6 @@ class ElementScannerService:
     _shared_playwright: Any = None
 
     def __init__(self, timeout_ms: int = 10_000, spa_threshold: int = _SPA_THRESHOLD) -> None:
-        self._timeout_s: float = timeout_ms / 1_000
         self._timeout_ms = timeout_ms
         self._navigation_timeout_ms = min(timeout_ms, 4_000)
         self._network_idle_timeout_ms = min(timeout_ms, 1_200)
@@ -414,37 +526,37 @@ class ElementScannerService:
         url: str,
         progress_callback: ProgressCallback | None = None,
     ) -> ScanResult:
-        # --- Fast path (lxml) ---
+        # --- Fast path (httpx + selectolax, fully async) ---
         await self._progress(progress_callback, "Buscando página...")
         try:
-            loop = asyncio.get_running_loop()
-            title, raw_elements = await loop.run_in_executor(
-                None,
-                functools.partial(_fetch_and_parse, url, self._timeout_s),
-            )
+            title, raw_elements, spa_hint, form_contexts = await _fetch_and_parse(url)
         except ElementScannerError:
             raise
         except Exception as exc:  # noqa: BLE001
             raise ElementScannerError(f"Scan failed: {exc}") from exc
 
-        # --- SPA fallback (Playwright) ---
-        if len(raw_elements) < self._spa_threshold:
+        # --- SPA fallback (Playwright) —--
+        # Form contexts are only available from the static fast path;
+        # Playwright scan returns a flat element list without form structure.
+        needs_browser = spa_hint or len(raw_elements) < self._spa_threshold
+        if needs_browser:
             if _PLAYWRIGHT_AVAILABLE:
+                reason = "SPA fingerprint detected" if spa_hint else f"only {len(raw_elements)} static elements"
                 logger.info(
-                    "lxml returned %d elements (< threshold %d) for %s — switching to Playwright browser scan.",
-                    len(raw_elements),
-                    self._spa_threshold,
+                    "%s for %s — switching to Playwright browser scan.",
+                    reason,
                     url,
                 )
                 await self._progress(
                     progress_callback,
-                    f"Encontrados  ({len(raw_elements)} elementos estáticos). "
+                    f"Página dinâmica detectada ({len(raw_elements)} elementos estáticos). "
                     "Iniciando navegador para escaneamento completo do DOM...",
                 )
                 title, raw_elements = await self._playwright_scan(url, progress_callback, title)
+                form_contexts = []  # not available from JS scan
             else:
                 logger.warning(
-                    "lxml returned only %d elements for %s but Playwright is not installed. "
+                    "selectolax returned only %d elements for %s but Playwright is not installed. "
                     "Install it for better SPA support.",
                     len(raw_elements),
                     url,
@@ -462,6 +574,7 @@ class ElementScannerService:
             total_elements=total_elements,
             summary=summary,
             elements=raw_elements,
+            form_contexts=[FormContext(**fc) for fc in form_contexts],
         )
 
     # ------------------------------------------------------------------
@@ -501,7 +614,7 @@ class ElementScannerService:
                 await context.close()
         except ElementScannerError:
             raise
-        except Exception as exc:  
+        except Exception as exc:
             raise ElementScannerError(f"Browser scan failed: {exc}") from exc
 
         return title, raw_elements
@@ -516,3 +629,4 @@ class ElementScannerService:
     async def _progress(self, callback: ProgressCallback | None, message: str) -> None:
         if callback:
             await callback(message)
+

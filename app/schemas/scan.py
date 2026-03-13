@@ -26,9 +26,17 @@ class ScannedElement(BaseModel):
     }
 
 
+class FormContext(BaseModel):
+    """Structural grouping of form-related elements — helps LLMs generate complete test flows."""
+    form_selector: str | None = None
+    inputs: list[str] = []        
+    submit: str | None = None     
+
+
 class ScanResult(BaseModel):
     url: str
     title: str
     total_elements: int
     summary: dict[str, int]
     elements: list[ScannedElement]
+    form_contexts: list[FormContext] = []

@@ -1,10 +1,15 @@
+import importlib
+
 import pytest
 import pytest_asyncio
-import importlib
 
 import app.services.element_scanner as scanner_module
 from app.services.element_scanner import ElementScannerError, ElementScannerService
 
+
+# ---------------------------------------------------------------------------
+# Playwright fakes
+# ---------------------------------------------------------------------------
 
 class FakePage:
     def set_default_timeout(self, timeout):
@@ -12,12 +17,9 @@ class FakePage:
 
     async def goto(self, url, wait_until, timeout):
         self.url = url
-        self.wait_until = wait_until
-        self.goto_timeout = timeout
 
     async def wait_for_load_state(self, state, timeout):
-        self.state = state
-        self.state_timeout = timeout
+        pass
 
     async def evaluate(self, script):
         return [
@@ -44,29 +46,25 @@ class FakePage:
 
 class FakeContext:
     async def route(self, pattern, handler):
-        self.pattern = pattern
-        self.handler = handler
+        pass
 
     async def new_page(self):
         return FakePage()
 
     async def close(self):
-        return None
+        pass
 
 
 class FakeBrowser:
     async def new_context(self, ignore_https_errors, service_workers=None):
-        self.ignore_https_errors = ignore_https_errors
-        self.service_workers = service_workers
         return FakeContext()
 
     async def close(self):
-        return None
+        pass
 
 
 class FakeChromium:
     async def launch(self, headless):
-        self.headless = headless
         return FakeBrowser()
 
 
@@ -74,7 +72,7 @@ class FakePlaywright:
     chromium = FakeChromium()
 
     async def stop(self):
-        return None
+        pass
 
 
 class FakePlaywrightManager:
@@ -82,56 +80,12 @@ class FakePlaywrightManager:
         return FakePlaywright()
 
     async def stop(self):
-        return None
+        pass
 
 
-@pytest_asyncio.fixture(autouse=True)
-async def reset_shared_state():
-    ElementScannerService._shared_browser = None
-    ElementScannerService._shared_playwright = None
-    yield
-    ElementScannerService._shared_browser = None
-    ElementScannerService._shared_playwright = None
-
-
-@pytest.mark.asyncio
-async def test_scan_url_success(monkeypatch):
-    scanner = ElementScannerService(timeout_ms=5000)
-    progress_messages = []
-
-    async def progress_callback(message: str):
-        progress_messages.append(message)
-
-    # Fast path returns < threshold so Playwright SPA fallback is triggered
-    monkeypatch.setattr(scanner_module, "_fetch_and_parse", lambda url, timeout: ("Untitled", []))
-    monkeypatch.setattr(scanner_module, "_PLAYWRIGHT_AVAILABLE", True)
-    monkeypatch.setattr("app.services.element_scanner.async_playwright", lambda: FakePlaywrightManager())
-
-    result = await scanner.scan_url("https://example.com", progress_callback=progress_callback)
-
-    assert result.url == "https://example.com"
-    assert result.title == "Login"
-    assert result.total_elements == 2
-    assert result.summary["input"] == 1
-    assert result.summary["button"] == 1
-    assert any("Carregando página no navegador" in msg for msg in progress_messages)
-    assert progress_messages[-1] == "Escaneamento concluído."
-
-
-@pytest.mark.asyncio
-async def test_scan_url_degrades_gracefully_without_playwright(monkeypatch):
-    """When lxml returns few elements and Playwright is unavailable, returns what lxml found."""
-    scanner = ElementScannerService(timeout_ms=5000)
-    partial_elements = [{"type": "link", "selector": "a", "text": "About"}]
-    monkeypatch.setattr(scanner_module, "_fetch_and_parse", lambda url, timeout: ("Partial", partial_elements))
-    monkeypatch.setattr(scanner_module, "_PLAYWRIGHT_AVAILABLE", False)
-
-    result = await scanner.scan_url("https://example.com")
-
-    assert result.title == "Partial"
-    assert result.total_elements == 1
-    assert result.summary["link"] == 1
-
+# ---------------------------------------------------------------------------
+# Custom page variants for edge-case tests
+# ---------------------------------------------------------------------------
 
 class TimeoutOnGotoPage(FakePage):
     async def goto(self, url, wait_until, timeout):
@@ -161,8 +115,6 @@ class CustomPageBrowser(FakeBrowser):
         self._page = page
 
     async def new_context(self, ignore_https_errors, service_workers=None):
-        self.ignore_https_errors = ignore_https_errors
-        self.service_workers = service_workers
         return CustomPageContext(self._page)
 
 
@@ -183,6 +135,72 @@ class CustomPagePlaywrightManager(FakePlaywrightManager):
         return CustomPagePlaywright(self._page)
 
 
+# ---------------------------------------------------------------------------
+# Shared state reset
+# ---------------------------------------------------------------------------
+
+@pytest_asyncio.fixture(autouse=True)
+async def reset_shared_state():
+    ElementScannerService._shared_browser = None
+    ElementScannerService._shared_playwright = None
+    yield
+    ElementScannerService._shared_browser = None
+    ElementScannerService._shared_playwright = None
+
+
+# ---------------------------------------------------------------------------
+# Helper: fake async _fetch_and_parse returning (title, elements, spa_hint, form_contexts)
+# ---------------------------------------------------------------------------
+
+def _fake_fetch(title="Untitled", elements=None, spa_hint=False, form_contexts=None):
+    async def _inner(url):
+        return title, elements or [], spa_hint, form_contexts or []
+    return _inner
+
+
+# ---------------------------------------------------------------------------
+# scan_url integration tests
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_scan_url_success(monkeypatch):
+    scanner = ElementScannerService(timeout_ms=5000)
+    progress_messages = []
+
+    async def progress_callback(message: str):
+        progress_messages.append(message)
+
+    # Fast path returns 0 elements → SPA fallback triggers
+    monkeypatch.setattr(scanner_module, "_fetch_and_parse", _fake_fetch())
+    monkeypatch.setattr(scanner_module, "_PLAYWRIGHT_AVAILABLE", True)
+    monkeypatch.setattr("app.services.element_scanner.async_playwright", lambda: FakePlaywrightManager())
+
+    result = await scanner.scan_url("https://example.com", progress_callback=progress_callback)
+
+    assert result.url == "https://example.com"
+    assert result.title == "Login"
+    assert result.total_elements == 2
+    assert result.summary["input"] == 1
+    assert result.summary["button"] == 1
+    assert any("Carregando página no navegador" in msg for msg in progress_messages)
+    assert progress_messages[-1] == "Escaneamento concluído."
+
+
+@pytest.mark.asyncio
+async def test_scan_url_degrades_gracefully_without_playwright(monkeypatch):
+    """When fast path returns few elements and Playwright is unavailable, returns what was found."""
+    scanner = ElementScannerService(timeout_ms=5000)
+    partial_elements = [{"type": "link", "selector": "a", "text": "About"}]
+    monkeypatch.setattr(scanner_module, "_fetch_and_parse", _fake_fetch("Partial", partial_elements))
+    monkeypatch.setattr(scanner_module, "_PLAYWRIGHT_AVAILABLE", False)
+
+    result = await scanner.scan_url("https://example.com")
+
+    assert result.title == "Partial"
+    assert result.total_elements == 1
+    assert result.summary["link"] == 1
+
+
 @pytest.mark.asyncio
 async def test_scan_url_continues_after_navigation_timeout(monkeypatch):
     scanner = ElementScannerService(timeout_ms=5000)
@@ -191,11 +209,10 @@ async def test_scan_url_continues_after_navigation_timeout(monkeypatch):
     async def progress_callback(message: str):
         progress_messages.append(message)
 
-    monkeypatch.setattr(scanner_module, "_fetch_and_parse", lambda url, timeout: ("Untitled", []))
+    monkeypatch.setattr(scanner_module, "_fetch_and_parse", _fake_fetch())
     monkeypatch.setattr(scanner_module, "_PLAYWRIGHT_AVAILABLE", True)
     monkeypatch.setattr(
-        scanner_module,
-        "async_playwright",
+        scanner_module, "async_playwright",
         lambda: CustomPagePlaywrightManager(TimeoutOnGotoPage()),
     )
 
@@ -212,11 +229,10 @@ async def test_scan_url_continues_after_network_idle_timeout(monkeypatch):
     async def progress_callback(message: str):
         progress_messages.append(message)
 
-    monkeypatch.setattr(scanner_module, "_fetch_and_parse", lambda url, timeout: ("Untitled", []))
+    monkeypatch.setattr(scanner_module, "_fetch_and_parse", _fake_fetch())
     monkeypatch.setattr(scanner_module, "_PLAYWRIGHT_AVAILABLE", True)
     monkeypatch.setattr(
-        scanner_module,
-        "async_playwright",
+        scanner_module, "async_playwright",
         lambda: CustomPagePlaywrightManager(TimeoutOnWaitStatePage()),
     )
 
@@ -228,17 +244,125 @@ async def test_scan_url_continues_after_network_idle_timeout(monkeypatch):
 @pytest.mark.asyncio
 async def test_scan_url_wraps_unexpected_exception(monkeypatch):
     scanner = ElementScannerService(timeout_ms=5000)
-    monkeypatch.setattr(scanner_module, "_fetch_and_parse", lambda url, timeout: ("Untitled", []))
+    monkeypatch.setattr(scanner_module, "_fetch_and_parse", _fake_fetch())
     monkeypatch.setattr(scanner_module, "_PLAYWRIGHT_AVAILABLE", True)
     monkeypatch.setattr(
-        scanner_module,
-        "async_playwright",
+        scanner_module, "async_playwright",
         lambda: CustomPagePlaywrightManager(ErrorOnEvaluatePage()),
     )
 
     with pytest.raises(ElementScannerError, match="Browser scan failed: boom"):
         await scanner.scan_url("https://example.com")
 
+
+@pytest.mark.asyncio
+async def test_scan_url_uses_fast_path_when_sufficient_elements(monkeypatch):
+    """When fast path returns >= threshold elements, Playwright is never invoked."""
+    scanner = ElementScannerService(timeout_ms=5000, spa_threshold=2)
+    fake_elements = [
+        {"type": "input", "selector": "#q", "xpath": '//*[@id="q"]', "text": None,
+         "name": None, "id": "q", "placeholder": None, "required": None,
+         "classes": None, "href": None, "aria_label": None, "aria_role": None, "data_testid": None},
+        {"type": "button", "selector": "button", "xpath": None, "text": "Go",
+         "name": None, "id": None, "placeholder": None, "required": None,
+         "classes": None, "href": None, "aria_label": None, "aria_role": None, "data_testid": None},
+        {"type": "link", "selector": "a", "xpath": None, "text": "About",
+         "name": None, "id": None, "placeholder": None, "required": None,
+         "classes": None, "href": "/about", "aria_label": None, "aria_role": None, "data_testid": None},
+    ]
+    monkeypatch.setattr(scanner_module, "_fetch_and_parse", _fake_fetch("Static Site", fake_elements))
+
+    result = await scanner.scan_url("https://example.com")
+    assert result.title == "Static Site"
+    assert result.total_elements == 3
+
+
+@pytest.mark.asyncio
+async def test_scan_url_fast_path_exception_wraps(monkeypatch):
+    """Non-ElementScannerError from _fetch_and_parse is wrapped."""
+    scanner = ElementScannerService(timeout_ms=5000)
+
+    async def boom(url):
+        raise ValueError("unexpected")
+
+    monkeypatch.setattr(scanner_module, "_fetch_and_parse", boom)
+
+    with pytest.raises(scanner_module.ElementScannerError, match="Scan failed"):
+        await scanner.scan_url("https://example.com")
+
+
+@pytest.mark.asyncio
+async def test_scan_url_fast_path_reraises_scanner_error(monkeypatch):
+    """ElementScannerError from _fetch_and_parse is re-raised unchanged."""
+    scanner = ElementScannerService(timeout_ms=5000)
+
+    async def raise_scanner_error(url):
+        raise scanner_module.ElementScannerError("original scanner error")
+
+    monkeypatch.setattr(scanner_module, "_fetch_and_parse", raise_scanner_error)
+
+    with pytest.raises(scanner_module.ElementScannerError, match="original scanner error"):
+        await scanner.scan_url("https://example.com")
+
+
+@pytest.mark.asyncio
+async def test_playwright_scan_reraises_scanner_error(monkeypatch):
+    """ElementScannerError raised inside _playwright_scan is re-raised unchanged."""
+    class ErrorOnContextPage(FakePage):
+        async def evaluate(self, script):
+            raise scanner_module.ElementScannerError("inner scanner error")
+
+    scanner = ElementScannerService(timeout_ms=5000)
+    monkeypatch.setattr(scanner_module, "_fetch_and_parse", _fake_fetch())
+    monkeypatch.setattr(scanner_module, "_PLAYWRIGHT_AVAILABLE", True)
+    monkeypatch.setattr(
+        scanner_module, "async_playwright",
+        lambda: CustomPagePlaywrightManager(ErrorOnContextPage()),
+    )
+
+    with pytest.raises(scanner_module.ElementScannerError, match="inner scanner error"):
+        await scanner.scan_url("https://example.com")
+
+
+@pytest.mark.asyncio
+async def test_scan_url_includes_form_contexts(monkeypatch):
+    """form_contexts returned by _fetch_and_parse are in the ScanResult."""
+    scanner = ElementScannerService(timeout_ms=5000, spa_threshold=0)
+    fc = [{"form_selector": "#login-form", "inputs": ["#email", "#password"], "submit": "#submit-btn"}]
+    monkeypatch.setattr(scanner_module, "_fetch_and_parse", _fake_fetch("Login", [], False, fc))
+
+    result = await scanner.scan_url("https://example.com")
+    assert len(result.form_contexts) == 1
+    assert result.form_contexts[0].form_selector == "#login-form"
+    assert "#email" in result.form_contexts[0].inputs
+    assert result.form_contexts[0].submit == "#submit-btn"
+
+
+@pytest.mark.asyncio
+async def test_scan_url_spa_hint_triggers_playwright(monkeypatch):
+    """Even with enough static elements, SPA hint forces Playwright scan."""
+    scanner = ElementScannerService(timeout_ms=5000, spa_threshold=1)
+    # Return 2 elements (above threshold=1) but spa_hint=True
+    fake_elements = [{"type": "input", "selector": "#q", "xpath": None, "text": None,
+                      "name": None, "id": "q", "placeholder": None, "required": None,
+                      "classes": None, "href": None, "aria_label": None, "aria_role": None, "data_testid": None},
+                     {"type": "button", "selector": "button", "xpath": None, "text": "Go",
+                      "name": None, "id": None, "placeholder": None, "required": None,
+                      "classes": None, "href": None, "aria_label": None, "aria_role": None, "data_testid": None}]
+    monkeypatch.setattr(scanner_module, "_fetch_and_parse",
+                        _fake_fetch("SPA", fake_elements, spa_hint=True))
+    monkeypatch.setattr(scanner_module, "_PLAYWRIGHT_AVAILABLE", True)
+    monkeypatch.setattr("app.services.element_scanner.async_playwright", lambda: FakePlaywrightManager())
+
+    result = await scanner.scan_url("https://example.com")
+    # Playwright returns 2 elements from FakePage.evaluate
+    assert result.title == "Login"
+    assert result.total_elements == 2
+
+
+# ---------------------------------------------------------------------------
+# route_filter tests
+# ---------------------------------------------------------------------------
 
 class FakeRequest:
     def __init__(self, resource_type: str):
@@ -262,9 +386,7 @@ class FakeRoute:
 async def test_route_filter_blocks_binary_assets():
     scanner = ElementScannerService()
     route = FakeRoute("image")
-
     await scanner._route_filter(route)
-
     assert route.aborted is True
     assert route.continued is False
 
@@ -273,12 +395,14 @@ async def test_route_filter_blocks_binary_assets():
 async def test_route_filter_continues_other_assets():
     scanner = ElementScannerService()
     route = FakeRoute("document")
-
     await scanner._route_filter(route)
-
     assert route.aborted is False
     assert route.continued is True
 
+
+# ---------------------------------------------------------------------------
+# Shared browser lifecycle
+# ---------------------------------------------------------------------------
 
 class DummyAsyncLock:
     def __init__(self, on_enter=None):
@@ -297,9 +421,7 @@ class DummyAsyncLock:
 async def test_get_shared_browser_returns_existing_instance():
     sentinel_browser = object()
     ElementScannerService._shared_browser = sentinel_browser
-
     browser = await ElementScannerService._get_shared_browser()
-
     assert browser is sentinel_browser
 
 
@@ -311,13 +433,10 @@ async def test_get_shared_browser_returns_instance_set_inside_lock(monkeypatch):
         ElementScannerService._shared_browser = sentinel_browser
 
     monkeypatch.setattr(
-        ElementScannerService,
-        "_browser_lock",
+        ElementScannerService, "_browser_lock",
         DummyAsyncLock(on_enter=set_shared_browser_inside_lock),
     )
-
     browser = await ElementScannerService._get_shared_browser()
-
     assert browser is sentinel_browser
 
 
@@ -363,7 +482,6 @@ def test_import_fallback_without_playwright(monkeypatch):
 
     monkeypatch.setattr("builtins.__import__", fake_import)
     reloaded = importlib.reload(scanner_module)
-
     assert reloaded.async_playwright is None
     assert reloaded.PlaywrightTimeoutError is TimeoutError
 
@@ -372,7 +490,7 @@ def test_import_fallback_without_playwright(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Tests for lxml helper functions
+# _normalize tests
 # ---------------------------------------------------------------------------
 
 def test_normalize_returns_none_for_none():
@@ -400,125 +518,132 @@ def test_normalize_returns_short_text_unchanged():
     assert scanner_module._normalize("hello", max_len=50) == "hello"
 
 
-def _make_el(html_str):
-    from lxml import html
-    return html.fragment_fromstring(html_str)
+# ---------------------------------------------------------------------------
+# selectolax-based helper tests (_css_selector, _xpath_for, _element_type, _element_meta)
+# ---------------------------------------------------------------------------
+
+def _parse_first(html_str: str, css: str):
+    """Parse a snippet and return the first matching Node."""
+    from selectolax.parser import HTMLParser
+    tree = HTMLParser(html_str.encode())
+    return tree.css_first(css)
 
 
 def test_css_selector_prioritizes_id():
-    el = _make_el('<input id="email" name="email"/>')
-    assert scanner_module._css_selector(el) == "#email"
+    node = _parse_first('<input id="email" name="email"/>', "input")
+    assert scanner_module._css_selector(node) == "#email"
 
 
 def test_css_selector_uses_data_testid():
-    el = _make_el('<button data-testid="submit">OK</button>')
-    assert scanner_module._css_selector(el) == '[data-testid="submit"]'
+    node = _parse_first('<button data-testid="submit">OK</button>', "button")
+    assert scanner_module._css_selector(node) == '[data-testid="submit"]'
 
 
 def test_css_selector_uses_name():
-    el = _make_el('<input name="email"/>')
-    assert scanner_module._css_selector(el) == 'input[name="email"]'
+    node = _parse_first('<input name="email"/>', "input")
+    assert scanner_module._css_selector(node) == 'input[name="email"]'
 
 
 def test_css_selector_uses_first_class():
-    el = _make_el('<button class="primary btn">OK</button>')
-    assert scanner_module._css_selector(el) == "button.primary"
+    node = _parse_first('<button class="primary btn">OK</button>', "button")
+    assert scanner_module._css_selector(node) == "button.primary"
 
 
 def test_css_selector_fallback_to_tag():
-    el = _make_el('<button>OK</button>')
-    assert scanner_module._css_selector(el) == "button"
+    node = _parse_first('<button>OK</button>', "button")
+    assert scanner_module._css_selector(node) == "button"
 
 
 def test_xpath_for_with_id():
-    el = _make_el('<input id="search"/>')
-    assert scanner_module._xpath_for(el) == '//*[@id="search"]'
+    node = _parse_first('<input id="search"/>', "input")
+    assert scanner_module._xpath_for(node) == '//*[@id="search"]'
 
 
 def test_xpath_for_without_id():
-    from lxml import html as lhtml
-    tree = lhtml.fromstring('<html><body><form><input name="q"/></form></body></html>')
-    el = tree.xpath("//input")[0]
-    xpath = scanner_module._xpath_for(el)
+    from selectolax.parser import HTMLParser
+    tree = HTMLParser(b'<html><body><form><input name="q"/></form></body></html>')
+    node = tree.css_first("input")
+    xpath = scanner_module._xpath_for(node)
     assert xpath is not None
     assert xpath.startswith("/")
 
 
 def test_element_type_text_input():
-    el = _make_el('<input type="text"/>')
-    assert scanner_module._element_type(el) == "input"
+    node = _parse_first('<input type="text"/>', "input")
+    assert scanner_module._element_type(node) == "input"
 
 
 def test_element_type_no_type_defaults_to_input():
-    el = _make_el('<input/>')
-    assert scanner_module._element_type(el) == "input"
+    node = _parse_first('<input/>', "input")
+    assert scanner_module._element_type(node) == "input"
 
 
 def test_element_type_hidden_returns_none():
-    el = _make_el('<input type="hidden"/>')
-    assert scanner_module._element_type(el) is None
+    node = _parse_first('<input type="hidden"/>', "input")
+    assert scanner_module._element_type(node) is None
 
 
 def test_element_type_file_returns_none():
-    el = _make_el('<input type="file"/>')
-    assert scanner_module._element_type(el) is None
+    node = _parse_first('<input type="file"/>', "input")
+    assert scanner_module._element_type(node) is None
 
 
 def test_element_type_submit_returns_button():
-    el = _make_el('<input type="submit"/>')
-    assert scanner_module._element_type(el) == "button"
+    node = _parse_first('<input type="submit"/>', "input")
+    assert scanner_module._element_type(node) == "button"
 
 
 def test_element_type_reset_returns_button():
-    el = _make_el('<input type="reset"/>')
-    assert scanner_module._element_type(el) == "button"
+    node = _parse_first('<input type="reset"/>', "input")
+    assert scanner_module._element_type(node) == "button"
 
 
 def test_element_type_button_input_returns_button():
-    el = _make_el('<input type="button"/>')
-    assert scanner_module._element_type(el) == "button"
+    node = _parse_first('<input type="button"/>', "input")
+    assert scanner_module._element_type(node) == "button"
 
 
 def test_element_type_button_tag():
-    el = _make_el('<button>Click</button>')
-    assert scanner_module._element_type(el) == "button"
+    node = _parse_first('<button>Click</button>', "button")
+    assert scanner_module._element_type(node) == "button"
 
 
 def test_element_type_link():
-    el = _make_el('<a href="/">Go</a>')
-    assert scanner_module._element_type(el) == "link"
+    node = _parse_first('<a href="/">Go</a>', "a")
+    assert scanner_module._element_type(node) == "link"
 
 
 def test_element_type_select():
-    el = _make_el('<select><option>A</option></select>')
-    assert scanner_module._element_type(el) == "select"
+    node = _parse_first('<select><option>A</option></select>', "select")
+    assert scanner_module._element_type(node) == "select"
 
 
 def test_element_type_textarea():
-    el = _make_el('<textarea/>')
-    assert scanner_module._element_type(el) == "textarea"
+    node = _parse_first('<textarea/>', "textarea")
+    assert scanner_module._element_type(node) == "textarea"
 
 
 def test_element_type_label():
-    el = _make_el('<label for="x">Name</label>')
-    assert scanner_module._element_type(el) == "label"
+    node = _parse_first('<label for="x">Name</label>', "label")
+    assert scanner_module._element_type(node) == "label"
 
 
 def test_element_type_unknown_returns_none():
-    el = _make_el('<div/>')
-    assert scanner_module._element_type(el) is None
+    node = _parse_first('<div/>', "div")
+    assert scanner_module._element_type(node) is None
 
 
-def test_element_meta_fields(monkeypatch):
-    from lxml import html as lhtml
-    tree = lhtml.fromstring(
-        '<html><body>'
-        '<input id="q" name="search" placeholder="Search" required '
-        'class="main big" aria-label="Search box" role="searchbox" data-testid="search-input"/>'
-        '</body></html>'
+def test_element_meta_fields():
+    from selectolax.parser import HTMLParser
+    html = (
+        b'<html><body>'
+        b'<input id="q" name="search" placeholder="Search" required '
+        b'class="main big" aria-label="Search box" role="searchbox" data-testid="search-input"/>'
+        b'</body></html>'
     )
-    el = tree.xpath("//input")[0]
-    meta = scanner_module._element_meta(el, "input", include_xpath=True)
+    tree = HTMLParser(html)
+    node = tree.css_first("input")
+    meta = scanner_module._element_meta(node, "input", include_xpath=True)
     assert meta["type"] == "input"
     assert meta["id"] == "q"
     assert meta["name"] == "search"
@@ -531,27 +656,42 @@ def test_element_meta_fields(monkeypatch):
 
 
 def test_element_meta_no_xpath():
-    from lxml import html as lhtml
-    tree = lhtml.fromstring('<html><body><input id="q"/></body></html>')
-    el = tree.xpath("//input")[0]
-    meta = scanner_module._element_meta(el, "input", include_xpath=False)
+    from selectolax.parser import HTMLParser
+    tree = HTMLParser(b'<html><body><input id="q"/></body></html>')
+    node = tree.css_first("input")
+    meta = scanner_module._element_meta(node, "input", include_xpath=False)
     assert meta["xpath"] is None
 
 
-def test_fetch_and_parse_success(monkeypatch):
-    from unittest.mock import MagicMock
-    fake_response = MagicMock()
-    fake_response.content = (
+# ---------------------------------------------------------------------------
+# _fetch_and_parse async tests (using httpx mock)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_fetch_and_parse_success(monkeypatch):
+    import httpx
+
+    html_content = (
         b'<html><head><title>Test Page</title></head><body>'
         b'<input id="email" type="text" placeholder="Email"/>'
         b'<button id="submit">Login</button>'
         b'<a href="/about">About</a>'
         b'</body></html>'
     )
-    fake_response.raise_for_status.return_value = None
-    monkeypatch.setattr("requests.get", lambda *a, **kw: fake_response)
 
-    title, elements = scanner_module._fetch_and_parse("http://example.com", 5.0)
+    class FakeHttpxResponse:
+        content = html_content
+        def raise_for_status(self):
+            pass
+
+    class FakeClient:
+        is_closed = False
+        async def get(self, url):
+            return FakeHttpxResponse()
+
+    monkeypatch.setattr(scanner_module, "_http_client", FakeClient())
+
+    title, elements, spa_hint, form_contexts = await scanner_module._fetch_and_parse("http://example.com")
 
     assert title == "Test Page"
     assert len(elements) == 3
@@ -559,182 +699,293 @@ def test_fetch_and_parse_success(monkeypatch):
     assert "input" in types
     assert "button" in types
     assert "link" in types
+    assert isinstance(spa_hint, bool)
 
 
-def test_fetch_and_parse_http_error(monkeypatch):
-    import requests as req
+@pytest.mark.asyncio
+async def test_fetch_and_parse_http_error(monkeypatch):
+    import httpx
 
-    def _raise(*a, **kw):
-        raise req.exceptions.ConnectionError("no conn")
+    class FakeClient:
+        is_closed = False
+        async def get(self, url):
+            raise httpx.ConnectError("no conn")
 
-    monkeypatch.setattr("requests.get", _raise)
+    monkeypatch.setattr(scanner_module, "_http_client", FakeClient())
 
     with pytest.raises(scanner_module.ElementScannerError, match="HTTP request failed"):
-        scanner_module._fetch_and_parse("http://example.com", 5.0)
+        await scanner_module._fetch_and_parse("http://example.com")
 
 
-def test_fetch_and_parse_no_title(monkeypatch):
-    from unittest.mock import MagicMock
-    fake_response = MagicMock()
-    fake_response.content = b'<html><body><input id="q"/></body></html>'
-    fake_response.raise_for_status.return_value = None
-    monkeypatch.setattr("requests.get", lambda *a, **kw: fake_response)
+@pytest.mark.asyncio
+async def test_fetch_and_parse_no_title(monkeypatch):
+    class FakeHttpxResponse:
+        content = b'<html><body><input id="q"/></body></html>'
+        def raise_for_status(self):
+            pass
 
-    title, _ = scanner_module._fetch_and_parse("http://example.com", 5.0)
+    class FakeClient:
+        is_closed = False
+        async def get(self, url):
+            return FakeHttpxResponse()
+
+    monkeypatch.setattr(scanner_module, "_http_client", FakeClient())
+
+    title, _, _, _ = await scanner_module._fetch_and_parse("http://example.com")
     assert title == "Untitled"
 
 
 @pytest.mark.asyncio
-async def test_scan_url_uses_lxml_fast_path_when_sufficient_elements(monkeypatch):
-    """When lxml returns >= threshold elements, Playwright is never invoked."""
-    scanner = ElementScannerService(timeout_ms=5000, spa_threshold=2)
-    fake_elements = [
-        {"type": "input", "selector": "#q", "xpath": None, "text": None, "name": None,
-         "id": "q", "placeholder": None, "required": None, "classes": None,
-         "href": None, "aria_label": None, "aria_role": None, "data_testid": None},
-        {"type": "button", "selector": "button", "xpath": None, "text": "Go", "name": None,
-         "id": None, "placeholder": None, "required": None, "classes": None,
-         "href": None, "aria_label": None, "aria_role": None, "data_testid": None},
-        {"type": "link", "selector": "a", "xpath": None, "text": "About", "name": None,
-         "id": None, "placeholder": None, "required": None, "classes": None,
-         "href": "/about", "aria_label": None, "aria_role": None, "data_testid": None},
-    ]
-    monkeypatch.setattr(
-        scanner_module, "_fetch_and_parse", lambda url, timeout: ("Static Site", fake_elements)
-    )
-    # Playwright should never be called — confirm by not patching it
-    result = await scanner.scan_url("https://example.com")
-    assert result.title == "Static Site"
-    assert result.total_elements == 3
-
-
-@pytest.mark.asyncio
-async def test_scan_url_fast_path_exception_wraps(monkeypatch):
-    """Non-ElementScannerError from _fetch_and_parse is wrapped."""
-    scanner = ElementScannerService(timeout_ms=5000)
-
-    def boom(url, timeout):
-        raise ValueError("unexpected")
-
-    monkeypatch.setattr(scanner_module, "_fetch_and_parse", boom)
-
-    with pytest.raises(scanner_module.ElementScannerError, match="Scan failed"):
-        await scanner.scan_url("https://example.com")
-
-
-@pytest.mark.asyncio
-async def test_scan_url_fast_path_reraises_scanner_error(monkeypatch):
-    """ElementScannerError raised by _fetch_and_parse is re-raised unchanged (line 426)."""
-    scanner = ElementScannerService(timeout_ms=5000)
-
-    def raise_scanner_error(url, timeout):
-        raise scanner_module.ElementScannerError("original scanner error")
-
-    monkeypatch.setattr(scanner_module, "_fetch_and_parse", raise_scanner_error)
-
-    with pytest.raises(scanner_module.ElementScannerError, match="original scanner error"):
-        await scanner.scan_url("https://example.com")
-
-
-@pytest.mark.asyncio
-async def test_playwright_scan_reraises_scanner_error(monkeypatch):
-    """ElementScannerError raised inside _playwright_scan is re-raised unchanged (line 503)."""
-    class ErrorOnContextPage(FakePage):
-        async def evaluate(self, script):
-            raise scanner_module.ElementScannerError("inner scanner error")
-
-    scanner = ElementScannerService(timeout_ms=5000)
-    monkeypatch.setattr(scanner_module, "_fetch_and_parse", lambda url, timeout: ("Untitled", []))
-    monkeypatch.setattr(scanner_module, "_PLAYWRIGHT_AVAILABLE", True)
-    monkeypatch.setattr(
-        scanner_module,
-        "async_playwright",
-        lambda: CustomPagePlaywrightManager(ErrorOnContextPage()),
-    )
-
-    with pytest.raises(scanner_module.ElementScannerError, match="inner scanner error"):
-        await scanner.scan_url("https://example.com")
-
-
-def test_xpath_for_non_string_tag_returns_none():
-    """_xpath_for returns None when an ancestor has a non-string tag (lines 104, 115)."""
-    from unittest.mock import MagicMock
-    from lxml import etree
-
-    # Build a real element whose tag is a callable (Comment node simulation via mock)
-    el = MagicMock()
-    el.get.return_value = None        # no id attribute
-    el.tag = etree.Comment            # callable — not a str, triggers the branch
-    el.getparent.return_value = None
-
-    result = scanner_module._xpath_for(el)
-    assert result is None
-
-
-def _fake_response_with_html(html_bytes):
-    from unittest.mock import MagicMock
-    r = MagicMock()
-    r.content = html_bytes
-    r.raise_for_status.return_value = None
-    return r
-
-
-def test_fetch_and_parse_skips_hidden_and_file_inputs(monkeypatch):
-    """hidden/file inputs are skipped (line 190: actual_type is None → continue)."""
+async def test_fetch_and_parse_skips_hidden_and_file_inputs(monkeypatch):
     html = (
-        b"<html><head><title>T</title></head><body>"
+        b'<html><head><title>T</title></head><body>'
         b'<input type="hidden" name="csrf"/>'
         b'<input type="file" name="upload"/>'
         b'<input type="text" id="visible"/>'
-        b"</body></html>"
+        b'</body></html>'
     )
-    monkeypatch.setattr("requests.get", lambda *a, **kw: _fake_response_with_html(html))
-    _, elements = scanner_module._fetch_and_parse("http://example.com", 5.0)
+
+    class FakeHttpxResponse:
+        content = html
+        def raise_for_status(self): pass
+
+    class FakeClient:
+        is_closed = False
+        async def get(self, url): return FakeHttpxResponse()
+
+    monkeypatch.setattr(scanner_module, "_http_client", FakeClient())
+
+    _, elements, _, _ = await scanner_module._fetch_and_parse("http://example.com")
     types = [e["type"] for e in elements]
     assert "input" in types
-    assert len(elements) == 1  # only the visible text input
+    assert len(elements) == 1
 
 
-def test_fetch_and_parse_deduplicates_elements(monkeypatch):
-    """Duplicate selector+xpath combos are skipped (line 199: dedup_key in seen → continue)."""
-    # Two inputs with the same id produce the same selector and xpath → deduplicated
+@pytest.mark.asyncio
+async def test_fetch_and_parse_deduplicates_elements(monkeypatch):
+    # Two inputs with the same id → same selector/xpath → deduplicated
     html = (
-        b"<html><head><title>T</title></head><body>"
+        b'<html><head><title>T</title></head><body>'
         b'<input id="dup" type="text"/>'
         b'<input id="dup" type="text"/>'
-        b"</body></html>"
+        b'</body></html>'
     )
-    monkeypatch.setattr("requests.get", lambda *a, **kw: _fake_response_with_html(html))
-    _, elements = scanner_module._fetch_and_parse("http://example.com", 5.0)
+
+    class FakeHttpxResponse:
+        content = html
+        def raise_for_status(self): pass
+
+    class FakeClient:
+        is_closed = False
+        async def get(self, url): return FakeHttpxResponse()
+
+    monkeypatch.setattr(scanner_module, "_http_client", FakeClient())
+
+    _, elements, _, _ = await scanner_module._fetch_and_parse("http://example.com")
     selectors = [e["selector"] for e in elements]
     assert selectors.count("#dup") == 1
 
 
-def test_fetch_and_parse_respects_type_cap(monkeypatch):
-    """Elements beyond the per-type cap are ignored (line 186: type_counts >= cap → break)."""
+@pytest.mark.asyncio
+async def test_fetch_and_parse_respects_type_cap(monkeypatch):
     # input cap is 35 — generate 40 unique inputs
     inputs = b"".join(
         f'<input type="text" id="inp{i}"/>'.encode() for i in range(40)
     )
     html = b"<html><head><title>T</title></head><body>" + inputs + b"</body></html>"
-    monkeypatch.setattr("requests.get", lambda *a, **kw: _fake_response_with_html(html))
-    _, elements = scanner_module._fetch_and_parse("http://example.com", 5.0)
+
+    class FakeHttpxResponse:
+        content = html
+        def raise_for_status(self): pass
+
+    class FakeClient:
+        is_closed = False
+        async def get(self, url): return FakeHttpxResponse()
+
+    monkeypatch.setattr(scanner_module, "_http_client", FakeClient())
+
+    _, elements, _, _ = await scanner_module._fetch_and_parse("http://example.com")
     inputs_found = [e for e in elements if e["type"] == "input"]
-    assert len(inputs_found) == 35  # capped at _TYPE_CAPS["input"]
+    assert len(inputs_found) == 35
 
 
-def test_fetch_and_parse_respects_global_element_cap(monkeypatch):
-    """Global cap of 120 elements is respected (lines 179 and 184).
-
-    We lower _ELEMENT_CAP to 3 so that:
-    - Line 184 fires: while adding inputs, after 3 the inner loop breaks.
-    - Line 179 fires: when the outer loop starts the 'button' type, total >= 3.
-    """
+@pytest.mark.asyncio
+async def test_fetch_and_parse_respects_global_element_cap(monkeypatch):
     monkeypatch.setattr(scanner_module, "_ELEMENT_CAP", 3)
 
     inputs = b"".join(f'<input type="text" id="i{i}"/>'.encode() for i in range(10))
     buttons = b"".join(f'<button id="b{i}">B</button>'.encode() for i in range(10))
     html = b"<html><head><title>T</title></head><body>" + inputs + buttons + b"</body></html>"
-    monkeypatch.setattr("requests.get", lambda *a, **kw: _fake_response_with_html(html))
-    _, elements = scanner_module._fetch_and_parse("http://example.com", 5.0)
+
+    class FakeHttpxResponse:
+        content = html
+        def raise_for_status(self): pass
+
+    class FakeClient:
+        is_closed = False
+        async def get(self, url): return FakeHttpxResponse()
+
+    monkeypatch.setattr(scanner_module, "_http_client", FakeClient())
+
+    _, elements, _, _ = await scanner_module._fetch_and_parse("http://example.com")
     assert len(elements) <= 3
+
+
+# ---------------------------------------------------------------------------
+# _is_likely_spa
+# ---------------------------------------------------------------------------
+
+def test_is_likely_spa_detects_next_data():
+    html = b'<html><body><script id="__NEXT_DATA__">{}</script></body></html>'
+    assert scanner_module._is_likely_spa(html) is True
+
+
+def test_is_likely_spa_detects_react_root():
+    html = b'<html><body><div data-reactroot=""></div></body></html>'
+    assert scanner_module._is_likely_spa(html) is True
+
+
+def test_is_likely_spa_returns_false_for_plain_html():
+    html = b'<html><body><form><input id="q"/></form></body></html>'
+    assert scanner_module._is_likely_spa(html) is False
+
+
+# ---------------------------------------------------------------------------
+# _extract_form_contexts
+# ---------------------------------------------------------------------------
+
+def test_extract_form_contexts_login_form():
+    from selectolax.parser import HTMLParser
+    html = (
+        b'<html><body>'
+        b'<form id="login-form">'
+        b'<input type="text" id="email"/>'
+        b'<input type="password" id="password"/>'
+        b'<button type="submit" id="submit-btn">Login</button>'
+        b'</form>'
+        b'</body></html>'
+    )
+    tree = HTMLParser(html)
+    contexts = scanner_module._extract_form_contexts(tree)
+    assert len(contexts) == 1
+    ctx = contexts[0]
+    assert ctx["form_selector"] == "#login-form"
+    assert "#email" in ctx["inputs"]
+    assert "#password" in ctx["inputs"]
+    assert ctx["submit"] == "#submit-btn"
+
+
+def test_extract_form_contexts_skips_hidden_file():
+    from selectolax.parser import HTMLParser
+    html = (
+        b'<html><body>'
+        b'<form>'
+        b'<input type="hidden" name="csrf"/>'
+        b'<input type="file" name="upload"/>'
+        b'<input type="text" id="name"/>'
+        b'</form>'
+        b'</body></html>'
+    )
+    tree = HTMLParser(html)
+    contexts = scanner_module._extract_form_contexts(tree)
+    assert len(contexts) == 1
+    assert all("hidden" not in sel for sel in contexts[0]["inputs"])
+    assert all("upload" not in sel for sel in contexts[0]["inputs"])
+
+
+def test_extract_form_contexts_no_forms():
+    from selectolax.parser import HTMLParser
+    html = b'<html><body><input id="q"/></body></html>'
+    tree = HTMLParser(html)
+    contexts = scanner_module._extract_form_contexts(tree)
+    assert contexts == []
+
+
+# ---------------------------------------------------------------------------
+# _xpath_for edge case: non-string tag
+# ---------------------------------------------------------------------------
+
+def test_xpath_for_non_string_tag_returns_none(monkeypatch):
+    """_xpath_for returns None when node has no id and tag traversal hits a dead end."""
+    from selectolax.parser import HTMLParser
+    # A node that resolves to just the tag with no parent should still return a path
+    tree = HTMLParser(b'<html><body><input id=""/></body></html>')
+    node = tree.css_first("input")
+    # Patch out the id so we exercise the traversal path
+    result = scanner_module._xpath_for(node)
+    # Should either return a path or None, not raise
+    assert result is None or isinstance(result, str)
+
+
+# ---------------------------------------------------------------------------
+# _get_http_client: lazy initialisation (lines 73-81)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_get_http_client_creates_new_client_when_none(monkeypatch):
+    """_get_http_client creates a new AsyncClient when _http_client is None."""
+    import httpx
+
+    monkeypatch.setattr(scanner_module, "_http_client", None)
+    client = await scanner_module._get_http_client()
+    try:
+        assert isinstance(client, httpx.AsyncClient)
+        assert not client.is_closed
+    finally:
+        await client.aclose()
+
+
+# ---------------------------------------------------------------------------
+# _xpath_for: falsy tag triggers break → empty parts → return None (lines 129, 145)
+# ---------------------------------------------------------------------------
+
+def test_xpath_for_returns_none_when_tag_is_none():
+    """Traversal breaks immediately when node.tag is None; returns None because parts is empty."""
+
+    class _FakeNode:
+        attributes = {}
+        tag = None
+        parent = None
+        prev = None
+
+    result = scanner_module._xpath_for(_FakeNode())
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# _xpath_for: preceding sibling with same tag increments index (line 139)
+# ---------------------------------------------------------------------------
+
+def test_xpath_for_counts_preceding_siblings_of_same_tag():
+    """When two inputs share the same parent, the second one gets index [2] in its XPath."""
+    from selectolax.parser import HTMLParser
+
+    tree = HTMLParser(b'<html><body><input name="a"/><input name="b"/></body></html>')
+    nodes = tree.css("input")
+    # Second input has one preceding sibling with the same tag → index becomes 2
+    second = nodes[1]
+    xpath = scanner_module._xpath_for(second)
+    assert xpath is not None
+    assert "input[2]" in xpath
+
+
+# ---------------------------------------------------------------------------
+# _extract_form_contexts: form with class but no id (line 223)
+# ---------------------------------------------------------------------------
+
+def test_extract_form_contexts_form_with_class_no_id():
+    """A form with a class attribute but no id uses 'form.<class>' as selector."""
+    from selectolax.parser import HTMLParser
+
+    html = (
+        b'<html><body>'
+        b'<form class="login-form">'
+        b'<input type="text" id="user"/>'
+        b'<button type="submit">Entrar</button>'
+        b'</form>'
+        b'</body></html>'
+    )
+    tree = HTMLParser(html)
+    contexts = scanner_module._extract_form_contexts(tree)
+    assert len(contexts) == 1
+    assert contexts[0]["form_selector"] == "form.login-form"

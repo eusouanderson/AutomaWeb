@@ -5,7 +5,21 @@ import {
   getProjectGeneratedTests,
   getProjects
 } from '../../services/test.service.js';
+import { loadTemplate, renderHTML } from '../../utils/dom.js';
 import { formatDate } from '../../utils/helpers.js';
+
+const TESTS_TEMPLATE_PATH = '/static/frontend/pages/scanner/tests.html';
+const EXECUTE_TEMPLATE_PATH = '/static/frontend/pages/scanner/execute.html';
+
+export async function mount({ testsRoot, executeRoot }, options) {
+  const [testsHtml, executeHtml] = await Promise.all([
+    loadTemplate(TESTS_TEMPLATE_PATH),
+    loadTemplate(EXECUTE_TEMPLATE_PATH)
+  ]);
+  renderHTML(testsRoot, testsHtml);
+  renderHTML(executeRoot, executeHtml);
+  return initScannerPage(options);
+}
 
 const SCANNER_STORAGE_FEEDBACK = 'scanner_feedback';
 

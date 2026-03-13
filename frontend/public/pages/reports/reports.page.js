@@ -1,6 +1,15 @@
 import { toast } from '../../components/toast.js';
 import { getProjectExecutions, getProjects } from '../../services/test.service.js';
+import { loadTemplate, renderHTML } from '../../utils/dom.js';
 import { escapeHtml, formatDate } from '../../utils/helpers.js';
+
+const TEMPLATE_PATH = '/static/frontend/pages/reports/reports.html';
+
+export async function mount(root, { store }) {
+  const html = await loadTemplate(TEMPLATE_PATH);
+  renderHTML(root, html);
+  return initReportsPage({ store });
+}
 
 export function initReportsPage({ store }) {
   const projectSelect = document.getElementById('reports-project');

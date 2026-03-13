@@ -546,3 +546,91 @@ async def test_update_robot_test_content_route_not_found(monkeypatch) -> None:
 
     assert exc.value.status_code == 404
     assert exc.value.detail == "Test not found"
+
+
+# ── scan_page: scan cache persistence ─────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_scan_page_persists_scan_cache_when_project_found(monkeypatch) -> None:
+    class DummyScanResult:
+        def model_dump(self):
+            return {"title": "Home", "total_elements": 3}
+
+    class DummyScanner:
+        async def scan_url(self, _url: str, progress_callback=None):
+            return DummyScanResult()
+
+    class DummyProject:
+        scan_cache = None
+        scan_cached_at = None
+
+    dummy_project = DummyProject()
+
+    class DummyProjectRepository:
+        async def get(self, session, project_id: int):
+            return dummy_project
+
+    class DummySession:
+        committed = False
+
+        async def commit(self):
+            self.committed = True
+
+    monkeypatch.setattr(routes, "ElementScannerService", lambda: DummyScanner())
+    monkeypatch.setattr(routes, "ProjectRepository", lambda: DummyProjectRepository())
+
+    dummy_session = DummySession()
+    response = await routes.scan_page(
+        routes.ScanRequest(url="https://example.com", project_id=1),
+        session=dummy_session,
+    )
+    body_iter = response.body_iterator
+
+    result_event = await anext(body_iter)
+    data = json.loads(result_event.removeprefix("data: ").strip())
+    await body_iter.aclose()
+
+    assert data["type"] == "result"
+    assert data["data"]["title"] == "Home"
+    assert dummy_project.scan_cache is not None
+    assert json.loads(dummy_project.scan_cache)["total_elements"] == 3
+    assert dummy_project.scan_cached_at is not None
+    assert dummy_session.committed is True
+
+
+@pytest.mark.asyncio
+async def test_scan_page_skips_cache_when_project_not_found(monkeypatch) -> None:
+    class DummyScanResult:
+        def model_dump(self):
+            return {"title": "Pagina", "total_elements": 0}
+
+    class DummyScanner:
+        async def scan_url(self, _url: str, progress_callback=None):
+            return DummyScanResult()
+
+    class DummyProjectRepository:
+        async def get(self, session, project_id: int):
+            return None  # project not found
+
+    class DummySession:
+        committed = False
+
+        async def commit(self):
+            self.committed = True
+
+    monkeypatch.setattr(routes, "ElementScannerService", lambda: DummyScanner())
+    monkeypatch.setattr(routes, "ProjectRepository", lambda: DummyProjectRepository())
+
+    dummy_session = DummySession()
+    response = await routes.scan_page(
+        routes.ScanRequest(url="https://example.com", project_id=99),
+        session=dummy_session,
+    )
+    body_iter = response.body_iterator
+
+    result_event = await anext(body_iter)
+    data = json.loads(result_event.removeprefix("data: ").strip())
+    await body_iter.aclose()
+
+    assert data["type"] == "result"
+    assert dummy_session.committed is False
