@@ -34,4 +34,4 @@ class TestExecutionResult(BaseModel):
     completed_at: datetime | None = None
     error_output: str | None = None
     mkdocs_index: str | None = None
-    test_cases: list[TestCaseResult] = []
+    test_cases: list[TestCaseResult] | None = []

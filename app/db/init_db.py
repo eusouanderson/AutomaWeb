@@ -43,6 +43,11 @@ def _ensure_test_execution_columns(sync_conn) -> None:
             text("ALTER TABLE test_executions ADD COLUMN mkdocs_index VARCHAR(500)")
         )
 
+    if "test_cases" not in columns:
+        sync_conn.execute(
+            text("ALTER TABLE test_executions ADD COLUMN test_cases JSON")
+        )
+
 
 def _ensure_project_url_column(sync_conn) -> None:
     inspector = inspect(sync_conn)

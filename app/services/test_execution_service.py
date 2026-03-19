@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 class TestExecutionService:
     """Service for executing tests and generating reports."""
 
+    _running_projects: set[int] = set() 
     _rfbrowser_ready = False
 
     def __init__(
@@ -43,78 +44,95 @@ class TestExecutionService:
         headless: bool = True,
     ) -> TestExecution:
         """Execute Robot Framework tests for a project."""
-        project = await self._project_repository.get(session, project_id)
-        if not project:
-            raise ValueError("Project not found")
-
-        if not project.test_directory:
-            raise ValueError("Project test directory not configured")
-
-        # Create test directory if it doesn't exist
-        test_dir = Path(project.test_directory)
-        test_dir.mkdir(parents=True, exist_ok=True)
-
-        # Get test files - search in project folder
-        from app.services.test_service import TestService
-        safe_name = TestService()._safe_dir_name(project.name)
-        base_dir = Path(project.test_directory) if project.test_directory else Path(settings.STATIC_DIR) / "projects"
-        project_dir = base_dir / safe_name
         
-        if test_ids:
-            selected_tests = await self._test_repository.list_generated_tests_by_ids_for_project(
-                session=session,
-                project_id=project_id,
-                test_ids=test_ids,
+        if project_id in self.__class__._running_projects:
+            raise ValueError(f"Tests are already running for project {project_id}")
+
+        # DB guard — works across restarts and multiple workers
+        if session is not None and hasattr(session, "execute"):
+            from sqlalchemy import select as _sa_select
+            _existing = await session.execute(
+                _sa_select(TestExecution)
+                .where(TestExecution.project_id == project_id, TestExecution.status == "running")
             )
-            test_files = [test.file_path for test in selected_tests]
-        else:
-            # Get all .robot files from project folder
-            test_files = [str(path) for path in project_dir.glob("*.robot")] if project_dir.exists() else []
+            if _existing.scalars().first():
+                raise ValueError(
+                    f"Project {project_id} already has a running execution. Wait for it to finish."
+                )
 
-        if not test_files:
-            raise ValueError(f"No test files found in {project_dir}")
-
-        if settings.AI_VALIDATION_ENABLED:
-            test_files = await self._apply_pre_execution_healing(
-                test_files=test_files,
-                page_url=str(project.url) if project.url else None,
-                ai_debug=ai_debug,
-            )
-
-        run_id = f"{project_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-
-        # Store execution artifacts inside project folder
-        project_reports_root = project_dir / "reports"
-        output_dir = project_reports_root / run_id
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        # Public mirror for frontend access
-        public_reports_root = Path(settings.STATIC_DIR) / "reports"
-        public_output_dir = public_reports_root / run_id
-
-        # URL paths for frontend access
-        url_base = f"/static/reports/{run_id}"
-        mkdocs_index_url = f"{url_base}/mkdocs/site/index.html"
-
-        # Create execution record
-        execution = TestExecution(
-            project_id=project_id,
-            log_file=f"{url_base}/log.html",
-            report_file=f"{url_base}/report.html",
-            output_file=f"{url_base}/output.xml",
-            status="running",
-            created_at=datetime.utcnow(),
-        )
-
-        # Ensure Browser deps installed
-        await asyncio.to_thread(self._ensure_rfbrowser)
-
-        # Prepare temp copies with headless variable injected
-        prepared_files, temp_dir = self._prepare_test_files(test_files, headless)
-        headless_var = "True" if headless else "False"
-
-        # Execute Robot Framework tests
+        self.__class__._running_projects.add(project_id)
+        temp_dir: Path | None = None
         try:
+            project = await self._project_repository.get(session, project_id)
+            if not project:
+                raise ValueError("Project not found")
+
+            if not project.test_directory:
+                raise ValueError("Project test directory not configured")
+
+            # Create test directory if it doesn't exist
+            test_dir = Path(project.test_directory)
+            test_dir.mkdir(parents=True, exist_ok=True)
+
+            # Get test files - search in project folder
+            from app.services.test_service import TestService
+            safe_name = TestService()._safe_dir_name(project.name)
+            base_dir = Path(project.test_directory) if project.test_directory else Path(settings.STATIC_DIR) / "projects"
+            project_dir = base_dir / safe_name
+
+            if test_ids:
+                selected_tests = await self._test_repository.list_generated_tests_by_ids_for_project(
+                    session=session,
+                    project_id=project_id,
+                    test_ids=test_ids,
+                )
+                test_files = [test.file_path for test in selected_tests]
+            else:
+                # Get all .robot files from project folder
+                test_files = [str(path) for path in project_dir.glob("*.robot")] if project_dir.exists() else []
+
+            if not test_files:
+                raise ValueError(f"No test files found in {project_dir}")
+
+            if settings.AI_VALIDATION_ENABLED:
+                test_files = await self._apply_pre_execution_healing(
+                    test_files=test_files,
+                    page_url=str(project.url) if project.url else None,
+                    ai_debug=ai_debug,
+                )
+
+            run_id = f"{project_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+            # Store execution artifacts inside project folder
+            project_reports_root = project_dir / "reports"
+            output_dir = project_reports_root / run_id
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            # Public mirror for frontend access
+            public_reports_root = Path(settings.STATIC_DIR) / "reports"
+            public_output_dir = public_reports_root / run_id
+
+            # URL paths for frontend access
+            url_base = f"/static/reports/{run_id}"
+            mkdocs_index_url = f"{url_base}/mkdocs/site/index.html"
+
+            # Create execution record
+            execution = TestExecution(
+                project_id=project_id,
+                log_file=f"{url_base}/log.html",
+                report_file=f"{url_base}/report.html",
+                output_file=f"{url_base}/output.xml",
+                status="running",
+                created_at=datetime.utcnow(),
+            )
+
+            await asyncio.to_thread(self._ensure_rfbrowser)
+
+            # Prepare temp copies with headless variable injected
+            prepared_files, temp_dir = self._prepare_test_files(test_files, headless)
+            headless_var = "True" if headless else "False"
+
+            # Execute Robot Framework tests
             result = await asyncio.to_thread(
                 subprocess.run,
                 [
@@ -138,7 +156,7 @@ class TestExecutionService:
             execution.passed = stats["passed"]
             execution.failed = stats["failed"]
             execution.skipped = stats["skipped"]
-            execution.test_cases = stats.get("test_cases", [])  # non-persisted, passed to schema
+            execution.test_cases = stats.get("test_cases", [])
             execution.status = "completed" if result.returncode == 0 else "failed"
             if result.returncode != 0:
                 execution.error_output = (result.stderr or result.stdout or "").strip() or "Test execution failed"
@@ -159,6 +177,8 @@ class TestExecutionService:
             self._ensure_report_files(output_dir, execution.error_output)
             self._sync_reports_for_static(output_dir, public_output_dir)
             logger.error("Test execution timed out")
+        except ValueError:
+            raise
         except Exception as e:
             execution.status = "failed"
             execution.error_output = str(e)
@@ -166,9 +186,11 @@ class TestExecutionService:
             self._ensure_report_files(output_dir, execution.error_output)
             self._sync_reports_for_static(output_dir, public_output_dir)
             logger.error(f"Test execution failed: {e}")
-
-        # Cleanup temp directory
-        shutil.rmtree(temp_dir, ignore_errors=True)
+        finally:
+            # Always release the project lock and clean up temp files
+            if temp_dir is not None:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            self.__class__._running_projects.discard(project_id)
 
         # Persist execution record to database
         if session is not None:
@@ -325,7 +347,7 @@ class TestExecutionService:
                         "message": msg,
                     })
 
-            stats["test_cases"] = test_cases
+            stats["test_cases"] = test_cases # type: ignore
             return stats
         except Exception as e:
             logger.error(f"Failed to parse output.xml: {e}")

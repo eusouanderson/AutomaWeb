@@ -1,7 +1,7 @@
 """Model for test execution results"""
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -26,5 +26,6 @@ class TestExecution(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     error_output: Mapped[str | None] = mapped_column(Text, nullable=True)
     mkdocs_index: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    test_cases: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
     project = relationship("Project", back_populates="test_executions")
