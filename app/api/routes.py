@@ -3,7 +3,7 @@ import asyncio
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -208,6 +208,29 @@ async def get_execution_report(execution_id: int) -> FileResponse:
 async def get_ai_metrics() -> dict[str, float | int]:
     """Return AI self-healing metrics."""
     return AIMetricsRegistry.instance().as_dict()
+
+
+@router.get("/health/llm")
+async def get_llm_health(response: Response) -> dict[str, str | bool | int | None]:
+    """Check if the LLM provider is reachable with recent-success fallback."""
+    try:
+        service = TestService()
+    except ValueError as exc:
+        response.status_code = 503
+        return {
+            "ok": False,
+            "source": "config",
+            "model": None,
+            "checked_at_epoch": None,
+            "last_success_epoch": None,
+            "error": str(exc),
+            "message": "LLM client not configured.",
+        }
+
+    health = await asyncio.to_thread(service.check_llm_health)
+    if not bool(health.get("ok")):
+        response.status_code = 503
+    return health
 
 
 class RobotImproveRequest(BaseModel):

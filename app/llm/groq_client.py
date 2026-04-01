@@ -4,14 +4,19 @@ import logging
 import time
 import json
 from dataclasses import dataclass
+from typing import Any
 
 import httpx
 from groq import Groq
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_not_exception_type, stop_after_attempt, wait_exponential
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+class PayloadTooLargeError(Exception):
+    """Raised when LLM request exceeds provider payload limits even after fallback."""
 
 
 @dataclass
@@ -61,16 +66,74 @@ class GroqClient:
             http_client=http_client,
         )
         self._cache = SimpleCache(settings.CACHE_TTL_SECONDS)
+        self._last_health_ok_at: float | None = None
+        self._last_health_error: str | None = None
 
-    @retry(stop=stop_after_attempt(settings.GROQ_MAX_RETRIES), wait=wait_exponential(min=1, max=10))
+    def check_api_health(self) -> dict[str, str | bool | int | None]:
+        """Check if the upstream LLM is reachable, with recent-success fallback."""
+        now = time.time()
+        try:
+            response = self._client.chat.completions.create(
+                model=settings.GROQ_MODEL,
+                messages=[
+                    {"role": "system", "content": "You are a health-check assistant."},
+                    {"role": "user", "content": "Reply only with: ok"},
+                ],
+                max_tokens=4,
+                temperature=0,
+            )
+            _ = (response.choices[0].message.content or "").strip()
+            self._last_health_ok_at = now
+            self._last_health_error = None
+            return {
+                "ok": True,
+                "source": "live",
+                "model": settings.GROQ_MODEL,
+                "checked_at_epoch": int(now),
+                "last_success_epoch": int(now),
+                "error": None,
+                "message": "LLM API reachable.",
+            }
+        except Exception as exc:
+            self._last_health_error = f"{exc.__class__.__name__}: {exc}"
+            fallback_window = settings.LLM_HEALTH_FALLBACK_WINDOW_SECONDS
+            if self._last_health_ok_at and now - self._last_health_ok_at <= fallback_window:
+                return {
+                    "ok": True,
+                    "source": "fallback_cache",
+                    "model": settings.GROQ_MODEL,
+                    "checked_at_epoch": int(now),
+                    "last_success_epoch": int(self._last_health_ok_at),
+                    "error": self._last_health_error,
+                    "message": "Live check failed, using recent successful health check fallback.",
+                }
+            return {
+                "ok": False,
+                "source": "live",
+                "model": settings.GROQ_MODEL,
+                "checked_at_epoch": int(now),
+                "last_success_epoch": int(self._last_health_ok_at) if self._last_health_ok_at else None,
+                "error": self._last_health_error,
+                "message": "LLM API unreachable.",
+            }
+
+    @retry(
+        stop=stop_after_attempt(settings.GROQ_MAX_RETRIES),
+        wait=wait_exponential(min=1, max=10),
+        retry=retry_if_not_exception_type(PayloadTooLargeError),
+    )
     def generate_robot_test(
         self,
         prompt: str,
         context: str | None = None,
         page_structure: dict | None = None,
     ) -> str:
-        page_structure_key = json.dumps(page_structure, ensure_ascii=False, sort_keys=True) if page_structure else ""
-        cache_key = f"{settings.GROQ_MODEL}:{prompt}:{context or ''}:{page_structure_key}"
+        prompt_text = self._truncate_text(prompt, settings.LLM_MAX_PROMPT_CHARS)
+        context_text = self._truncate_text(context, settings.LLM_MAX_CONTEXT_CHARS)
+        page_structure_text = self._serialize_page_structure(page_structure, settings.LLM_MAX_PAGE_STRUCTURE_CHARS)
+
+        page_structure_key = page_structure_text
+        cache_key = f"{settings.GROQ_MODEL}:{prompt_text}:{context_text or ''}:{page_structure_key}"
         cached = self._cache.get(cache_key)
         if cached:
             logger.info("Groq cache hit")
@@ -110,27 +173,93 @@ class GroqClient:
             "15) NÃO invente seletores como 'css=h1' para verificar o título — o título vem de Get Title, não de um h1 visível. "
             "    Somente use 'Wait For Elements State    css=h1' se o h1 for um elemento que o usuário precisa interagir ou verificar como texto visível."
         )
-        if page_structure:
+        if page_structure_text:
             system_prompt = (
                 f"{system_prompt}\n\n"
                 "You are generating Robot Framework tests. "
                 "Here is the page structure in JSON format:\n"
-                f"{json.dumps(page_structure, ensure_ascii=False)}"
+                f"{page_structure_text}"
             )
-        user_content = prompt
-        if context:
-            user_content = f"Contexto:\n{context}\n\nPrompt:\n{prompt}"
+        user_content = prompt_text
+        if context_text:
+            user_content = f"Contexto:\n{context_text}\n\nPrompt:\n{prompt_text}"
 
-        response = self._client.chat.completions.create(
-            model=settings.GROQ_MODEL,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_content},
-            ],
-        )
-        content = response.choices[0].message.content
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content},
+        ]
+        try:
+            content = self._chat_completion(messages)
+        except Exception as exc:
+            if not self._is_payload_too_large(exc):
+                raise
+
+            logger.warning("LLM returned 413 payload too large. Retrying once with compact fallback payload.")
+            fallback_prompt = self._truncate_text(prompt_text, max(800, settings.LLM_MAX_PROMPT_CHARS // 3)) or ""
+            fallback_context = self._truncate_text(context_text, max(1200, settings.LLM_MAX_CONTEXT_CHARS // 3))
+            fallback_structure = self._serialize_page_structure(
+                page_structure,
+                max(2000, settings.LLM_MAX_PAGE_STRUCTURE_CHARS // 4),
+            )
+
+            compact_system_prompt = system_prompt
+            if fallback_structure:
+                compact_system_prompt = (
+                    "O contexto da página foi reduzido automaticamente para caber no limite de payload. "
+                    f"{compact_system_prompt}"
+                )
+
+            compact_user_content = fallback_prompt
+            if fallback_context:
+                compact_user_content = (
+                    "Contexto reduzido automaticamente por limite de payload:\n"
+                    f"{fallback_context}\n\nPrompt:\n{fallback_prompt}"
+                )
+
+            compact_messages = [
+                {"role": "system", "content": compact_system_prompt},
+                {"role": "user", "content": compact_user_content},
+            ]
+            try:
+                content = self._chat_completion(compact_messages)
+            except Exception as compact_exc:
+                if self._is_payload_too_large(compact_exc):
+                    raise PayloadTooLargeError(
+                        "LLM payload exceeds provider limits even after automatic fallback reduction"
+                    ) from compact_exc
+                raise
+
         self._cache.set(cache_key, content)
         return content
+
+    def _chat_completion(self, messages: list[dict[str, Any]]) -> str:
+        response = self._client.chat.completions.create(
+            model=settings.GROQ_MODEL,
+            messages=messages,  # type: ignore[arg-type]
+        )
+        return response.choices[0].message.content or ""
+
+    def _truncate_text(self, value: str | None, limit: int) -> str | None:
+        if value is None:
+            return None
+        if len(value) <= limit:
+            return value
+        return value[:limit] + "\n...[TRUNCATED]"
+
+    def _serialize_page_structure(self, page_structure: dict | None, max_chars: int) -> str:
+        if not page_structure:
+            return ""
+        as_text = json.dumps(page_structure, ensure_ascii=False)
+        if len(as_text) <= max_chars:
+            return as_text
+        return as_text[:max_chars] + "\n...[TRUNCATED]"
+
+    def _is_payload_too_large(self, exc: Exception) -> bool:
+        status_code = getattr(exc, "status_code", None)
+        if status_code == 413:
+            return True
+        response = getattr(exc, "response", None)
+        return getattr(response, "status_code", None) == 413
 
     def regenerate_robot_step(
         self,

@@ -4,7 +4,7 @@ import {
   generateTestFromPrompt,
   getProjectGeneratedTests,
   getProjects,
-  getTestContent
+  getTestContent,
 } from '../../services/test.service.js';
 import { loadTemplate, renderHTML } from '../../utils/dom.js';
 
@@ -49,7 +49,7 @@ export function initGeneratorPage({ store }) {
   if (!form || !projectSelect) {
     return {
       loadProjectsDropdown: async () => {},
-      generateFromExecutionFeedback: async () => {}
+      generateFromExecutionFeedback: async () => {},
     };
   }
 
@@ -127,6 +127,12 @@ export function initGeneratorPage({ store }) {
               `<option value="${project.id}" data-url="${project.url || ''}" data-cached-at="${project.scan_cached_at || ''}">${project.name}</option>`
           )
           .join('');
+
+      const activeId = store.getState().activeProjectId;
+      if (activeId) {
+        projectSelect.value = String(activeId);
+      }
+
       updateCacheState();
     } catch (error) {
       toast(error.message, 'error');
@@ -204,13 +210,13 @@ export function initGeneratorPage({ store }) {
         onError: (message) => {
           appendScanProgress(`Erro: ${message}`);
           toast(message || 'Erro no scan', 'error');
-        }
+        },
       });
 
       if (result) {
         store.setState({
           lastScanResult: result,
-          activeProjectId: projectId
+          activeProjectId: projectId,
         });
 
         scanSummary?.classList.remove('hidden');
@@ -252,6 +258,8 @@ export function initGeneratorPage({ store }) {
   });
 
   projectSelect.addEventListener('change', () => {
+    const projectId = Number.parseInt(projectSelect.value, 10) || null;
+    store.setState({ activeProjectId: projectId });
     resetScanPanel();
     forceRescan = false;
     if (genRescanBtn) {
@@ -307,6 +315,6 @@ export function initGeneratorPage({ store }) {
 
   return {
     loadProjectsDropdown,
-    generateFromExecutionFeedback
+    generateFromExecutionFeedback,
   };
 }

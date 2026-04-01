@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     GROQ_MAX_RETRIES: int = 3
     GROQ_CA_BUNDLE: str | None = None
     GROQ_INSECURE_SKIP_VERIFY: bool = False
+    LLM_HEALTH_FALLBACK_WINDOW_SECONDS: int = 300
+    LLM_MAX_PROMPT_CHARS: int = 6000
+    LLM_MAX_CONTEXT_CHARS: int = 12000
+    LLM_MAX_PAGE_STRUCTURE_CHARS: int = 24000
+    LLM_DOM_CHUNKING_ENABLED: bool = True
+    LLM_DOM_CHUNK_TARGET_CHARS: int = 12000
+    LLM_DOM_CHUNK_MAX_PARTS: int = 8
     CACHE_TTL_SECONDS: int = 300
     SCAN_CACHE_TTL_SECONDS: int = 3600
     STATIC_DIR: str = "app/static"

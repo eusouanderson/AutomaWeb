@@ -1,10 +1,12 @@
 import pytest
 import pytest_asyncio
+import json
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from tenacity import RetryError
 
 from app.core.config import settings
 from app.db.base import Base
+from app.llm.groq_client import PayloadTooLargeError
 from app.models.project import Project
 from app.models.test_execution import TestExecution  # noqa: F401 — registers mapper
 from app.services.element_scanner import ElementScannerError
@@ -95,6 +97,30 @@ class APIConnectionError(Exception):
 class APIConnectionFailingGroqClient:
     def generate_robot_test(self, prompt, context=None, page_structure=None):
         raise APIConnectionError("network")
+
+
+class PayloadTooLargeFailingGroqClient:
+    def generate_robot_test(self, prompt, context=None, page_structure=None):
+        raise PayloadTooLargeError("too large")
+
+
+class ChunkingGroqClient:
+    def __init__(self):
+        self.calls = []
+        self._first = True
+
+    def generate_robot_test(self, prompt, context=None, page_structure=None):
+        self.calls.append({"prompt": prompt, "context": context, "page_structure": page_structure})
+        if self._first:
+            self._first = False
+            raise PayloadTooLargeError("too large")
+        return (
+            "*** Settings ***\n"
+            "Library    Browser\n\n"
+            "*** Test Cases ***\n"
+            "Caso Chunk\n"
+            "    Log    OK\n"
+        )
 
 
 class UnexpectedLLMError(Exception):
@@ -212,6 +238,24 @@ async def test_generate_test_raises_llm_unavailable_on_api_connection_error(tmp_
 
 
 @pytest.mark.asyncio
+async def test_generate_test_raises_llm_unavailable_on_payload_too_large(tmp_path) -> None:
+    settings.STATIC_DIR = str(tmp_path)
+    project = Project(id=1, name="Projeto", description="Desc", test_directory=str(tmp_path), url=None)
+    test_repo = DummyTestRepository()
+    service = TestService(
+        test_repository=test_repo,
+        project_repository=DummyProjectRepository(project),
+        groq_client=PayloadTooLargeFailingGroqClient(),
+        element_scanner=SuccessfulScanService(),
+    )
+
+    with pytest.raises(LLMServiceUnavailableError, match="LLM request payload too large"):
+        await service.generate_test(session=None, project_id=1, prompt="Gerar teste")
+
+    assert test_repo.updated_statuses[-1] == "failed"
+
+
+@pytest.mark.asyncio
 async def test_generate_test_uses_scanned_page_structure(tmp_path) -> None:
     settings.STATIC_DIR = str(tmp_path)
     project = Project(id=1, name="Projeto", description="Desc", test_directory=str(tmp_path), url="https://example.com")
@@ -231,6 +275,39 @@ async def test_generate_test_uses_scanned_page_structure(tmp_path) -> None:
 
     assert generated.id == 99
     assert groq_client.captured_page_structure == {"title": "Page"}
+
+
+@pytest.mark.asyncio
+async def test_generate_test_uses_chunked_generation_after_payload_too_large(tmp_path) -> None:
+    settings.STATIC_DIR = str(tmp_path)
+    settings.LLM_DOM_CHUNKING_ENABLED = True
+    settings.LLM_DOM_CHUNK_TARGET_CHARS = 250
+    settings.LLM_DOM_CHUNK_MAX_PARTS = 4
+
+    big_items = [{"id": i, "text": "x" * 120} for i in range(12)]
+    project = Project(
+        id=1,
+        name="Projeto",
+        description="Desc",
+        test_directory=str(tmp_path),
+        url="https://example.com",
+        scan_cache=json.dumps({"title": "Page", "items": big_items}),
+    )
+    test_repo = DummyTestRepository()
+    groq_client = ChunkingGroqClient()
+    service = TestService(
+        test_repository=test_repo,
+        project_repository=DummyProjectRepository(project),
+        groq_client=groq_client,
+        element_scanner=SuccessfulScanService(),
+    )
+
+    generated = await service.generate_test(session=None, project_id=1, prompt="Gerar teste", context="ctx")
+
+    assert generated.id == 99
+    assert "*** Test Cases ***" in generated.content
+    assert len(groq_client.calls) > 1
+    assert any("[CHUNK" in call["prompt"] for call in groq_client.calls[1:])
 
 
 @pytest.mark.asyncio
@@ -342,6 +419,36 @@ def test_sanitize_robot_output_filters_noise_and_normalizes_library() -> None:
     assert "Library    Browser" in cleaned
     assert "Observação" not in cleaned
     assert "** nota" not in cleaned
+
+
+def test_split_page_structure_chunks_large_payload() -> None:
+    service = TestService(groq_client=DummyGroqClient())
+    settings.LLM_DOM_CHUNK_TARGET_CHARS = 200
+    page_structure = {
+        "title": "Page",
+        "elements": [{"selector": f"#id-{i}", "text": "x" * 80} for i in range(10)],
+    }
+
+    chunks = service._split_page_structure(page_structure)
+
+    assert len(chunks) > 1
+    assert all("title" in c for c in chunks)
+
+
+def test_merge_robot_parts_keeps_sections() -> None:
+    service = TestService(groq_client=DummyGroqClient())
+    parts = [
+        "*** Settings ***\nLibrary    Browser\n\n*** Test Cases ***\nCaso A\n    Log    A\n",
+        "*** Test Cases ***\nCaso B\n    Log    B\n\n*** Keywords ***\nKW\n    Log    K\n",
+    ]
+
+    merged = service._merge_robot_parts(parts)
+
+    assert "*** Settings ***" in merged
+    assert "*** Test Cases ***" in merged
+    assert "Caso A" in merged
+    assert "Caso B" in merged
+    assert "*** Keywords ***" in merged
 
 
 def test_sanitize_robot_output_hardens_strict_mode_selector_from_context() -> None:

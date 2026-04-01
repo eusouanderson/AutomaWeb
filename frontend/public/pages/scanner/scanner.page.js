@@ -3,7 +3,7 @@ import {
   deleteGeneratedTestService,
   executeProjectTests,
   getProjectGeneratedTests,
-  getProjects
+  getProjects,
 } from '../../services/test.service.js';
 import { loadTemplate, renderHTML } from '../../utils/dom.js';
 import { formatDate } from '../../utils/helpers.js';
@@ -14,7 +14,7 @@ const EXECUTE_TEMPLATE_PATH = '/static/frontend/pages/scanner/execute.html';
 export async function mount({ testsRoot, executeRoot }, options) {
   const [testsHtml, executeHtml] = await Promise.all([
     loadTemplate(TESTS_TEMPLATE_PATH),
-    loadTemplate(EXECUTE_TEMPLATE_PATH)
+    loadTemplate(EXECUTE_TEMPLATE_PATH),
   ]);
   renderHTML(testsRoot, testsHtml);
   renderHTML(executeRoot, executeHtml);
@@ -26,8 +26,8 @@ const SCANNER_STORAGE_FEEDBACK = 'scanner_feedback';
 function buildExecutionFeedback(data) {
   let lines = [
     'A execucao dos testes apresentou falhas. Corrija APENAS os test cases que falharam, mantendo INTACTOS todos os test cases que passaram.',
-    '',
-    `Resumo: total=${data.total_tests}, passed=${data.passed}, failed=${data.failed}, skipped=${data.skipped}`
+    'Não deve apagar os testes e sim corrigi-lo conforme o erro se não encontrar como corrigir deve mostrar comentado no robot',
+    `Resumo: total=${data.total_tests}, passed=${data.passed}, failed=${data.failed}, skipped=${data.skipped}`,
   ];
 
   const failedCases = (data.test_cases || []).filter(
@@ -51,7 +51,7 @@ function buildExecutionFeedback(data) {
     '1. Retorne o arquivo Robot Framework COMPLETO, com TODOS os test cases originais.',
     '2. Corrija apenas os test cases listados acima.',
     '3. NAO remova test cases que passaram.',
-    '4. Mantenha a estrutura de Settings, Variables, Keywords intacta.'
+    '4. Mantenha a estrutura de Settings, Variables, Keywords intacta.',
   ]);
 
   return lines.join('\n').slice(0, 8000);
@@ -72,7 +72,7 @@ function extractExecutionMessage(data) {
   return 'Testes executados com sucesso!';
 }
 
-export function initScannerPage({ onRecreateRequested }) {
+export function initScannerPage({ store, onRecreateRequested }) {
   const testsProjectSelect = document.getElementById('tests-project');
   const testsList = document.getElementById('tests-list');
 
@@ -218,10 +218,12 @@ export function initScannerPage({ onRecreateRequested }) {
         return;
       }
 
-      const selectedId = Number.parseInt(testsProjectSelect.value, 10);
-      const projectId = selectedId || projects[0].id;
-      testsProjectSelect.value = String(projectId);
-      await loadGeneratedTests(projectId);
+      const activeId = store?.getState().activeProjectId;
+      const selectedId =
+        activeId || Number.parseInt(testsProjectSelect.value, 10) || projects[0].id;
+      testsProjectSelect.value = String(selectedId);
+      if (activeId) store.setState({ activeProjectId: activeId });
+      await loadGeneratedTests(selectedId);
     } catch (error) {
       testsList.innerHTML = '<div class="empty">Erro ao carregar projetos</div>';
       toast(error.message, 'error');
@@ -246,7 +248,13 @@ export function initScannerPage({ onRecreateRequested }) {
         executeProjectSelect.appendChild(option);
       });
 
-      resetExecutionResult();
+      const activeId = store?.getState().activeProjectId;
+      if (activeId) {
+        executeProjectSelect.value = String(activeId);
+        await loadExecuteTests(activeId);
+      } else {
+        resetExecutionResult();
+      }
     } catch (error) {
       toast(error.message, 'error');
     }
@@ -289,6 +297,7 @@ export function initScannerPage({ onRecreateRequested }) {
 
   testsProjectSelect?.addEventListener('change', async (event) => {
     const projectId = Number.parseInt(event.target.value, 10);
+    store?.setState({ activeProjectId: projectId || null });
     await loadGeneratedTests(projectId);
   });
 
@@ -321,7 +330,7 @@ export function initScannerPage({ onRecreateRequested }) {
     { id: 'prepare', label: 'Preparando ambiente' },
     { id: 'heal', label: 'Validando e curando testes (AI)' },
     { id: 'run', label: 'Executando testes Robot' },
-    { id: 'report', label: 'Gerando relatórios' }
+    { id: 'report', label: 'Gerando relatórios' },
   ];
 
   function buildExecTracker() {
@@ -371,7 +380,7 @@ export function initScannerPage({ onRecreateRequested }) {
         const el = getEl(phaseId);
         if (el) el.className = 'gen-step gen-step--error';
         if (phaseTitle) phaseTitle.textContent = 'Execução falhou';
-      }
+      },
     };
   }
 
@@ -477,6 +486,7 @@ export function initScannerPage({ onRecreateRequested }) {
   executeProjectSelect?.addEventListener('change', () => {
     resetExecutionResult();
     const projectId = Number.parseInt(executeProjectSelect.value, 10);
+    store?.setState({ activeProjectId: projectId || null });
     loadExecuteTests(projectId);
   });
 
@@ -538,6 +548,6 @@ export function initScannerPage({ onRecreateRequested }) {
 
   return {
     loadTestsProjects,
-    loadExecuteProjects
+    loadExecuteProjects,
   };
 }

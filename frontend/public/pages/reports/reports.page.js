@@ -23,7 +23,7 @@ export function initReportsPage({ store }) {
     const map = {
       completed: { cls: 'badge-pass', label: '✅ Concluído' },
       failed: { cls: 'badge-fail', label: '❌ Falhou' },
-      running: { cls: 'badge-skip', label: '⏳ Executando' }
+      running: { cls: 'badge-skip', label: '⏳ Executando' },
     };
     const { cls, label } = map[status] || { cls: 'badge-skip', label: status };
     return `<span class="exec-badge ${cls}">${label}</span>`;
@@ -106,8 +106,14 @@ export function initReportsPage({ store }) {
         '<option value="">Selecione um projeto...</option>' +
         projects.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
 
-      reportsList.innerHTML =
-        '<div class="empty">Selecione um projeto para ver os relatórios</div>';
+      const activeId = store.getState().activeProjectId;
+      if (activeId) {
+        projectSelect.value = String(activeId);
+        await loadExecutions(activeId);
+      } else {
+        reportsList.innerHTML =
+          '<div class="empty">Selecione um projeto para ver os relatórios</div>';
+      }
     } catch (error) {
       toast(error.message, 'error');
     }
@@ -115,6 +121,7 @@ export function initReportsPage({ store }) {
 
   projectSelect.addEventListener('change', async (event) => {
     const projectId = Number.parseInt(event.target.value, 10);
+    store.setState({ activeProjectId: projectId || null });
     if (!projectId) {
       reportsList.innerHTML =
         '<div class="empty">Selecione um projeto para ver os relatórios</div>';

@@ -367,6 +367,75 @@ async def test_generate_test_route_scan_unavailable(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_get_llm_health_success(monkeypatch) -> None:
+    def fake_check_llm_health(self):
+        return {
+            "ok": True,
+            "source": "live",
+            "model": "x",
+            "checked_at_epoch": 1,
+            "last_success_epoch": 1,
+            "error": None,
+            "message": "ok",
+        }
+
+    monkeypatch.setattr(routes.TestService, "check_llm_health", fake_check_llm_health)
+
+    class DummyResponse:
+        status_code = 200
+
+    response = DummyResponse()
+    result = await routes.get_llm_health(response=response)
+
+    assert result["ok"] is True
+    assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_get_llm_health_sets_503_when_unhealthy(monkeypatch) -> None:
+    def fake_check_llm_health(self):
+        return {
+            "ok": False,
+            "source": "live",
+            "model": "x",
+            "checked_at_epoch": 1,
+            "last_success_epoch": None,
+            "error": "boom",
+            "message": "down",
+        }
+
+    monkeypatch.setattr(routes.TestService, "check_llm_health", fake_check_llm_health)
+
+    class DummyResponse:
+        status_code = 200
+
+    response = DummyResponse()
+    result = await routes.get_llm_health(response=response)
+
+    assert result["ok"] is False
+    assert response.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_get_llm_health_handles_missing_configuration(monkeypatch) -> None:
+    class BrokenTestService:
+        def __init__(self):
+            raise ValueError("GROQ_API_KEY is not configured")
+
+    monkeypatch.setattr(routes, "TestService", BrokenTestService)
+
+    class DummyResponse:
+        status_code = 200
+
+    response = DummyResponse()
+    result = await routes.get_llm_health(response=response)
+
+    assert result["ok"] is False
+    assert result["source"] == "config"
+    assert response.status_code == 503
+
+
+@pytest.mark.asyncio
 async def test_scan_page_stream_success(monkeypatch) -> None:
     class DummyScanResult:
         def model_dump(self):

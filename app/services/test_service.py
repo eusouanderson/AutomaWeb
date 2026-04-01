@@ -11,7 +11,7 @@ from tenacity import RetryError
 
 from app.ai_validation.self_healing_service import AITestSelfHealingService
 from app.core.config import settings
-from app.llm.groq_client import GroqClient
+from app.llm.groq_client import GroqClient, PayloadTooLargeError
 from app.models.generated_test import GeneratedTest
 from app.models.test_request import TestRequest
 from app.repositories.project_repository import ProjectRepository
@@ -44,6 +44,9 @@ class TestService:
         self._groq_client = groq_client or GroqClient()
         self._element_scanner = element_scanner or ElementScannerService()
         self._self_healing = AITestSelfHealingService()
+
+    def check_llm_health(self) -> dict[str, str | bool | int | None]:
+        return self._groq_client.check_api_health()
 
     async def generate_test(
         self,
@@ -97,6 +100,26 @@ class TestService:
             await self._test_repository.update_test_request(session, test_request)
             logger.error("Failed to generate test: LLM connection retries exhausted")
             raise LLMServiceUnavailableError("LLM provider connection failed") from exc
+        except PayloadTooLargeError as exc:
+            if page_structure and settings.LLM_DOM_CHUNKING_ENABLED:
+                logger.warning("LLM payload too large. Trying DOM chunked generation for project %s", project_id)
+                try:
+                    content = await asyncio.to_thread(
+                        self._generate_robot_test_chunked,
+                        prompt,
+                        context,
+                        page_structure,
+                    )
+                except PayloadTooLargeError:
+                    test_request.status = "failed"
+                    await self._test_repository.update_test_request(session, test_request)
+                    logger.error("Failed to generate test: LLM payload too large even after chunked generation")
+                    raise LLMServiceUnavailableError("LLM request payload too large") from exc
+            else:
+                test_request.status = "failed"
+                await self._test_repository.update_test_request(session, test_request)
+                logger.error("Failed to generate test: LLM payload too large even after fallback")
+                raise LLMServiceUnavailableError("LLM request payload too large") from exc
         except Exception as exc:
             error_name = exc.__class__.__name__
             if "APIConnectionError" in error_name or "APITimeoutError" in error_name:
@@ -249,6 +272,158 @@ class TestService:
     def _safe_dir_name(self, name: str) -> str:
         safe = "".join(c for c in name if c.isalnum() or c in ("-", "_", " ")).strip().replace(" ", "_") or "project"
         return f"🧪_{safe}"
+
+    def _generate_robot_test_chunked(self, prompt: str, context: str | None, page_structure: dict) -> str:
+        chunks = self._split_page_structure(page_structure)
+        if len(chunks) <= 1:
+            raise PayloadTooLargeError("Page structure cannot be split into smaller chunks")
+
+        max_parts = max(1, settings.LLM_DOM_CHUNK_MAX_PARTS)
+        chunks = chunks[:max_parts]
+
+        partial_outputs: list[str] = []
+        for idx, chunk in enumerate(chunks, start=1):
+            chunk_prompt = (
+                f"{prompt}\n\n"
+                f"[CHUNK {idx}/{len(chunks)}] Gere casos de teste APENAS com base neste subconjunto do DOM. "
+                "Evite duplicar test cases de chunks anteriores e mantenha nomes descritivos."
+            )
+            part = self._groq_client.generate_robot_test(
+                prompt=chunk_prompt,
+                context=context,
+                page_structure=chunk,
+            )
+            partial_outputs.append(self._sanitize_robot_output(part, context=context))
+
+        if not partial_outputs:
+            raise PayloadTooLargeError("Chunked generation produced no output")
+
+        return self._merge_robot_parts(partial_outputs)
+
+    def _split_page_structure(self, page_structure: dict) -> list[dict]:
+        target_chars = max(200, settings.LLM_DOM_CHUNK_TARGET_CHARS)
+        serialized = json.dumps(page_structure, ensure_ascii=False, separators=(",", ":"))
+        if len(serialized) <= target_chars:
+            return [page_structure]
+
+        scalar_base: dict = {}
+        sequence_items: list[tuple[str, object]] = []
+
+        for key, value in page_structure.items():
+            if isinstance(value, list):
+                for item in value:
+                    sequence_items.append((key, item))
+            elif isinstance(value, dict):
+                for sub_key, sub_value in value.items():
+                    sequence_items.append((f"{key}.{sub_key}", sub_value))
+            else:
+                scalar_base[key] = value
+
+        # Fallback when nothing is splittable: chunk a minified string payload.
+        if not sequence_items:
+            text_chunks = [serialized[i:i + target_chars] for i in range(0, len(serialized), target_chars)]
+            return [{"chunk_text": t, "chunk_format": "json-minified"} for t in text_chunks]
+
+        chunks: list[dict] = []
+        current: dict = dict(scalar_base)
+
+        def append_entry(container: dict, dotted_key: str, entry_value: object) -> None:
+            if "." not in dotted_key:
+                container.setdefault(dotted_key, []).append(entry_value)
+                return
+            root, sub = dotted_key.split(".", 1)
+            container.setdefault(root, {})
+            root_value = container[root]
+            if not isinstance(root_value, dict):
+                container[root] = {}
+                root_value = container[root]
+            root_value.setdefault(sub, []).append(entry_value)
+
+        for dotted_key, value in sequence_items:
+            candidate = json.loads(json.dumps(current, ensure_ascii=False))
+            append_entry(candidate, dotted_key, value)
+            candidate_len = len(json.dumps(candidate, ensure_ascii=False, separators=(",", ":")))
+
+            if candidate_len <= target_chars:
+                current = candidate
+                continue
+
+            # If current already has data beyond base, flush and start new chunk with this item.
+            if current != scalar_base:
+                chunks.append(current)
+                current = dict(scalar_base)
+                append_entry(current, dotted_key, value)
+                continue
+
+            # Single entry is already too large: keep it as its own chunk to preserve data.
+            chunks.append(candidate)
+            current = dict(scalar_base)
+
+        if current != scalar_base:
+            chunks.append(current)
+
+        return chunks or [page_structure]
+
+    def _merge_robot_parts(self, parts: list[str]) -> str:
+        section_order = [
+            "*** Settings ***",
+            "*** Variables ***",
+            "*** Test Cases ***",
+            "*** Keywords ***",
+        ]
+        merged: dict[str, list[str]] = {name: [] for name in section_order}
+
+        for part in parts:
+            sections = self._extract_robot_sections(part)
+            for name in section_order:
+                merged[name].extend(sections.get(name, []))
+
+        output_lines: list[str] = []
+        for name in section_order:
+            lines = self._dedupe_preserve_order(merged[name])
+            if not lines:
+                continue
+            output_lines.append(name)
+            output_lines.extend(lines)
+            output_lines.append("")
+
+        return "\n".join(output_lines).strip() + "\n"
+
+    def _extract_robot_sections(self, content: str) -> dict[str, list[str]]:
+        section_order = {
+            "*** Settings ***",
+            "*** Variables ***",
+            "*** Test Cases ***",
+            "*** Keywords ***",
+        }
+        sections: dict[str, list[str]] = {name: [] for name in section_order}
+        current: str | None = None
+        for line in content.splitlines():
+            stripped = line.strip()
+            if stripped in section_order:
+                current = stripped
+                continue
+            if current:
+                sections[current].append(line)
+        return sections
+
+    def _dedupe_preserve_order(self, lines: list[str]) -> list[str]:
+        seen: set[str] = set()
+        result: list[str] = []
+        for line in lines:
+            key = line.strip()
+            if not key:
+                if result and result[-1].strip() == "":
+                    continue
+                result.append("")
+                continue
+            if key in seen:
+                continue
+            seen.add(key)
+            result.append(line)
+        while result and result[-1].strip() == "":
+            result.pop()
+        return result
 
     def _sanitize_robot_output(self, content: str, context: str | None = None) -> str:
         """Remove qualquer texto fora das seções Robot e normaliza libs."""

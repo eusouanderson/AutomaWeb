@@ -317,3 +317,175 @@ def test_regenerate_robot_step_returns_empty_string_when_content_is_none():
     )
 
     assert result == ""
+
+
+def test_check_api_health_live_success():
+    from unittest.mock import MagicMock, patch
+    from app.core.config import Settings
+    from app.llm.groq_client import GroqClient
+
+    settings_obj = Settings(GROQ_API_KEY="test_key")
+    with patch("app.llm.groq_client.settings", settings_obj):
+        client = GroqClient()
+
+    mock_response = MagicMock()
+    mock_response.choices[0].message.content = "ok"
+    client._client.chat.completions.create = MagicMock(return_value=mock_response)
+
+    result = client.check_api_health()
+
+    assert result["ok"] is True
+    assert result["source"] == "live"
+    assert result["error"] is None
+
+
+def test_check_api_health_uses_fallback_cache_on_failure():
+    from unittest.mock import MagicMock, patch
+    from app.core.config import Settings
+    from app.llm.groq_client import GroqClient
+
+    settings_obj = Settings(GROQ_API_KEY="test_key", LLM_HEALTH_FALLBACK_WINDOW_SECONDS=300)
+    with patch("app.llm.groq_client.settings", settings_obj):
+        client = GroqClient()
+
+    mock_response = MagicMock()
+    mock_response.choices[0].message.content = "ok"
+    client._client.chat.completions.create = MagicMock(return_value=mock_response)
+    first = client.check_api_health()
+    assert first["ok"] is True
+
+    client._client.chat.completions.create = MagicMock(side_effect=RuntimeError("network down"))
+    second = client.check_api_health()
+
+    assert second["ok"] is True
+    assert second["source"] == "fallback_cache"
+    assert "network down" in str(second["error"])
+
+
+def test_generate_robot_test_retries_once_with_compact_payload_on_413():
+    from unittest.mock import MagicMock, patch
+    from app.core.config import Settings
+    from app.llm.groq_client import GroqClient
+
+    class _PayloadTooLargeError(Exception):
+        status_code = 413
+
+    settings_obj = Settings(
+        GROQ_API_KEY="test_key",
+        LLM_MAX_PROMPT_CHARS=2000,
+        LLM_MAX_CONTEXT_CHARS=3000,
+        LLM_MAX_PAGE_STRUCTURE_CHARS=6000,
+    )
+    with patch("app.llm.groq_client.settings", settings_obj):
+        client = GroqClient()
+
+    mock_response = MagicMock()
+    mock_response.choices[0].message.content = "*** Test Cases ***\nExample\n    Log    ok"
+    client._client.chat.completions.create = MagicMock(side_effect=[_PayloadTooLargeError(), mock_response])
+
+    long_context = "ctx-" * 4000
+    long_prompt = "prompt-" * 2000
+    result = client.generate_robot_test(
+        long_prompt,
+        context=long_context,
+        page_structure={"items": ["x" * 4000 for _ in range(10)]},
+    )
+
+    assert "*** Test Cases ***" in result
+    assert client._client.chat.completions.create.call_count == 2
+
+    first_messages = client._client.chat.completions.create.call_args_list[0].kwargs["messages"]
+    second_messages = client._client.chat.completions.create.call_args_list[1].kwargs["messages"]
+    assert len(second_messages[1]["content"]) < len(first_messages[1]["content"])
+    assert "Contexto reduzido automaticamente" in second_messages[1]["content"]
+
+
+def test_generate_robot_test_raises_payload_too_large_after_compact_fallback():
+    from unittest.mock import MagicMock, patch
+    from app.core.config import Settings
+    from app.llm.groq_client import GroqClient, PayloadTooLargeError
+
+    class _PayloadTooLargeError(Exception):
+        status_code = 413
+
+    settings_obj = Settings(GROQ_API_KEY="test_key")
+    with patch("app.llm.groq_client.settings", settings_obj):
+        client = GroqClient()
+
+    client._client.chat.completions.create = MagicMock(side_effect=[_PayloadTooLargeError(), _PayloadTooLargeError()])
+
+    with pytest.raises(PayloadTooLargeError, match="payload exceeds provider limits"):
+        client.generate_robot_test(
+            "Prompt",
+            context="Contexto" * 3000,
+            page_structure={"items": ["x" * 5000 for _ in range(10)]},
+        )
+
+
+# --- Cobertura extra: exceção inesperada em generate_robot_test ---
+def test_generate_robot_test_raises_unexpected_exception():
+    from unittest.mock import MagicMock, patch
+    from app.core.config import Settings
+    from app.llm.groq_client import GroqClient
+
+    class _SomeOtherError(Exception):
+        pass
+
+    settings_obj = Settings(GROQ_API_KEY="test_key")
+    with patch("app.llm.groq_client.settings", settings_obj):
+        client = GroqClient()
+
+    client._client.chat.completions.create = MagicMock(side_effect=_SomeOtherError("fail!"))
+
+    import tenacity
+    with pytest.raises(tenacity.RetryError) as excinfo:
+        client.generate_robot_test("Prompt", context="ctx")
+    # A causa original deve ser _SomeOtherError
+    assert isinstance(excinfo.value.last_attempt.exception(), _SomeOtherError)
+
+
+# --- Cobertura extra: _chat_completion retorna None ou vazio ---
+def test__chat_completion_returns_empty_string_on_none():
+    from unittest.mock import MagicMock, patch
+    from app.core.config import Settings
+    from app.llm.groq_client import GroqClient
+
+    settings_obj = Settings(GROQ_API_KEY="test_key")
+    with patch("app.llm.groq_client.settings", settings_obj):
+        client = GroqClient()
+
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = None
+    client._client.chat.completions.create = MagicMock(return_value=mock_response)
+
+    result = client._chat_completion([{"role": "user", "content": "hi"}])
+    assert result == ""
+
+    mock_response.choices[0].message.content = ""
+    result2 = client._chat_completion([{"role": "user", "content": "hi"}])
+    assert result2 == ""
+
+
+# --- Cobertura extra: _is_payload_too_large com response.status_code ---
+def test__is_payload_too_large_with_response_status_code():
+    from app.llm.groq_client import GroqClient
+    client = GroqClient()
+
+    class DummyResponse:
+        status_code = 413
+
+    class DummyExc(Exception):
+        response = DummyResponse()
+
+    exc = DummyExc()
+    assert client._is_payload_too_large(exc) is True
+
+    class DummyResponse2:
+        status_code = 400
+
+    class DummyExc2(Exception):
+        response = DummyResponse2()
+
+    exc2 = DummyExc2()
+    assert client._is_payload_too_large(exc2) is False

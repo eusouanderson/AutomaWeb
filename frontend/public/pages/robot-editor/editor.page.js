@@ -4,7 +4,7 @@ import {
   getTestsForProject,
   improveWithAI,
   loadRobotTestContent,
-  saveEditorContent
+  saveEditorContent,
 } from '../../services/editor.service.js';
 import { getProjects } from '../../services/test.service.js';
 import { loadTemplate, qs, renderHTML } from '../../utils/dom.js';
@@ -166,10 +166,17 @@ export async function mount(root, context) {
     projectSelect.innerHTML =
       '<option value="">Select project</option>' +
       projects.map((p) => `<option value="${p.id}">${p.name}</option>`).join('');
+
+    const activeId = context.store.getState().activeProjectId;
+    if (activeId) {
+      projectSelect.value = String(activeId);
+      projectSelect.dispatchEvent(new Event('change'));
+    }
   }
 
   projectSelect.addEventListener('change', async () => {
     const projectId = Number(projectSelect.value);
+    context.store.setState({ activeProjectId: projectId || null });
     if (!projectId) {
       testSelect.innerHTML = '<option value="">Select a project first</option>';
       testSelect.disabled = true;
@@ -226,4 +233,13 @@ export async function mount(root, context) {
   });
 
   await loadProjectsOptions();
+
+  context.store.subscribe((state) => {
+    const activeId = state.activeProjectId;
+    const currentValue = Number(projectSelect.value) || null;
+    if (activeId !== currentValue) {
+      projectSelect.value = activeId ? String(activeId) : '';
+      projectSelect.dispatchEvent(new Event('change'));
+    }
+  });
 }

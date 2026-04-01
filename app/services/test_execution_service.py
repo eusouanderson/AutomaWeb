@@ -197,7 +197,7 @@ class TestExecutionService:
             session.add(execution)
             await session.commit()
             await session.refresh(execution)
-
+        print('Execution completed', execution)
         return execution
 
     async def list_executions_by_project(
