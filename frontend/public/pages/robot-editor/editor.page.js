@@ -26,19 +26,8 @@ function highlightRobotSyntax(text) {
  * Extract plain text from a contenteditable element, preserving newlines.
  */
 function getEditorText(el) {
-  const lines = [];
-  el.childNodes.forEach((node) => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      lines.push(node.textContent);
-    } else if (node.nodeName === 'DIV' || node.nodeName === 'P') {
-      lines.push(node.textContent);
-    } else if (node.nodeName === 'SPAN' || node.nodeName === 'BR') {
-      // inline span (highlight) — collect its text
-      lines.push(node.textContent);
-    }
-  });
-  // Fallback: if nothing came through child-walk, use innerText
-  return lines.length ? lines.join('\n') : el.innerText || el.textContent || '';
+  const text = el.innerText || el.textContent || '';
+  return text.replace(/\r\n/g, '\n').replace(/\u00a0/g, ' ');
 }
 
 /**

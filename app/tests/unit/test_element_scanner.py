@@ -531,106 +531,105 @@ def _parse_first(html_str: str, css: str):
 
 def test_css_selector_prioritizes_id():
     node = _parse_first('<input id="email" name="email"/>', "input")
-    assert scanner_module._css_selector(node) == "#email"
+    assert scanner_module._css_selector(node) == "#email"  # type: ignore[arg-type]
 
 
 def test_css_selector_uses_data_testid():
     node = _parse_first('<button data-testid="submit">OK</button>', "button")
-    assert scanner_module._css_selector(node) == '[data-testid="submit"]'
+    assert scanner_module._css_selector(node) == '[data-testid="submit"]'  # type: ignore[arg-type]
 
 
 def test_css_selector_uses_name():
     node = _parse_first('<input name="email"/>', "input")
-    assert scanner_module._css_selector(node) == 'input[name="email"]'
-
+    assert scanner_module._css_selector(node) == 'input[name="email"]'  # type: ignore[arg-type]
 
 def test_css_selector_uses_first_class():
     node = _parse_first('<button class="primary btn">OK</button>', "button")
-    assert scanner_module._css_selector(node) == "button.primary"
+    assert scanner_module._css_selector(node) == "button.primary"  # type: ignore[arg-type]
 
 
 def test_css_selector_fallback_to_tag():
     node = _parse_first('<button>OK</button>', "button")
-    assert scanner_module._css_selector(node) == "button"
+    assert scanner_module._css_selector(node) == "button"   # type: ignore[arg-type]
 
 
 def test_xpath_for_with_id():
     node = _parse_first('<input id="search"/>', "input")
-    assert scanner_module._xpath_for(node) == '//*[@id="search"]'
+    assert scanner_module._xpath_for(node) == '//*[@id="search"]' # type: ignore[arg-type]
 
 
 def test_xpath_for_without_id():
     from selectolax.parser import HTMLParser
     tree = HTMLParser(b'<html><body><form><input name="q"/></form></body></html>')
     node = tree.css_first("input")
-    xpath = scanner_module._xpath_for(node)
+    xpath = scanner_module._xpath_for(node) # type: ignore[arg-type]
     assert xpath is not None
     assert xpath.startswith("/")
 
 
 def test_element_type_text_input():
     node = _parse_first('<input type="text"/>', "input")
-    assert scanner_module._element_type(node) == "input"
+    assert scanner_module._element_type(node) == "input" # type: ignore[arg-type]
 
 
 def test_element_type_no_type_defaults_to_input():
     node = _parse_first('<input/>', "input")
-    assert scanner_module._element_type(node) == "input"
+    assert scanner_module._element_type(node) == "input" # type: ignore[arg-type]
 
 
 def test_element_type_hidden_returns_none():
     node = _parse_first('<input type="hidden"/>', "input")
-    assert scanner_module._element_type(node) is None
+    assert scanner_module._element_type(node) is None # type: ignore[arg-type]
 
 
 def test_element_type_file_returns_none():
     node = _parse_first('<input type="file"/>', "input")
-    assert scanner_module._element_type(node) is None
+    assert scanner_module._element_type(node) is None # type: ignore[arg-type]
 
 
 def test_element_type_submit_returns_button():
     node = _parse_first('<input type="submit"/>', "input")
-    assert scanner_module._element_type(node) == "button"
+    assert scanner_module._element_type(node) == "button" # type: ignore[arg-type]
 
 
 def test_element_type_reset_returns_button():
     node = _parse_first('<input type="reset"/>', "input")
-    assert scanner_module._element_type(node) == "button"
+    assert scanner_module._element_type(node) == "button" # type: ignore[arg-type]
 
 
 def test_element_type_button_input_returns_button():
     node = _parse_first('<input type="button"/>', "input")
-    assert scanner_module._element_type(node) == "button"
+    assert scanner_module._element_type(node) == "button" # type: ignore[arg-type]
 
 
 def test_element_type_button_tag():
     node = _parse_first('<button>Click</button>', "button")
-    assert scanner_module._element_type(node) == "button"
+    assert scanner_module._element_type(node) == "button" # type: ignore[arg-type]
 
 
 def test_element_type_link():
     node = _parse_first('<a href="/">Go</a>', "a")
-    assert scanner_module._element_type(node) == "link"
+    assert scanner_module._element_type(node) == "link" # type: ignore[arg-type]
 
 
 def test_element_type_select():
     node = _parse_first('<select><option>A</option></select>', "select")
-    assert scanner_module._element_type(node) == "select"
+    assert scanner_module._element_type(node) == "select" # type: ignore[arg-type]
 
 
 def test_element_type_textarea():
     node = _parse_first('<textarea/>', "textarea")
-    assert scanner_module._element_type(node) == "textarea"
+    assert scanner_module._element_type(node) == "textarea" # type: ignore[arg-type]
 
 
 def test_element_type_label():
     node = _parse_first('<label for="x">Name</label>', "label")
-    assert scanner_module._element_type(node) == "label"
+    assert scanner_module._element_type(node) == "label" # type: ignore[arg-type]
 
 
 def test_element_type_unknown_returns_none():
     node = _parse_first('<div/>', "div")
-    assert scanner_module._element_type(node) is None
+    assert scanner_module._element_type(node) is None # type: ignore[arg-type]
 
 
 def test_element_meta_fields():
@@ -643,7 +642,7 @@ def test_element_meta_fields():
     )
     tree = HTMLParser(html)
     node = tree.css_first("input")
-    meta = scanner_module._element_meta(node, "input", include_xpath=True)
+    meta = scanner_module._element_meta(node, "input", include_xpath=True) # type: ignore[arg-type]
     assert meta["type"] == "input"
     assert meta["id"] == "q"
     assert meta["name"] == "search"
@@ -659,7 +658,7 @@ def test_element_meta_no_xpath():
     from selectolax.parser import HTMLParser
     tree = HTMLParser(b'<html><body><input id="q"/></body></html>')
     node = tree.css_first("input")
-    meta = scanner_module._element_meta(node, "input", include_xpath=False)
+    meta = scanner_module._element_meta(node, "input", include_xpath=False) # type: ignore[arg-type]
     assert meta["xpath"] is None
 
 
@@ -912,7 +911,7 @@ def test_xpath_for_non_string_tag_returns_none(monkeypatch):
     tree = HTMLParser(b'<html><body><input id=""/></body></html>')
     node = tree.css_first("input")
     # Patch out the id so we exercise the traversal path
-    result = scanner_module._xpath_for(node)
+    result = scanner_module._xpath_for(node) # type: ignore[arg-type]
     # Should either return a path or None, not raise
     assert result is None or isinstance(result, str)
 
@@ -948,7 +947,7 @@ def test_xpath_for_returns_none_when_tag_is_none():
         parent = None
         prev = None
 
-    result = scanner_module._xpath_for(_FakeNode())
+    result = scanner_module._xpath_for(_FakeNode()) # type: ignore[arg-type]
     assert result is None
 
 

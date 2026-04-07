@@ -28,6 +28,9 @@ def test_groq_client_with_context() -> None:
             call_args = client._client.chat.completions.create.call_args
             messages = call_args.kwargs["messages"]
             user_message = messages[1]["content"]
-            assert "Contexto" in user_message
+            assert "What (o quê):" in user_message
+            assert "Why (por que):" in user_message
+            assert "Where (onde):" in user_message
+            assert "How (como):" in user_message
             assert "some context" in user_message
             assert "test prompt" in user_message

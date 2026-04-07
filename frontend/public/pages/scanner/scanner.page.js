@@ -108,9 +108,23 @@ export function initScannerPage({ store, onRecreateRequested }) {
   const execSelectAllBtn = document.getElementById('exec-select-all');
   const execDeselectAllBtn = document.getElementById('exec-deselect-all');
   const execHeadlessCheckbox = document.getElementById('exec-headless');
+  const execTimeoutInput = document.getElementById('exec-timeout');
+  const execSpeedInput = document.getElementById('exec-speed');
 
   function getHeadless() {
     return execHeadlessCheckbox ? execHeadlessCheckbox.checked : true;
+  }
+
+  function getTimeoutSeconds() {
+    const raw = Number.parseInt(execTimeoutInput?.value || '', 10);
+    if (!Number.isFinite(raw)) return 300;
+    return Math.min(3600, Math.max(30, raw));
+  }
+
+  function getSpeedMs() {
+    const raw = Number.parseInt(execSpeedInput?.value || '', 10);
+    if (!Number.isFinite(raw)) return 0;
+    return Math.min(10000, Math.max(0, raw));
   }
 
   function getSelectedTestIds() {
@@ -441,7 +455,11 @@ export function initScannerPage({ store, onRecreateRequested }) {
         tracker.activate('run');
       }, 8000);
 
-      const data = await executeProjectTests(projectId, getSelectedTestIds(), getHeadless());
+      const data = await executeProjectTests(projectId, getSelectedTestIds(), {
+        headless: getHeadless(),
+        timeoutSeconds: getTimeoutSeconds(),
+        speedMs: getSpeedMs(),
+      });
 
       clearTimeout(t1);
       clearTimeout(t2);

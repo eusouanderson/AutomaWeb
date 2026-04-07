@@ -16,8 +16,14 @@
     </select>
   </div>
 
+
+
   <div id="editor-toolbar" class="editor-toolbar hidden">
     <div id="editor-actions-slot"></div>
+  </div>
+
+  <div>
+    <label> Digite um prompt para a IA</label>
   </div>
 
   <div id="editor-loading" class="editor-loading hidden" role="status" aria-live="polite">
@@ -30,17 +36,8 @@
       <span id="editor-filename" class="editor-filename"></span>
       <span id="editor-dirty-badge" class="editor-dirty-badge hidden">alterações não salvas</span>
     </div>
-    <div
-      id="robot-editor"
-      class="robot-editor"
-      contenteditable="true"
-      spellcheck="false"
-      autocorrect="off"
-      autocapitalize="none"
-      aria-label="Editor do Robot Framework"
-      aria-multiline="true"
-      role="textbox"
-    ></div>
+    <div id="robot-editor" class="robot-editor" contenteditable="true" spellcheck="false" autocorrect="off"
+      autocapitalize="none" aria-label="Editor do Robot Framework" aria-multiline="true" role="textbox"></div>
   </div>
 
   <div id="editor-status" class="editor-status" aria-live="polite"></div>

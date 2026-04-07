@@ -45,7 +45,7 @@ def _prepare_project(tmp_path, name: str = "Projeto") -> Project:
 
 def _create_robot_file(project: Project) -> Path:
     safe_name = TestService()._safe_dir_name(project.name)
-    project_dir = Path(project.test_directory) / safe_name
+    project_dir = Path(project.test_directory) / safe_name # type: ignore[arg-type]
     project_dir.mkdir(parents=True, exist_ok=True)
     robot_file = project_dir / "sample.robot"
     robot_file.write_text("*** Test Cases ***\nExample\n    Log    Hello")
@@ -58,8 +58,8 @@ async def test_execute_tests_happy_path(tmp_path, monkeypatch) -> None:
     project = _prepare_project(tmp_path)
 
     service = TestExecutionService(
-        project_repository=DummyProjectRepo(project),
-        test_repository=DummyTestRepo(),
+        project_repository=DummyProjectRepo(project), # type: ignore[arg-type]
+        test_repository=DummyTestRepo(), # type: ignore[arg-type]
     )
 
     _create_robot_file(project)
@@ -80,7 +80,7 @@ async def test_execute_tests_happy_path(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(service, "_generate_mkdocs_report", fake_generate_mkdocs_report)
     monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
 
-    execution = await service.execute_tests(session=None, project_id=1)
+    execution = await service.execute_tests(session=None, project_id=1) # type: ignore[arg-type]
 
     assert execution.status == "completed"
     assert execution.passed == 1
@@ -93,8 +93,8 @@ async def test_execute_tests_runs_robot_non_interactive(tmp_path, monkeypatch) -
     project = _prepare_project(tmp_path)
 
     service = TestExecutionService(
-        project_repository=DummyProjectRepo(project),
-        test_repository=DummyTestRepo(),
+        project_repository=DummyProjectRepo(project), # type: ignore[arg-type]
+        test_repository=DummyTestRepo(), # type: ignore[arg-type]
     )
 
     _create_robot_file(project)
@@ -118,7 +118,7 @@ async def test_execute_tests_runs_robot_non_interactive(tmp_path, monkeypatch) -
     monkeypatch.setattr(service, "_generate_mkdocs_report", fake_generate_mkdocs_report)
     monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
 
-    await service.execute_tests(session=None, project_id=1)
+    await service.execute_tests(session=None, project_id=1) # type: ignore[arg-type]
 
     assert call_kwargs.get("stdin") is subprocess.DEVNULL
 
@@ -128,8 +128,8 @@ async def test_execute_tests_with_selected_test_ids(tmp_path, monkeypatch) -> No
     settings.STATIC_DIR = str(tmp_path / "static")
     project = _prepare_project(tmp_path)
     service = TestExecutionService(
-        project_repository=DummyProjectRepo(project),
-        test_repository=DummyTestRepo(),
+        project_repository=DummyProjectRepo(project), # type: ignore[arg-type]
+        test_repository=DummyTestRepo(), # type: ignore[arg-type]
     )
 
     def fake_run(*args, **kwargs):
@@ -148,7 +148,7 @@ async def test_execute_tests_with_selected_test_ids(tmp_path, monkeypatch) -> No
     monkeypatch.setattr(service, "_generate_mkdocs_report", fake_generate_mkdocs_report)
     monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
 
-    execution = await service.execute_tests(session=None, project_id=1, test_ids=[10, 20])
+    execution = await service.execute_tests(session=None, project_id=1, test_ids=[10, 20]) # type: ignore[arg-type]
 
     assert execution.status == "completed"
     assert execution.total_tests == 2
@@ -157,36 +157,74 @@ async def test_execute_tests_with_selected_test_ids(tmp_path, monkeypatch) -> No
 @pytest.mark.asyncio
 async def test_execute_tests_project_not_found() -> None:
     service = TestExecutionService(
-        project_repository=DummyProjectRepo(None),
-        test_repository=DummyTestRepo(),
+        project_repository=DummyProjectRepo(None), # type: ignore[arg-type]
+        test_repository=DummyTestRepo(), # type: ignore[arg-type]
     )
 
     with pytest.raises(ValueError, match="Project not found"):
-        await service.execute_tests(session=None, project_id=1)
+        await service.execute_tests(session=None, project_id=1) # type: ignore[arg-type]
+
+
+@pytest.mark.asyncio
+async def test_execute_tests_raises_when_project_is_already_running() -> None:
+    service = TestExecutionService(
+        project_repository=DummyProjectRepo(None), # type: ignore[arg-type]
+        test_repository=DummyTestRepo(), # type: ignore[arg-type]
+    )
+
+    service.__class__._running_projects.add(1)
+    try:
+        with pytest.raises(ValueError, match="Tests are already running for project 1"):
+            await service.execute_tests(session=None, project_id=1) # type: ignore[arg-type]
+    finally:
+        service.__class__._running_projects.discard(1)
+
+
+@pytest.mark.asyncio
+async def test_execute_tests_raises_when_db_has_running_execution() -> None:
+    service = TestExecutionService(
+        project_repository=DummyProjectRepo(None), # type: ignore[arg-type]
+        test_repository=DummyTestRepo(), # type: ignore[arg-type]
+    )
+
+    class _ScalarResult:
+        def first(self):
+            return object()
+
+    class _ExecuteResult:
+        def scalars(self):
+            return _ScalarResult()
+
+    class _SessionWithExecute:
+        async def execute(self, _query):
+            return _ExecuteResult()
+
+    with pytest.raises(ValueError, match="already has a running execution"):
+        await service.execute_tests(session=_SessionWithExecute(), project_id=1) # type: ignore[arg-type]
 
 
 @pytest.mark.asyncio
 async def test_execute_tests_missing_test_directory() -> None:
     project = Project(id=1, name="Projeto", description="Desc", test_directory=None)
     service = TestExecutionService(
-        project_repository=DummyProjectRepo(project),
-        test_repository=DummyTestRepo(),
+        project_repository=DummyProjectRepo(project), # type: ignore[arg-type]
+        test_repository=DummyTestRepo(), # type: ignore[arg-type]
     )
 
     with pytest.raises(ValueError, match="Project test directory not configured"):
-        await service.execute_tests(session=None, project_id=1)
+        await service.execute_tests(session=None, project_id=1) # type: ignore[arg-type]
 
 
 @pytest.mark.asyncio
 async def test_execute_tests_no_test_files(tmp_path) -> None:
     project = _prepare_project(tmp_path)
     service = TestExecutionService(
-        project_repository=DummyProjectRepo(project),
-        test_repository=DummyTestRepo(),
+        project_repository=DummyProjectRepo(project), # type: ignore[arg-type]
+        test_repository=DummyTestRepo(), # type: ignore[arg-type]
     )
 
     with pytest.raises(ValueError, match="No test files found"):
-        await service.execute_tests(session=None, project_id=1)
+        await service.execute_tests(session=None, project_id=1) # type: ignore[arg-type]
 
 
 @pytest.mark.asyncio
@@ -194,8 +232,8 @@ async def test_execute_tests_failed_returncode_with_default_message(tmp_path, mo
     settings.STATIC_DIR = str(tmp_path / "static")
     project = _prepare_project(tmp_path)
     service = TestExecutionService(
-        project_repository=DummyProjectRepo(project),
-        test_repository=DummyTestRepo(),
+        project_repository=DummyProjectRepo(project), # type: ignore[arg-type]
+        test_repository=DummyTestRepo(), # type: ignore[arg-type]
     )
     _create_robot_file(project)
 
@@ -215,7 +253,7 @@ async def test_execute_tests_failed_returncode_with_default_message(tmp_path, mo
     monkeypatch.setattr(service, "_generate_mkdocs_report", fake_generate_mkdocs_report)
     monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
 
-    execution = await service.execute_tests(session=None, project_id=1)
+    execution = await service.execute_tests(session=None, project_id=1) # type: ignore[arg-type]
 
     assert execution.status == "failed"
     assert execution.error_output == "Test execution failed"
@@ -226,8 +264,8 @@ async def test_execute_tests_timeout(tmp_path, monkeypatch) -> None:
     settings.STATIC_DIR = str(tmp_path / "static")
     project = _prepare_project(tmp_path)
     service = TestExecutionService(
-        project_repository=DummyProjectRepo(project),
-        test_repository=DummyTestRepo(),
+        project_repository=DummyProjectRepo(project), # type: ignore[arg-type]
+        test_repository=DummyTestRepo(), # type: ignore[arg-type]
     )
     _create_robot_file(project)
 
@@ -239,7 +277,7 @@ async def test_execute_tests_timeout(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(service, "_ensure_rfbrowser", lambda: None)
     monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
 
-    execution = await service.execute_tests(session=None, project_id=1)
+    execution = await service.execute_tests(session=None, project_id=1) # type: ignore[arg-type]
     assert execution.status == "failed"
     assert execution.error_output == "Test execution timed out"
 
@@ -249,8 +287,8 @@ async def test_execute_tests_handles_unexpected_exception(tmp_path, monkeypatch)
     settings.STATIC_DIR = str(tmp_path / "static")
     project = _prepare_project(tmp_path)
     service = TestExecutionService(
-        project_repository=DummyProjectRepo(project),
-        test_repository=DummyTestRepo(),
+        project_repository=DummyProjectRepo(project), # type: ignore[arg-type]
+        test_repository=DummyTestRepo(), # type: ignore[arg-type]
     )
     _create_robot_file(project)
 
@@ -260,7 +298,7 @@ async def test_execute_tests_handles_unexpected_exception(tmp_path, monkeypatch)
     monkeypatch.setattr(service, "_ensure_rfbrowser", lambda: None)
     monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
 
-    execution = await service.execute_tests(session=None, project_id=1)
+    execution = await service.execute_tests(session=None, project_id=1) # type: ignore[arg-type]
 
     assert execution.status == "failed"
     assert execution.error_output == "robot failed badly"
@@ -568,8 +606,8 @@ async def test_execute_tests_persists_to_db_when_session_provided(tmp_path, monk
     settings.STATIC_DIR = str(tmp_path / "static")
     project = _prepare_project(tmp_path)
     service = TestExecutionService(
-        project_repository=DummyProjectRepo(project),
-        test_repository=DummyTestRepo(),
+        project_repository=DummyProjectRepo(project), # type: ignore[arg-type]
+        test_repository=DummyTestRepo(), # type: ignore[arg-type]
     )
     _create_robot_file(project)
 
@@ -601,7 +639,7 @@ async def test_execute_tests_persists_to_db_when_session_provided(tmp_path, monk
         async def refresh(self, obj):
             calls.append(("refresh", obj))
 
-    execution = await service.execute_tests(session=FakeSession(), project_id=1)
+    execution = await service.execute_tests(session=FakeSession(), project_id=1) # type: ignore[arg-type]
 
     assert execution.status == "completed"
     assert any(c[0] == "add" for c in calls)

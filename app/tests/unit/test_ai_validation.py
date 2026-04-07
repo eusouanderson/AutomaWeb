@@ -323,7 +323,7 @@ class TestTestValidator:
         report = await self.validator.validate(BASIC_ROBOT, page_url="http://example.com")
         strict_violations = [i for i in report.issues if i.issue_type == "strict_mode_violation"]
         assert len(strict_violations) >= 1
-        assert ">> nth=0" in strict_violations[0].suggested_locator
+        assert ">> nth=0" in strict_violations[0].suggested_locator  # type: ignore[arg-type]
         assert report.has_errors is True
 
     @pytest.mark.asyncio

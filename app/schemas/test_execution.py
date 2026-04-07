@@ -1,7 +1,7 @@
 """Schema for test execution results"""
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TestExecutionRequest(BaseModel):
@@ -9,6 +9,8 @@ class TestExecutionRequest(BaseModel):
     test_ids: list[int] | None = None  # se None, executa todos os testes do projeto
     ai_debug: bool = False
     headless: bool = True  # True = sem janela (CI), False = abre o navegador
+    timeout_seconds: int = Field(default=300, ge=30, le=3600)
+    speed_ms: int = Field(default=0, ge=0, le=10000)
 
 
 class TestCaseResult(BaseModel):

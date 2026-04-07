@@ -2,7 +2,7 @@ import { toast } from '../../components/toast.js';
 import {
   createProjectService,
   deleteProjectService,
-  getProjects
+  getProjects,
 } from '../../services/test.service.js';
 import { loadTemplate, renderHTML } from '../../utils/dom.js';
 import { escapeHtml, formatDate } from '../../utils/helpers.js';
@@ -21,7 +21,7 @@ export function initDashboardPage({ store }) {
 
   if (!form || !list) {
     return {
-      loadProjects: async () => {}
+      loadProjects: async () => {},
     };
   }
 
@@ -45,7 +45,8 @@ export function initDashboardPage({ store }) {
                 <h3>${escapeHtml(project.name)}</h3>
                 <p>${escapeHtml(project.description || 'Sem descrição')}</p>
                 <small>URL: ${escapeHtml(project.url || 'Não definida')}</small><br />
-                <small>ID: ${project.id} | Criado em: ${formatDate(project.created_at)}</small>
+                <small>ID: ${project.id} | Criado em: ${formatDate(project.created_at)}</small><br>
+                <small>Numero de testes gerados : ${project.test_count || 0}</small>
               </div>
               <button class="btn btn-danger" data-project-id="${project.id}">🗑️ Deletar</button>
             </div>
@@ -66,7 +67,7 @@ export function initDashboardPage({ store }) {
         name: document.getElementById('project-name').value,
         description: document.getElementById('project-description').value,
         url: document.getElementById('project-url').value,
-        test_directory: document.getElementById('project-test-dir').value
+        test_directory: document.getElementById('project-test-dir').value,
       });
 
       form.reset();

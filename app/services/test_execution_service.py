@@ -42,6 +42,8 @@ class TestExecutionService:
         test_ids: list[int] | None = None,
         ai_debug: bool = False,
         headless: bool = True,
+        timeout_seconds: int = 300,
+        speed_ms: int = 0,
     ) -> TestExecution:
         """Execute Robot Framework tests for a project."""
         
@@ -129,7 +131,7 @@ class TestExecutionService:
             await asyncio.to_thread(self._ensure_rfbrowser)
 
             # Prepare temp copies with headless variable injected
-            prepared_files, temp_dir = self._prepare_test_files(test_files, headless)
+            prepared_files, temp_dir = self._prepare_test_files(test_files, headless, speed_ms)
             headless_var = "True" if headless else "False"
 
             # Execute Robot Framework tests
@@ -142,12 +144,13 @@ class TestExecutionService:
                     "--report", "report.html",
                     "--output", "output.xml",
                     "--variable", f"HEADLESS:{headless_var}",
+                    "--variable", f"SPEED_MS:{int(speed_ms)}",
                     *prepared_files,
                 ],
                 capture_output=True,
                 text=True,
                 stdin=subprocess.DEVNULL,
-                timeout=300,  # 5 minutes timeout
+                timeout=int(timeout_seconds),
             )
 
             # Parse output.xml to get statistics
@@ -214,17 +217,22 @@ class TestExecutionService:
         )
         return list(result.scalars().all())
 
-    def _prepare_test_files(self, test_files: list[str], headless: bool) -> tuple[list[str], Path]:
+    def _prepare_test_files(self, test_files: list[str], headless: bool, speed_ms: int) -> tuple[list[str], Path]:
         """Copy test files to a temp dir, injecting headless=${HEADLESS} in every New Browser call."""
         temp_dir = Path(tempfile.mkdtemp(prefix="robot_run_"))
         prepared: list[str] = []
         for fp in test_files:
             src = Path(fp)
             content = src.read_text(encoding="utf-8")
-            # Add headless=${HEADLESS} to any `New Browser  <browser>` not already specifying headless
+            # Add headless=${HEADLESS} and slowMo=${SPEED_MS}ms to New Browser when missing.
             content = re.sub(
-                r"(New Browser\s+\S+)(?!.*headless=)",
+                r"(New Browser\s+\S+)(?![^\n]*headless=)",
                 r"\1    headless=${HEADLESS}",
+                content,
+            )
+            content = re.sub(
+                r"(New Browser\s+\S+)(?![^\n]*slowMo=)",
+                r"\1    slowMo=${SPEED_MS}ms",
                 content,
             )
             dst = temp_dir / src.name

@@ -5,11 +5,11 @@ vi.mock('../../../services/editor.service.js', () => ({
   loadRobotTestContent: vi.fn(),
   getTestsForProject: vi.fn(),
   improveWithAI: vi.fn(),
-  saveEditorContent: vi.fn()
+  saveEditorContent: vi.fn(),
 }));
 
 vi.mock('../../../services/test.service.js', () => ({
-  getProjects: vi.fn()
+  getProjects: vi.fn(),
 }));
 
 vi.mock('../../../utils/dom.js', async () => {
@@ -38,7 +38,7 @@ vi.mock('../../../utils/dom.js', async () => {
         </div>
         <div id="editor-status"></div>
       </section>
-    `)
+    `),
   };
 });
 
@@ -50,21 +50,27 @@ import {
   getTestsForProject,
   improveWithAI,
   loadRobotTestContent,
-  saveEditorContent
+  saveEditorContent,
 } from '../../../services/editor.service.js';
 import { getProjects } from '../../../services/test.service.js';
 import { mount } from '../editor.page.js';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
-function makeContext(projects = []) {
-  let state = { projects };
+function makeContext(projects = [], activeProjectId = null) {
+  let state = { projects, activeProjectId };
+  const listeners = new Set();
   return {
     store: {
       getState: () => state,
       setState: (partial) => {
         state = { ...state, ...partial };
-      }
-    }
+        listeners.forEach((listener) => listener(state));
+      },
+      subscribe: (listener) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+    },
   };
 }
 
@@ -125,6 +131,15 @@ describe('robot-editor page – mount', () => {
     expect(names).toContain('Beta');
   });
 
+  it('loads tests immediately when there is an active project in store', async () => {
+    getTestsForProject.mockResolvedValue([{ id: 11, file_path: 'tests/active.robot' }]);
+
+    await mount(root, makeContext([{ id: 1, name: 'Demo' }], 1));
+
+    await vi.waitFor(() => expect(getTestsForProject).toHaveBeenCalledWith(1));
+    expect(root.querySelector('#editor-project').value).toBe('1');
+  });
+
   // ── project select change ──────────────────────────────────────────────────
 
   it('enables test select when a project is chosen', async () => {
@@ -174,7 +189,7 @@ describe('robot-editor page – mount', () => {
     loadRobotTestContent.mockResolvedValue({
       id: 10,
       file_path: '/tests/test_login.robot',
-      content: '*** Test Cases ***\nLogin Test\n    Log    hello'
+      content: '*** Test Cases ***\nLogin Test\n    Log    hello',
     });
     await mount(root, makeContext());
 
@@ -216,7 +231,7 @@ describe('robot-editor page – mount', () => {
     loadRobotTestContent.mockResolvedValue({
       id: 5,
       file_path: '/tests/t.robot',
-      content: '*** Test Cases ***'
+      content: '*** Test Cases ***',
     });
     saveEditorContent.mockResolvedValue({ id: 5 });
     await mount(root, makeContext());
@@ -241,7 +256,7 @@ describe('robot-editor page – mount', () => {
     loadRobotTestContent.mockResolvedValue({
       id: 5,
       file_path: '/t.robot',
-      content: '*** Test Cases ***'
+      content: '*** Test Cases ***',
     });
     saveEditorContent.mockRejectedValue(new Error('Save failed'));
     await mount(root, makeContext());
@@ -266,7 +281,7 @@ describe('robot-editor page – mount', () => {
     loadRobotTestContent.mockResolvedValue({
       id: 7,
       file_path: '/t.robot',
-      content: '*** Test Cases ***'
+      content: '*** Test Cases ***',
     });
     improveWithAI.mockResolvedValue('*** Test Cases ***\nImproved Test\n    Log    improved');
     await mount(root, makeContext());
@@ -290,7 +305,7 @@ describe('robot-editor page – mount', () => {
     loadRobotTestContent.mockResolvedValue({
       id: 7,
       file_path: '/t.robot',
-      content: '*** Test Cases ***'
+      content: '*** Test Cases ***',
     });
     improveWithAI.mockRejectedValue(new Error('AI unavailable'));
     await mount(root, makeContext());
@@ -315,7 +330,7 @@ describe('robot-editor page – mount', () => {
     loadRobotTestContent.mockResolvedValue({
       id: 1,
       file_path: '/t.robot',
-      content: '*** Test Cases ***'
+      content: '*** Test Cases ***',
     });
     saveEditorContent.mockResolvedValue({ id: 1 });
     await mount(root, makeContext());
@@ -350,7 +365,7 @@ describe('robot-editor page – mount', () => {
     loadRobotTestContent.mockResolvedValue({
       id: 2,
       file_path: '/t.robot',
-      content: '*** Test Cases ***'
+      content: '*** Test Cases ***',
     });
     saveEditorContent.mockResolvedValue({ id: 2 });
     await mount(root, makeContext());
@@ -401,7 +416,7 @@ describe('robot-editor page – mount', () => {
     loadRobotTestContent.mockResolvedValue({
       id: 5,
       file_path: '/t.robot',
-      content: '*** Test Cases ***'
+      content: '*** Test Cases ***',
     });
     await mount(root, makeContext());
 
@@ -433,7 +448,7 @@ describe('robot-editor page – mount', () => {
     loadRobotTestContent.mockResolvedValue({
       id: 7,
       file_path: '/t.robot',
-      content: '*** Test Cases ***'
+      content: '*** Test Cases ***',
     });
     saveEditorContent.mockResolvedValue({ id: 7 });
     await mount(root, makeContext());
@@ -464,7 +479,7 @@ describe('robot-editor page – mount', () => {
     loadRobotTestContent.mockResolvedValue({
       id: 8,
       file_path: '/t.robot',
-      content: '*** Test Cases ***'
+      content: '*** Test Cases ***',
     });
     saveEditorContent.mockResolvedValue({ id: 8 });
     await mount(root, makeContext());
@@ -495,7 +510,7 @@ describe('robot-editor page – mount', () => {
     loadRobotTestContent.mockResolvedValue({
       id: 9,
       file_path: '/t.robot',
-      content: ''
+      content: '',
     });
     saveEditorContent.mockResolvedValue({ id: 9 });
     await mount(root, makeContext());
@@ -542,5 +557,23 @@ describe('robot-editor page – mount', () => {
     aiBtn.click();
     await new Promise((r) => setTimeout(r, 0));
     expect(improveWithAI).not.toHaveBeenCalled();
+  });
+
+  it('reacts to store activeProjectId changes via subscribe callback', async () => {
+    getTestsForProject.mockResolvedValue([]);
+    const context = makeContext(
+      [
+        { id: 1, name: 'Project 1' },
+        { id: 2, name: 'Project 2' },
+      ],
+      1
+    );
+
+    await mount(root, context);
+
+    context.store.setState({ activeProjectId: 2 });
+
+    await vi.waitFor(() => expect(getTestsForProject).toHaveBeenCalledWith(2));
+    expect(root.querySelector('#editor-project').value).toBe('2');
   });
 });

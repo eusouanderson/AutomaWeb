@@ -35,7 +35,16 @@ export function initGeneratorPage({ store }) {
   const scanTotal = document.getElementById('scan-total');
   const scanTypes = document.getElementById('scan-types');
 
+  const submitBtn = document.getElementById('generate-submit-btn');
+  const generationStatus = document.getElementById('generation-status');
+  const generationStatusLabel = document.getElementById('generation-status-label');
+  const generationStatusDetail = document.getElementById('generation-status-detail');
+  const generationStatusTimer = document.getElementById('generation-status-timer');
+
   const resultSection = document.getElementById('generated-result');
+  const generationParts = document.getElementById('generation-parts');
+  const generationPartsSummary = document.getElementById('generation-parts-summary');
+  const generationPartsList = document.getElementById('generation-parts-list');
   const codeElement = document.getElementById('test-code');
   const copyButton = document.getElementById('copy-test-btn');
   const downloadButton = document.getElementById('download-test-btn');
@@ -114,6 +123,89 @@ export function initGeneratorPage({ store }) {
     scanProgress.scrollTop = scanProgress.scrollHeight;
   }
 
+  let _generationTimerInterval = null;
+
+  function showGenerationStatus(estimatedChunks) {
+    generationStatus?.classList.remove('hidden');
+    if (generationStatusLabel) generationStatusLabel.textContent = 'Gerando teste...';
+    if (generationStatusDetail) {
+      generationStatusDetail.textContent =
+        estimatedChunks > 1
+          ? `Estimativa: ${estimatedChunks} parte(s) a enviar para o LLM`
+          : 'Preparando envio para o LLM...';
+    }
+    if (generationStatusTimer) generationStatusTimer.textContent = '0s';
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Gerando...';
+    }
+    let elapsed = 0;
+    clearInterval(_generationTimerInterval);
+    _generationTimerInterval = setInterval(() => {
+      elapsed += 1;
+      if (generationStatusTimer) generationStatusTimer.textContent = `${elapsed}s`;
+      if (elapsed === 30 && generationStatusDetail) {
+        generationStatusDetail.textContent = 'Aguardando resposta do LLM (pode haver fila)...';
+      }
+    }, 1000);
+  }
+
+  function hideGenerationStatus() {
+    clearInterval(_generationTimerInterval);
+    _generationTimerInterval = null;
+    generationStatus?.classList.add('hidden');
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Gerar Teste';
+    }
+  }
+
+  function estimateChunks(totalElements) {
+    // ~250 chars/element, chunk target ~12 000 chars → ~48 elements/chunk
+    if (!totalElements) return 1;
+    return Math.max(1, Math.ceil(totalElements / 48));
+  }
+
+  function resetGenerationParts() {
+    generationParts?.classList.add('hidden');
+    if (generationPartsSummary) {
+      generationPartsSummary.textContent = '';
+    }
+    if (generationPartsList) {
+      generationPartsList.innerHTML = '';
+    }
+  }
+
+  function renderGenerationParts(result) {
+    const strategy = result?.generation_strategy;
+    const chunkCount = Number(result?.chunk_count || 0);
+    const chunkParts = Array.isArray(result?.chunk_parts) ? result.chunk_parts : [];
+
+    if (strategy !== 'chunked' || chunkCount <= 0) {
+      resetGenerationParts();
+      return;
+    }
+
+    if (generationPartsSummary) {
+      generationPartsSummary.textContent =
+        `Gerado em ${chunkCount} parte(s) do scan e consolidado em 1 arquivo .robot.` +
+        (result?.chunk_target_chars
+          ? ` (alvo por parte: ~${result.chunk_target_chars} caracteres)`
+          : '');
+    }
+
+    if (generationPartsList) {
+      generationPartsList.innerHTML = chunkParts
+        .map((part) => {
+          const keys = Array.isArray(part.keys) && part.keys.length ? part.keys.join(', ') : '-';
+          return `<li>Parte ${part.index}: ~${part.approx_chars || 0} chars | chaves: ${keys}</li>`;
+        })
+        .join('');
+    }
+
+    generationParts?.classList.remove('hidden');
+  }
+
   async function loadProjectsDropdown() {
     try {
       const projects = await getProjects();
@@ -166,9 +258,16 @@ export function initGeneratorPage({ store }) {
       ? `${feedbackText}\n\n--- CODIGO ROBOT FRAMEWORK ORIGINAL ---\n${originalContent}`
       : feedbackText;
 
-    const result = await generateTestFromPrompt({ projectId, prompt, context });
+    showGenerationStatus(1);
+    let result;
+    try {
+      result = await generateTestFromPrompt({ projectId, prompt, context });
+    } finally {
+      hideGenerationStatus();
+    }
 
     codeElement.textContent = result.content || '';
+    renderGenerationParts(result);
     resultSection.classList.remove('hidden');
     downloadButton.dataset.testId = String(result.id || '');
     projectSelect.value = String(projectId);
@@ -277,11 +376,13 @@ export function initGeneratorPage({ store }) {
     const context = contextInput.value;
 
     resultSection.classList.add('hidden');
+    resetGenerationParts();
 
     const state = store.getState();
     const selectedOption = projectSelect.options[projectSelect.selectedIndex];
     const hasCachedScan = !!selectedOption?.dataset?.cachedAt;
     const hasFreshScan = state.lastScanResult && state.activeProjectId === projectId;
+    const totalElements = Number(state.lastScanResult?.total_elements || 0);
 
     if (!hasFreshScan && !hasCachedScan) {
       toast('Execute o scan da página antes de gerar o teste.', 'error');
@@ -289,13 +390,16 @@ export function initGeneratorPage({ store }) {
     }
 
     try {
-      toast('Gerando teste... Aguarde.', 'info');
+      showGenerationStatus(estimateChunks(totalElements));
       const result = await generateTestFromPrompt({ projectId, prompt, context, forceRescan });
+      hideGenerationStatus();
       codeElement.textContent = result.content || '';
+      renderGenerationParts(result);
       resultSection.classList.remove('hidden');
       downloadButton.dataset.testId = String(result.id || '');
       toast('Teste gerado com sucesso!');
     } catch (error) {
+      hideGenerationStatus();
       toast(error.message, 'error');
     }
   });

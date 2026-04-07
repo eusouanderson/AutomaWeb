@@ -4,7 +4,7 @@ vi.mock('../../../services/test.service.js', () => ({
   getProjects: vi.fn(),
   generateTestFromPrompt: vi.fn(),
   getProjectGeneratedTests: vi.fn().mockResolvedValue([]),
-  getTestContent: vi.fn().mockResolvedValue(null)
+  getTestContent: vi.fn().mockResolvedValue(null),
 }));
 vi.mock('../../../services/scan.service.js', () => ({ runProjectScan: vi.fn() }));
 vi.mock('../../../components/toast.js', () => ({ toast: vi.fn() }));
@@ -20,7 +20,7 @@ import {
   generateTestFromPrompt,
   getProjectGeneratedTests,
   getProjects,
-  getTestContent
+  getTestContent,
 } from '../../../services/test.service.js';
 import { initGeneratorPage, mount } from '../generator.page.js';
 
@@ -36,6 +36,7 @@ function buildDOM() {
       <div id="gen-scan-cache-notice" class="hidden"><span id="gen-scan-cache-date"></span></div>
       <button id="gen-rescan-btn">Refazer scan</button>
       <button id="scan-page-btn">Scan</button>
+      <button id="generate-submit-btn" type="submit">Gerar Teste</button>
       <button id="copy-test-btn">Copy</button>
       <button id="download-test-btn" data-test-id="">Download</button>
     </form>
@@ -47,7 +48,19 @@ function buildDOM() {
     <span id="scan-title">-</span>
     <span id="scan-total">0</span>
     <span id="scan-types">-</span>
+    <div id="generation-status" class="hidden">
+      <span class="generation-status-spinner"></span>
+      <div class="generation-status-body">
+        <span id="generation-status-label"></span>
+        <span id="generation-status-detail"></span>
+      </div>
+      <span id="generation-status-timer">0s</span>
+    </div>
     <div id="generated-result" class="hidden"></div>
+    <div id="generation-parts" class="hidden">
+      <p id="generation-parts-summary"></p>
+      <ul id="generation-parts-list"></ul>
+    </div>
     <code id="test-code"></code>
   `;
 }
@@ -58,7 +71,7 @@ function makeStore(extra = {}) {
     getState: () => s,
     setState: (p) => {
       s = { ...s, ...p };
-    }
+    },
   };
 }
 
@@ -126,6 +139,16 @@ describe('generator page (legacy) – initGeneratorPage', () => {
     expect(toast).toHaveBeenCalledWith('API down', 'error');
   });
 
+  it('selects active project from store when loading projects dropdown', async () => {
+    getProjects.mockResolvedValue([
+      { id: 1, name: 'Proj A', url: 'https://a.com' },
+      { id: 2, name: 'Proj B', url: 'https://b.com' },
+    ]);
+    const page = initGeneratorPage({ store: makeStore({ activeProjectId: 2 }) });
+    await page.loadProjectsDropdown();
+    expect(document.getElementById('test-project').value).toBe('2');
+  });
+
   // ── generateFromExecutionFeedback ─────────────────────────────────────────
 
   it('fills code element and shows result after generateFromExecutionFeedback', async () => {
@@ -182,6 +205,54 @@ describe('generator page (legacy) – initGeneratorPage', () => {
       expect(document.getElementById('generated-result').classList.contains('hidden')).toBe(false)
     );
     expect(document.getElementById('test-code').textContent).toBe('*** Test ***');
+  });
+
+  it('renders chunk parts summary when API returns chunk metadata', async () => {
+    generateTestFromPrompt.mockResolvedValue({
+      id: 11,
+      content: '*** Test ***',
+      generation_strategy: 'chunked',
+      chunk_count: 2,
+      chunk_target_chars: 1200,
+      chunk_parts: [
+        { index: 1, approx_chars: 900, keys: ['title', 'buttons'] },
+        { index: 2, approx_chars: 850, keys: ['forms'] },
+      ],
+    });
+    const store = makeStore({ lastScanResult: { title: 'x' }, activeProjectId: 1 });
+    initGeneratorPage({ store });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('generate-test-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+
+    await vi.waitFor(() =>
+      expect(document.getElementById('generation-parts').classList.contains('hidden')).toBe(false)
+    );
+    expect(document.getElementById('generation-parts-summary').textContent).toContain(
+      'consolidado em 1 arquivo .robot'
+    );
+    expect(document.getElementById('generation-parts-list').textContent).toContain('Parte 1');
+    expect(document.getElementById('generation-parts-list').textContent).toContain(
+      'title, buttons'
+    );
+  });
+
+  it('hides chunk parts summary for non-chunked generation', async () => {
+    generateTestFromPrompt.mockResolvedValue({
+      id: 12,
+      content: '*** Test ***',
+      generation_strategy: 'single',
+    });
+    const store = makeStore({ lastScanResult: { title: 'x' }, activeProjectId: 1 });
+    initGeneratorPage({ store });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('generate-test-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+
+    await vi.waitFor(() => expect(generateTestFromPrompt).toHaveBeenCalledTimes(1));
+    expect(document.getElementById('generation-parts').classList.contains('hidden')).toBe(true);
   });
 
   it('toasts error when generate fails on submit', async () => {
@@ -488,5 +559,124 @@ describe('generator page (legacy) – initGeneratorPage', () => {
     await page.generateFromExecutionFeedback(1, 'feedback text', []);
     expect(getProjectGeneratedTests).toHaveBeenCalledWith(1);
     expect(getTestContent).toHaveBeenCalledWith(7);
+  });
+
+  // ── generation status panel ────────────────────────────────────────────────
+
+  it('shows generation-status panel and disables submit button while generating', async () => {
+    let resolveGenerate;
+    generateTestFromPrompt.mockImplementation(
+      () =>
+        new Promise((res) => {
+          resolveGenerate = res;
+        })
+    );
+    const store = makeStore({
+      lastScanResult: { title: 'x', total_elements: 50 },
+      activeProjectId: 1,
+    });
+    initGeneratorPage({ store });
+    document.getElementById('test-project').value = '1';
+    document.getElementById('test-prompt').value = 'Teste login';
+    document
+      .getElementById('generate-test-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+
+    await vi.waitFor(() =>
+      expect(document.getElementById('generation-status').classList.contains('hidden')).toBe(false)
+    );
+    expect(document.getElementById('generate-submit-btn').disabled).toBe(true);
+    expect(document.getElementById('generate-submit-btn').textContent).toBe('Gerando...');
+
+    resolveGenerate({ id: 99, content: '*** Test Cases ***' });
+    await vi.waitFor(() =>
+      expect(document.getElementById('generation-status').classList.contains('hidden')).toBe(true)
+    );
+    expect(document.getElementById('generate-submit-btn').disabled).toBe(false);
+    expect(document.getElementById('generate-submit-btn').textContent).toBe('Gerar Teste');
+  });
+
+  it('hides generation-status panel and re-enables button on generation error', async () => {
+    generateTestFromPrompt.mockRejectedValue(new Error('LLM error'));
+    const store = makeStore({ lastScanResult: { title: 'x' }, activeProjectId: 1 });
+    initGeneratorPage({ store });
+    document.getElementById('test-project').value = '1';
+    document.getElementById('test-prompt').value = 'Teste';
+    document
+      .getElementById('generate-test-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+
+    await vi.waitFor(() =>
+      expect(document.getElementById('generation-status').classList.contains('hidden')).toBe(true)
+    );
+    expect(document.getElementById('generate-submit-btn').disabled).toBe(false);
+    expect(toast).toHaveBeenCalledWith('LLM error', 'error');
+  });
+
+  it('shows multi-part estimate in detail when element count is high', async () => {
+    let resolveGenerate;
+    generateTestFromPrompt.mockImplementation(
+      () =>
+        new Promise((res) => {
+          resolveGenerate = res;
+        })
+    );
+    // 96 elements → estimateChunks = ceil(96/48) = 2
+    const store = makeStore({
+      lastScanResult: { title: 'x', total_elements: 96 },
+      activeProjectId: 1,
+    });
+    initGeneratorPage({ store });
+    document.getElementById('test-project').value = '1';
+    document.getElementById('test-prompt').value = 'Teste';
+    document
+      .getElementById('generate-test-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+
+    await vi.waitFor(() =>
+      expect(document.getElementById('generation-status').classList.contains('hidden')).toBe(false)
+    );
+    expect(document.getElementById('generation-status-detail').textContent).toContain(
+      'parte(s) a enviar'
+    );
+    resolveGenerate({ id: 100, content: '' });
+  });
+
+  it('updates generation status detail after 30 seconds elapsed', async () => {
+    vi.useFakeTimers();
+    let resolveGenerate;
+    generateTestFromPrompt.mockImplementation(
+      () =>
+        new Promise((res) => {
+          resolveGenerate = res;
+        })
+    );
+
+    const store = makeStore({
+      lastScanResult: { title: 'x', total_elements: 10 },
+      activeProjectId: 1,
+    });
+    initGeneratorPage({ store });
+    document.getElementById('test-project').value = '1';
+    document.getElementById('test-prompt').value = 'Teste';
+    document
+      .getElementById('generate-test-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+
+    await vi.waitFor(() =>
+      expect(document.getElementById('generation-status').classList.contains('hidden')).toBe(false)
+    );
+
+    vi.advanceTimersByTime(30000);
+    expect(document.getElementById('generation-status-timer').textContent).toBe('30s');
+    expect(document.getElementById('generation-status-detail').textContent).toContain(
+      'Aguardando resposta do LLM'
+    );
+
+    resolveGenerate({ id: 101, content: 'ok' });
+    await vi.waitFor(() =>
+      expect(document.getElementById('generation-status').classList.contains('hidden')).toBe(true)
+    );
+    vi.useRealTimers();
   });
 });

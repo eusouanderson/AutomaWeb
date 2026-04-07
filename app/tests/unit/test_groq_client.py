@@ -188,8 +188,12 @@ def test_groq_client_generate_with_context_in_user_message():
 
     assert result == "Generated test code"
     messages = client._client.chat.completions.create.call_args.kwargs["messages"]
-    assert "Contexto:\nsome context" in messages[1]["content"]
-    assert "Prompt:\nmy prompt" in messages[1]["content"]
+    assert "What (o quê):" in messages[1]["content"]
+    assert "Why (por que):" in messages[1]["content"]
+    assert "Where (onde):" in messages[1]["content"]
+    assert "How (como):" in messages[1]["content"]
+    assert "some context" in messages[1]["content"]
+    assert "my prompt" in messages[1]["content"]
 
 
 def test_regenerate_robot_step_returns_first_line():
@@ -362,6 +366,25 @@ def test_check_api_health_uses_fallback_cache_on_failure():
     assert "network down" in str(second["error"])
 
 
+def test_check_api_health_returns_not_ok_when_live_fails_without_recent_success():
+    from unittest.mock import MagicMock, patch
+    from app.core.config import Settings
+    from app.llm.groq_client import GroqClient
+
+    settings_obj = Settings(GROQ_API_KEY="test_key", LLM_HEALTH_FALLBACK_WINDOW_SECONDS=300)
+    with patch("app.llm.groq_client.settings", settings_obj):
+        client = GroqClient()
+
+    client._client.chat.completions.create = MagicMock(side_effect=RuntimeError("health down"))
+
+    result = client.check_api_health()
+
+    assert result["ok"] is False
+    assert result["source"] == "live"
+    assert result["last_success_epoch"] is None
+    assert "health down" in str(result["error"])
+
+
 def test_generate_robot_test_retries_once_with_compact_payload_on_413():
     from unittest.mock import MagicMock, patch
     from app.core.config import Settings
@@ -397,6 +420,7 @@ def test_generate_robot_test_retries_once_with_compact_payload_on_413():
     first_messages = client._client.chat.completions.create.call_args_list[0].kwargs["messages"]
     second_messages = client._client.chat.completions.create.call_args_list[1].kwargs["messages"]
     assert len(second_messages[1]["content"]) < len(first_messages[1]["content"])
+    assert "Where (onde):" in second_messages[1]["content"]
     assert "Contexto reduzido automaticamente" in second_messages[1]["content"]
 
 
@@ -420,6 +444,36 @@ def test_generate_robot_test_raises_payload_too_large_after_compact_fallback():
             context="Contexto" * 3000,
             page_structure={"items": ["x" * 5000 for _ in range(10)]},
         )
+
+
+def test_generate_robot_test_reraises_non_413_error_from_compact_fallback():
+    from unittest.mock import patch
+    from app.core.config import Settings
+    from app.llm.groq_client import GroqClient
+
+    class _PayloadTooLargeError(Exception):
+        status_code = 413
+
+    class _CompactFallbackError(Exception):
+        pass
+
+    settings_obj = Settings(GROQ_API_KEY="test_key")
+    with patch("app.llm.groq_client.settings", settings_obj):
+        client = GroqClient()
+
+    # Bypass tenacity retry wrapper to assert the direct branch behavior.
+    with patch.object(
+        client,
+        "_chat_completion",
+        side_effect=[_PayloadTooLargeError("413"), _CompactFallbackError("boom")],
+    ):
+        with pytest.raises(_CompactFallbackError, match="boom"):
+            GroqClient.generate_robot_test.__wrapped__(
+                client,
+                "Prompt",
+                context="ctx",
+                page_structure={"k": "v"},
+            )
 
 
 # --- Cobertura extra: exceção inesperada em generate_robot_test ---

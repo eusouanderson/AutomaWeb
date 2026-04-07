@@ -18,5 +18,6 @@ class ProjectOut(BaseModel):
     description: str | None
     url: str | None
     test_directory: str | None
+    test_count: int = 0
     scan_cached_at: datetime | None = None
     created_at: datetime

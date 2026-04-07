@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../services/test.service.js', () => ({
   getProjects: vi.fn(),
-  getProjectExecutions: vi.fn()
+  getProjectExecutions: vi.fn(),
 }));
 vi.mock('../../../components/toast.js', () => ({ toast: vi.fn() }));
 vi.mock('../../../utils/helpers.js', () => ({
   escapeHtml: (v) => String(v ?? ''),
-  formatDate: (v) => (v ? String(v) : '-')
+  formatDate: (v) => (v ? String(v) : '-'),
 }));
 
 vi.mock('../../../utils/dom.js', async () => {
@@ -34,7 +34,7 @@ function makeStore(state = {}) {
     getState: () => s,
     setState: (p) => {
       s = { ...s, ...p };
-    }
+    },
   };
 }
 
@@ -83,6 +83,28 @@ describe('reports page – initReportsPage', () => {
     expect(document.getElementById('reports-list').textContent).toContain('Selecione um projeto');
   });
 
+  it('auto-loads executions when store has active project id', async () => {
+    getProjectExecutions.mockResolvedValue([
+      {
+        id: 20,
+        status: 'completed',
+        total_tests: 1,
+        passed: 1,
+        failed: 0,
+        skipped: 0,
+        created_at: '2024',
+      },
+    ]);
+    const page = initReportsPage({
+      store: makeStore({ projects: [{ id: 4, name: 'Auto' }], activeProjectId: 4 }),
+    });
+
+    await page.loadReportsProjects();
+
+    expect(document.getElementById('reports-project').value).toBe('4');
+    expect(getProjectExecutions).toHaveBeenCalledWith(4);
+  });
+
   it('toasts error when loadReportsProjects fails', async () => {
     getProjects.mockRejectedValue(new Error('Fetch fail'));
     const page = initReportsPage({ store: makeStore() });
@@ -101,8 +123,8 @@ describe('reports page – initReportsPage', () => {
         passed: 2,
         failed: 0,
         skipped: 0,
-        created_at: '2024'
-      }
+        created_at: '2024',
+      },
     ]);
     initReportsPage({ store: makeStore() });
 
@@ -135,8 +157,8 @@ describe('reports page – initReportsPage', () => {
         passed: 4,
         failed: 1,
         skipped: 0,
-        created_at: '2024'
-      }
+        created_at: '2024',
+      },
     ]);
     initReportsPage({ store: makeStore() });
     const select = document.getElementById('reports-project');
@@ -195,8 +217,8 @@ describe('reports page – initReportsPage', () => {
         created_at: '2024',
         mkdocs_index: '/reports/1/index.html',
         report_file: null,
-        log_file: null
-      }
+        log_file: null,
+      },
     ]);
     initReportsPage({ store: makeStore() });
     const select = document.getElementById('reports-project');
@@ -225,8 +247,8 @@ describe('reports page – initReportsPage', () => {
         created_at: '2024',
         mkdocs_index: null,
         report_file: '/reports/2/report.html',
-        log_file: '/reports/2/log.html'
-      }
+        log_file: '/reports/2/log.html',
+      },
     ]);
     initReportsPage({ store: makeStore() });
     const select = document.getElementById('reports-project');
@@ -259,8 +281,8 @@ describe('reports page – initReportsPage', () => {
         error_output: 'Robot error: something went wrong',
         mkdocs_index: null,
         report_file: null,
-        log_file: null
-      }
+        log_file: null,
+      },
     ]);
     initReportsPage({ store: makeStore() });
     const select = document.getElementById('reports-project');
@@ -291,8 +313,8 @@ describe('reports page – initReportsPage', () => {
         error_output: null,
         mkdocs_index: null,
         report_file: null,
-        log_file: null
-      }
+        log_file: null,
+      },
     ]);
     initReportsPage({ store: makeStore() });
     const select = document.getElementById('reports-project');
@@ -321,8 +343,8 @@ describe('reports page – initReportsPage', () => {
         error_output: null,
         mkdocs_index: null,
         report_file: null,
-        log_file: null
-      }
+        log_file: null,
+      },
     ]);
     initReportsPage({ store: makeStore() });
     const select = document.getElementById('reports-project');

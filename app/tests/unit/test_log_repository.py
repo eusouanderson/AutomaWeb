@@ -7,13 +7,13 @@ from app.repositories.log_repository import LogRepository
 
 
 @pytest_asyncio.fixture()
-async def session() -> AsyncSession:
+async def session() -> AsyncSession: # type: ignore[arg-type]
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     async_session = async_sessionmaker(engine, expire_on_commit=False)
     async with async_session() as session:
-        yield session
+        yield session # type: ignore[arg-type]
 
 
 async def test_create_log(session: AsyncSession) -> None:

@@ -5,12 +5,12 @@ vi.mock('../../../services/test.service.js', () => ({
   getProjects: vi.fn(),
   getProjectGeneratedTests: vi.fn(),
   executeProjectTests: vi.fn(),
-  deleteGeneratedTestService: vi.fn()
+  deleteGeneratedTestService: vi.fn(),
 }));
 
 vi.mock('../../../components/toast.js', () => ({ toast: vi.fn() }));
 vi.mock('../../../utils/helpers.js', () => ({
-  formatDate: vi.fn((v) => (v ? String(v) : '-'))
+  formatDate: vi.fn((v) => (v ? String(v) : '-')),
 }));
 
 vi.mock('../../../utils/dom.js', async () => {
@@ -24,7 +24,7 @@ import {
   deleteGeneratedTestService,
   executeProjectTests,
   getProjectGeneratedTests,
-  getProjects
+  getProjects,
 } from '../../../services/test.service.js';
 import { initScannerPage, mount } from '../scanner.page.js';
 
@@ -61,7 +61,19 @@ function buildDOM() {
     <button id="exec-select-all"></button>
     <button id="exec-deselect-all"></button>
     <input type="checkbox" id="exec-headless" checked />
+    <input type="number" id="exec-timeout" value="300" />
+    <input type="number" id="exec-speed" value="0" />
   `;
+}
+
+function makeStore(initial = {}) {
+  let state = { projects: [], activeProjectId: null, ...initial };
+  return {
+    getState: vi.fn(() => state),
+    setState: vi.fn((partial) => {
+      state = { ...state, ...partial };
+    }),
+  };
 }
 
 // ── tests ─────────────────────────────────────────────────────────────────────
@@ -103,6 +115,24 @@ describe('scanner page – initScannerPage', () => {
     expect(texts).toContain('Proj A');
   });
 
+  it('loadTestsProjects prioritizes activeProjectId from store', async () => {
+    const store = makeStore({ activeProjectId: 2 });
+    getProjects.mockResolvedValue([
+      { id: 1, name: 'Proj A' },
+      { id: 2, name: 'Proj B' },
+    ]);
+    getProjectGeneratedTests.mockResolvedValue([
+      { id: 21, file_path: 'tests/b.robot', created_at: '2024' },
+    ]);
+
+    const { loadTestsProjects } = initScannerPage({ store, onRecreateRequested: vi.fn() });
+    await loadTestsProjects();
+
+    expect(document.getElementById('tests-project').value).toBe('2');
+    expect(getProjectGeneratedTests).toHaveBeenCalledWith(2);
+    expect(store.setState).toHaveBeenCalledWith({ activeProjectId: 2 });
+  });
+
   it('loads projects into execute-project select', async () => {
     getProjects.mockResolvedValue([{ id: 2, name: 'Proj B', test_directory: 'tests/' }]);
     getProjectGeneratedTests.mockResolvedValue([]);
@@ -115,10 +145,22 @@ describe('scanner page – initScannerPage', () => {
     expect(texts.some((t) => t.includes('Proj B'))).toBe(true);
   });
 
+  it('loadExecuteProjects auto-loads tests for active project in store', async () => {
+    const store = makeStore({ activeProjectId: 3 });
+    getProjects.mockResolvedValue([{ id: 3, name: 'Proj C', test_directory: 'tests/' }]);
+    getProjectGeneratedTests.mockResolvedValue([{ id: 30, file_path: 'tests/c.robot' }]);
+
+    const { loadExecuteProjects } = initScannerPage({ store, onRecreateRequested: vi.fn() });
+    await loadExecuteProjects();
+
+    expect(document.getElementById('execute-project').value).toBe('3');
+    expect(getProjectGeneratedTests).toHaveBeenCalledWith(3);
+  });
+
   it('shows test list items after loadTestsProjects', async () => {
     getProjects.mockResolvedValue([{ id: 1, name: 'MyProj' }]);
     getProjectGeneratedTests.mockResolvedValue([
-      { id: 10, file_path: 'tests/login.robot', created_at: '2024-01-01' }
+      { id: 10, file_path: 'tests/login.robot', created_at: '2024-01-01' },
     ]);
 
     const { loadTestsProjects } = initScannerPage({ onRecreateRequested: vi.fn() });
@@ -135,7 +177,7 @@ describe('scanner page – initScannerPage', () => {
       passed: 1,
       failed: 0,
       skipped: 0,
-      error_output: null
+      error_output: null,
     });
 
     const { loadExecuteProjects } = initScannerPage({ onRecreateRequested: vi.fn() });
@@ -147,6 +189,11 @@ describe('scanner page – initScannerPage', () => {
       .dispatchEvent(new Event('submit', { bubbles: true }));
 
     await vi.waitFor(() => expect(executeProjectTests).toHaveBeenCalledTimes(1));
+    expect(executeProjectTests).toHaveBeenCalledWith(1, [], {
+      headless: true,
+      timeoutSeconds: 300,
+      speedMs: 0,
+    });
   });
 
   it('displays stat values after successful execution', async () => {
@@ -157,7 +204,7 @@ describe('scanner page – initScannerPage', () => {
       passed: 2,
       failed: 1,
       skipped: 0,
-      error_output: null
+      error_output: null,
     });
 
     const { loadExecuteProjects } = initScannerPage({ onRecreateRequested: vi.fn() });
@@ -270,7 +317,7 @@ describe('scanner page – initScannerPage', () => {
 
     // Populate a test so the list renders
     getProjectGeneratedTests.mockResolvedValue([
-      { id: 5, file_path: 'tests/login.robot', created_at: '2024-01-01' }
+      { id: 5, file_path: 'tests/login.robot', created_at: '2024-01-01' },
     ]);
 
     const select = document.getElementById('execute-project');
@@ -319,7 +366,7 @@ describe('scanner page – initScannerPage', () => {
       expect(onRecreate).toHaveBeenCalledWith({
         projectId: 7,
         feedback: 'Fix the login test',
-        testIds: expect.any(Array)
+        testIds: expect.any(Array),
       })
     );
   });
@@ -352,7 +399,7 @@ describe('scanner page – initScannerPage', () => {
 
     getProjects.mockResolvedValue([{ id: 1, name: 'Proj' }]);
     getProjectGeneratedTests.mockResolvedValue([
-      { id: 5, file_path: 'tests/login.robot', created_at: '2024-01-01' }
+      { id: 5, file_path: 'tests/login.robot', created_at: '2024-01-01' },
     ]);
 
     const { loadTestsProjects } = initScannerPage({ onRecreateRequested: vi.fn() });
@@ -382,7 +429,7 @@ describe('scanner page – initScannerPage', () => {
 
     getProjects.mockResolvedValue([{ id: 1, name: 'Proj' }]);
     getProjectGeneratedTests.mockResolvedValue([
-      { id: 5, file_path: 'tests/login.robot', created_at: '2024-01-01' }
+      { id: 5, file_path: 'tests/login.robot', created_at: '2024-01-01' },
     ]);
     const { loadTestsProjects } = initScannerPage({ onRecreateRequested: vi.fn() });
     await loadTestsProjects();
@@ -400,7 +447,7 @@ describe('scanner page – initScannerPage', () => {
 
     getProjects.mockResolvedValue([{ id: 1, name: 'Proj' }]);
     getProjectGeneratedTests.mockResolvedValue([
-      { id: 5, file_path: 'tests/login.robot', created_at: '2024-01-01' }
+      { id: 5, file_path: 'tests/login.robot', created_at: '2024-01-01' },
     ]);
     deleteGeneratedTestService.mockResolvedValue(undefined);
 
@@ -422,7 +469,7 @@ describe('scanner page – initScannerPage', () => {
 
     getProjects.mockResolvedValue([{ id: 1, name: 'Proj' }]);
     getProjectGeneratedTests.mockResolvedValue([
-      { id: 5, file_path: 'tests/login.robot', created_at: '2024-01-01' }
+      { id: 5, file_path: 'tests/login.robot', created_at: '2024-01-01' },
     ]);
     deleteGeneratedTestService.mockRejectedValue(new Error('Delete failed'));
 
@@ -445,7 +492,7 @@ describe('scanner page – initScannerPage', () => {
     await loadTestsProjects();
 
     getProjectGeneratedTests.mockResolvedValue([
-      { id: 7, file_path: 'tests/new.robot', created_at: '2024-01-01' }
+      { id: 7, file_path: 'tests/new.robot', created_at: '2024-01-01' },
     ]);
 
     const select = document.getElementById('tests-project');
@@ -455,6 +502,18 @@ describe('scanner page – initScannerPage', () => {
     await vi.waitFor(() =>
       expect(document.getElementById('tests-list').textContent).toContain('tests/new.robot')
     );
+  });
+
+  it('testsProjectSelect change stores activeProjectId when store is provided', async () => {
+    const store = makeStore();
+    initScannerPage({ store, onRecreateRequested: vi.fn() });
+
+    const select = document.getElementById('tests-project');
+    select.innerHTML = '<option value="2">Proj 2</option>';
+    select.value = '2';
+    select.dispatchEvent(new Event('change'));
+
+    await vi.waitFor(() => expect(store.setState).toHaveBeenCalledWith({ activeProjectId: 2 }));
   });
 
   // ── loadExecuteTests error ────────────────────────────────────────────────
@@ -532,8 +591,8 @@ describe('scanner page – initScannerPage', () => {
       test_cases: [
         { name: 'Test Pass', status: 'PASS', message: null },
         { name: 'Test Fail', status: 'FAIL', message: 'Something broke' },
-        { name: 'Test Skip', status: 'SKIP', message: '' }
-      ]
+        { name: 'Test Skip', status: 'SKIP', message: '' },
+      ],
     });
 
     const { loadExecuteProjects } = initScannerPage({ onRecreateRequested: vi.fn() });
@@ -566,7 +625,7 @@ describe('scanner page – initScannerPage', () => {
       failed: 0,
       skipped: 0,
       error_output: null,
-      test_cases: []
+      test_cases: [],
     });
 
     const { loadExecuteProjects } = initScannerPage({ onRecreateRequested: vi.fn() });
@@ -593,7 +652,7 @@ describe('scanner page – initScannerPage', () => {
       failed: 1,
       skipped: 0,
       error_output: 'Robot execution error details',
-      test_cases: []
+      test_cases: [],
     });
 
     const { loadExecuteProjects } = initScannerPage({ onRecreateRequested: vi.fn() });
@@ -612,6 +671,20 @@ describe('scanner page – initScannerPage', () => {
     });
   });
 
+  it('executeProjectSelect change stores activeProjectId when store is provided', async () => {
+    const store = makeStore();
+    getProjects.mockResolvedValue([{ id: 1, name: 'Proj' }]);
+    getProjectGeneratedTests.mockResolvedValue([]);
+
+    const { loadExecuteProjects } = initScannerPage({ store, onRecreateRequested: vi.fn() });
+    await loadExecuteProjects();
+
+    const select = document.getElementById('execute-project');
+    select.value = '1';
+    select.dispatchEvent(new Event('change'));
+
+    await vi.waitFor(() => expect(store.setState).toHaveBeenCalledWith({ activeProjectId: 1 }));
+  });
   // ── phase timeout callbacks ───────────────────────────────────────────────
 
   it('activates heal and run phases via setTimeout callbacks', async () => {
@@ -631,7 +704,7 @@ describe('scanner page – initScannerPage', () => {
               failed: 0,
               skipped: 0,
               error_output: null,
-              test_cases: []
+              test_cases: [],
             });
         })
     );
@@ -759,7 +832,7 @@ describe('scanner page – initScannerPage', () => {
       failed: 0,
       skipped: 0,
       error_output: '\n   \n   \n', // truthy but all lines are blank/whitespace
-      test_cases: []
+      test_cases: [],
     });
 
     const { loadExecuteProjects } = initScannerPage({ onRecreateRequested: vi.fn() });
@@ -785,7 +858,7 @@ describe('scanner page – initScannerPage', () => {
       passed: 0,
       failed: 0,
       skipped: 0,
-      error_output: null
+      error_output: null,
     });
 
     const { loadExecuteProjects } = initScannerPage({ onRecreateRequested: vi.fn() });
@@ -797,8 +870,12 @@ describe('scanner page – initScannerPage', () => {
       .dispatchEvent(new Event('submit', { bubbles: true }));
 
     await vi.waitFor(() => expect(executeProjectTests).toHaveBeenCalledTimes(1));
-    // Third arg: getHeadless() fallback returns true when element is absent
-    expect(executeProjectTests.mock.calls[0][2]).toBe(true);
+    // Third arg: options object with getHeadless() fallback and default timeout/speed.
+    expect(executeProjectTests.mock.calls[0][2]).toEqual({
+      headless: true,
+      timeoutSeconds: 300,
+      speedMs: 0,
+    });
   });
 
   // ── getSelectedTestIds: ?. false branch when execute-test-list-check absent (line 88) ──
@@ -811,7 +888,7 @@ describe('scanner page – initScannerPage', () => {
       passed: 0,
       failed: 0,
       skipped: 0,
-      error_output: null
+      error_output: null,
     });
 
     const { loadExecuteProjects } = initScannerPage({ onRecreateRequested: vi.fn() });
@@ -864,7 +941,7 @@ describe('scanner page – initScannerPage', () => {
               failed: 0,
               skipped: 0,
               error_output: null,
-              test_cases: []
+              test_cases: [],
             });
         })
     );
@@ -906,7 +983,7 @@ describe('scanner page – initScannerPage', () => {
       failed: 0,
       skipped: 1,
       error_output: null,
-      test_cases: [{ name: 'Unknown Status', status: null, message: null }]
+      test_cases: [{ name: 'Unknown Status', status: null, message: null }],
     });
 
     const { loadExecuteProjects } = initScannerPage({ onRecreateRequested: vi.fn() });
@@ -963,7 +1040,7 @@ describe('scanner page – initScannerPage', () => {
       failed: 1,
       skipped: 0,
       error_output: null,
-      test_cases: [{ name: 'Null Status Test', status: null, message: 'err' }]
+      test_cases: [{ name: 'Null Status Test', status: null, message: 'err' }],
     });
 
     const { loadExecuteProjects } = initScannerPage({ onRecreateRequested: vi.fn() });
@@ -990,7 +1067,7 @@ describe('scanner page – initScannerPage', () => {
       failed: 1,
       skipped: 0,
       error_output: null,
-      test_cases: [{ name: 'No Message Test', status: 'FAIL', message: null }]
+      test_cases: [{ name: 'No Message Test', status: 'FAIL', message: null }],
     });
 
     const { loadExecuteProjects } = initScannerPage({ onRecreateRequested: vi.fn() });

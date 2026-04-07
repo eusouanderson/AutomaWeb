@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../client.js', () => ({
   request: vi.fn(),
-  streamPost: vi.fn()
+  streamPost: vi.fn(),
 }));
 
 import {
@@ -17,7 +17,7 @@ import {
   listProjects,
   runTests,
   saveRobotTestContent,
-  scanProject
+  scanProject,
 } from '../automaweb.api.js';
 import { request, streamPost } from '../client.js';
 
@@ -70,7 +70,7 @@ describe('automaweb.api', () => {
       method: 'POST',
       url: '/executions/run',
       data: payload,
-      timeout: 600000
+      timeout: 600000,
     });
   });
 
@@ -90,13 +90,23 @@ describe('automaweb.api', () => {
     );
   });
 
+  it('delegates scanProject with null project_id when projectId is undefined', async () => {
+    const onMessage = vi.fn();
+    await scanProject('https://example.com', undefined, onMessage);
+    expect(streamPost).toHaveBeenCalledWith(
+      '/scan',
+      { url: 'https://example.com', project_id: null },
+      onMessage
+    );
+  });
+
   it('delegates improveRobotTest to request()', async () => {
     request.mockResolvedValueOnce({ content: '*** Test Cases ***' });
     await improveRobotTest(7, '*** Test Cases ***\nOld');
     expect(request).toHaveBeenCalledWith({
       method: 'POST',
       url: '/tests/7/improve',
-      data: { content: '*** Test Cases ***\nOld' }
+      data: { content: '*** Test Cases ***\nOld' },
     });
   });
 
@@ -106,7 +116,7 @@ describe('automaweb.api', () => {
     expect(request).toHaveBeenCalledWith({
       method: 'PUT',
       url: '/tests/3/content',
-      data: { content: '*** Test Cases ***\nEdited' }
+      data: { content: '*** Test Cases ***\nEdited' },
     });
   });
 

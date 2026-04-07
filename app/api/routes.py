@@ -12,7 +12,7 @@ from pathlib import Path
 from app.api.deps import get_db
 from app.ai_validation.metrics import AIMetricsRegistry
 from app.repositories.project_repository import ProjectRepository
-from app.schemas.generated_test import GeneratedTestOut, GeneratedTestSummaryOut
+from app.schemas.generated_test import GeneratedChunkPartOut, GeneratedTestOut, GeneratedTestSummaryOut
 from app.schemas.project import ProjectCreate, ProjectOut
 from app.schemas.scan import ScanRequest
 from app.schemas.test_execution import TestExecutionRequest, TestExecutionResult
@@ -46,8 +46,11 @@ async def create_project(payload: ProjectCreate, session: AsyncSession = Depends
 @router.get("/projects", response_model=list[ProjectOut])
 async def list_projects(session: AsyncSession = Depends(get_db)) -> list[ProjectOut]:
     service = ProjectService()
-    projects = await service.list_projects(session)
-    return [ProjectOut.model_validate(project) for project in projects]
+    projects_with_count = await service.list_projects_with_test_count(session)
+    return [
+        ProjectOut.model_validate(project).model_copy(update={"test_count": test_count})
+        for project, test_count in projects_with_count
+    ]
 
 
 @router.get("/projects/{project_id}/tests", response_model=list[GeneratedTestSummaryOut])
@@ -101,7 +104,18 @@ async def generate_test(payload: TestGenerateRequest, session: AsyncSession = De
             status_code=502,
             detail=f"Não foi possível escanear a página do projeto antes de gerar o teste: {exc}",
         ) from exc
-    return GeneratedTestOut.model_validate(generated)
+    response = GeneratedTestOut.model_validate(generated)
+    generation_meta = service.last_generation_metadata or {}
+    raw_parts = generation_meta.get("chunk_parts")
+    chunk_parts = [GeneratedChunkPartOut(**p) for p in raw_parts] if raw_parts else None
+    return response.model_copy(
+        update={
+            "generation_strategy": generation_meta.get("strategy"),
+            "chunk_target_chars": generation_meta.get("chunk_target_chars"),
+            "chunk_count": generation_meta.get("chunk_count"),
+            "chunk_parts": chunk_parts,
+        }
+    )
 
 
 @router.post("/scan")
@@ -192,6 +206,8 @@ async def execute_tests(payload: TestExecutionRequest, session: AsyncSession = D
             test_ids=payload.test_ids,
             ai_debug=payload.ai_debug,
             headless=payload.headless,
+            timeout_seconds=payload.timeout_seconds,
+            speed_ms=payload.speed_ms,
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

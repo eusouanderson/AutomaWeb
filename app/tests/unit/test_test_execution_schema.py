@@ -7,6 +7,8 @@ def test_test_execution_request_defaults() -> None:
     req = TestExecutionRequest(project_id=1)
     assert req.project_id == 1
     assert req.test_ids is None
+    assert req.timeout_seconds == 300
+    assert req.speed_ms == 0
 
 
 def test_test_execution_result_schema() -> None:

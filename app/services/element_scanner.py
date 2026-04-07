@@ -220,7 +220,7 @@ def _extract_form_contexts(tree: HTMLParser) -> list[dict]:
         if form_attrs.get("id"):
             form_sel = f'#{form_attrs["id"]}'
         elif form_attrs.get("class"):
-            form_sel = f'form.{form_attrs["class"].split()[0]}'
+            form_sel = f'form.{form_attrs["class"].split()[0]}'  # type: ignore[arg-type]
         else:
             form_sel = "form"
 
@@ -502,8 +502,8 @@ class ElementScannerService:
         async with cls._browser_lock:
             if cls._shared_browser is not None:
                 return cls._shared_browser
-
-            cls._shared_playwright = await async_playwright().start()
+ 
+            cls._shared_playwright = await async_playwright().start()  # type: ignore[arg-type]
             cls._shared_browser = await cls._shared_playwright.chromium.launch(headless=True)
             return cls._shared_browser
 
@@ -573,7 +573,7 @@ class ElementScannerService:
             title=title,
             total_elements=total_elements,
             summary=summary,
-            elements=raw_elements,
+            elements=raw_elements,  # type: ignore[arg-type]
             form_contexts=[FormContext(**fc) for fc in form_contexts],
         )
 

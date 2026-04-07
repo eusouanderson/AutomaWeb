@@ -31,6 +31,9 @@ class ProjectService:
     async def list_projects(self, session: AsyncSession) -> list[Project]:
         return await self._repository.list(session)
 
+    async def list_projects_with_test_count(self, session: AsyncSession) -> list[tuple[Project, int]]:
+        return await self._repository.list_with_test_count(session)  # type: ignore[arg-type]
+
     async def get_project(self, session: AsyncSession, project_id: int) -> Project | None:
         return await self._repository.get(session, project_id)
 

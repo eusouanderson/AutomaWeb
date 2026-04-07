@@ -2,18 +2,21 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.db.base import Base
+from app.models import generated_test, test_request  # noqa: F401
+from app.models.generated_test import GeneratedTest
 from app.models.project import Project
+from app.models.test_request import TestRequest
 from app.repositories.project_repository import ProjectRepository
 
 
 @pytest_asyncio.fixture()
-async def session() -> AsyncSession:
+async def session() -> AsyncSession: # type: ignore[arg-type]
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     async_session = async_sessionmaker(engine, expire_on_commit=False)
     async with async_session() as session:
-        yield session
+        yield session # type: ignore[arg-type]
 
 
 async def test_create_project(session: AsyncSession) -> None:
@@ -51,3 +54,22 @@ async def test_get_nonexistent_project(session: AsyncSession) -> None:
     repo = ProjectRepository()
     found = await repo.get(session, 9999)
     assert found is None
+
+
+async def test_list_projects_with_test_count(session: AsyncSession) -> None:
+    repo = ProjectRepository()
+    project = await repo.create(session, Project(name="Project With Tests", description="Desc"))
+
+    request = TestRequest(project_id=project.id, prompt="Generate test", context=None, status="done")
+    session.add(request)
+    await session.commit()
+    await session.refresh(request)
+
+    session.add(GeneratedTest(test_request_id=request.id, content="*** Test Cases ***", file_path="/tmp/test.robot"))
+    await session.commit()
+
+    projects = await repo.list_with_test_count(session)
+    assert len(projects) == 1
+    listed_project, test_count = projects[0]
+    assert listed_project.id == project.id
+    assert test_count == 1

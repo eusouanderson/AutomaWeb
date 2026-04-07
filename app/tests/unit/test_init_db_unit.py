@@ -115,7 +115,7 @@ async def test_init_db_runs_all_sync_steps() -> None:
         def begin(self):
             return FakeBeginCtx()
 
-    await init_db(FakeEngine())
+    await init_db(FakeEngine()) # type: ignore[arg-type]
 
     assert calls == [
         "create_all",

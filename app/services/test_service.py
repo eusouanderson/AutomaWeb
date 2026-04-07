@@ -44,6 +44,11 @@ class TestService:
         self._groq_client = groq_client or GroqClient()
         self._element_scanner = element_scanner or ElementScannerService()
         self._self_healing = AITestSelfHealingService()
+        self._last_generation_metadata: dict | None = None
+
+    @property
+    def last_generation_metadata(self) -> dict | None:
+        return self._last_generation_metadata
 
     def check_llm_health(self) -> dict[str, str | bool | int | None]:
         return self._groq_client.check_api_health()
@@ -57,6 +62,7 @@ class TestService:
         ai_debug: bool = False,
         force_rescan: bool = False,
     ) -> GeneratedTest:
+        self._last_generation_metadata = None
         project = await self._project_repository.get(session, project_id)
         if not project:
             raise ValueError("Project not found")
@@ -95,6 +101,12 @@ class TestService:
                 context=context,
                 page_structure=page_structure,
             )
+            self._last_generation_metadata = {
+                "strategy": "single",
+                "chunk_target_chars": settings.LLM_DOM_CHUNK_TARGET_CHARS,
+                "chunk_count": 1,
+                "chunk_parts": None,
+            }
         except RetryError as exc:
             test_request.status = "failed"
             await self._test_repository.update_test_request(session, test_request)
@@ -246,10 +258,11 @@ class TestService:
         generated = await self._test_repository.get_generated_test(session, test_id)
         if not generated:
             return None
-        sanitized = self._sanitize_robot_output(content)
+        # Keep editor content intact; save should not rewrite user-authored Robot syntax.
+        normalized = content.replace("\r\n", "\n")
         file_path = Path(generated.file_path)
-        file_path.write_text(sanitized, encoding="utf-8")
-        generated.content = sanitized
+        file_path.write_text(normalized, encoding="utf-8")
+        generated.content = normalized
         await session.flush()
         return generated
 
@@ -274,19 +287,63 @@ class TestService:
         return f"🧪_{safe}"
 
     def _generate_robot_test_chunked(self, prompt: str, context: str | None, page_structure: dict) -> str:
-        chunks = self._split_page_structure(page_structure)
-        if len(chunks) <= 1:
-            raise PayloadTooLargeError("Page structure cannot be split into smaller chunks")
+        base_target = max(200, settings.LLM_DOM_CHUNK_TARGET_CHARS)
+        target_candidates = [base_target, max(800, base_target // 2), max(400, base_target // 4)]
 
-        max_parts = max(1, settings.LLM_DOM_CHUNK_MAX_PARTS)
-        chunks = chunks[:max_parts]
+        # Preserve order and avoid duplicate retries with the same target size.
+        deduped_targets: list[int] = []
+        for target in target_candidates:
+            if target not in deduped_targets:
+                deduped_targets.append(target)
 
+        last_payload_error: PayloadTooLargeError | None = None
+        structure_candidates = [page_structure, self._compact_page_structure(page_structure)]
+
+        for structure_idx, candidate_structure in enumerate(structure_candidates):
+            for target_chars in deduped_targets:
+                chunks = self._split_page_structure(candidate_structure, target_chars=target_chars)
+                if len(chunks) <= 1:
+                    continue
+
+                max_parts = max(1, settings.LLM_DOM_CHUNK_MAX_PARTS)
+                chunks = chunks[:max_parts]
+
+                try:
+                    merged, chunk_parts_meta = self._generate_from_chunks(
+                        prompt=prompt,
+                        context=context,
+                        chunks=chunks,
+                    )
+                    self._last_generation_metadata = {
+                        "strategy": "chunked",
+                        "chunk_target_chars": target_chars,
+                        "chunk_count": len(chunk_parts_meta),
+                        "chunk_parts": chunk_parts_meta,
+                        "scan_compacted": bool(structure_idx == 1),
+                    }
+                    return merged
+                except PayloadTooLargeError as exc:
+                    last_payload_error = exc
+                    logger.warning(
+                        "Chunked generation still too large. Retrying with smaller chunks (target=%s, compacted=%s)",
+                        target_chars,
+                        bool(structure_idx == 1),
+                    )
+
+        if last_payload_error:
+            raise last_payload_error
+        raise PayloadTooLargeError("Page structure cannot be split into smaller chunks")
+
+    def _generate_from_chunks(self, prompt: str, context: str | None, chunks: list[dict]) -> tuple[str, list[dict]]:
         partial_outputs: list[str] = []
+        chunk_parts_meta: list[dict] = []
+
         for idx, chunk in enumerate(chunks, start=1):
             chunk_prompt = (
-                f"{prompt}\n\n"
-                f"[CHUNK {idx}/{len(chunks)}] Gere casos de teste APENAS com base neste subconjunto do DOM. "
-                "Evite duplicar test cases de chunks anteriores e mantenha nomes descritivos."
+                f"What (o quê):\n{prompt}\n\n"
+                "Why (por que):\nGerar cobertura incremental por partes para evitar limite de payload e manter o cenário solicitado.\n\n"
+                f"Where (onde):\nSubconjunto do DOM referente ao CHUNK {idx}/{len(chunks)}.\n\n"
+                "How (como):\nGerar casos APENAS com base neste chunk, sem duplicar casos de chunks anteriores e com nomes descritivos."
             )
             part = self._groq_client.generate_robot_test(
                 prompt=chunk_prompt,
@@ -294,14 +351,47 @@ class TestService:
                 page_structure=chunk,
             )
             partial_outputs.append(self._sanitize_robot_output(part, context=context))
+            chunk_parts_meta.append(
+                {
+                    "index": idx,
+                    "approx_chars": len(json.dumps(chunk, ensure_ascii=False, separators=(",", ":"))),
+                    "keys": sorted(str(key) for key in chunk.keys()),
+                }
+            )
 
         if not partial_outputs:
             raise PayloadTooLargeError("Chunked generation produced no output")
 
-        return self._merge_robot_parts(partial_outputs)
+        return self._merge_robot_parts(partial_outputs), chunk_parts_meta
 
-    def _split_page_structure(self, page_structure: dict) -> list[dict]:
-        target_chars = max(200, settings.LLM_DOM_CHUNK_TARGET_CHARS)
+    def _compact_page_structure(self, page_structure: dict) -> dict:
+        """Reduce heavy scan payload while preserving the most relevant keys for test generation."""
+        max_items_per_list = 30
+        max_string_chars = 220
+
+        def compact(value):
+            if isinstance(value, str):
+                return value[:max_string_chars]
+            if isinstance(value, list):
+                return [compact(item) for item in value[:max_items_per_list]]
+            if isinstance(value, dict):
+                compacted: dict = {}
+                for key, item in value.items():
+                    if isinstance(item, str):
+                        compacted[key] = item[:max_string_chars]
+                    elif isinstance(item, list):
+                        compacted[key] = [compact(entry) for entry in item[:max_items_per_list]]
+                    elif isinstance(item, dict):
+                        compacted[key] = compact(item)
+                    else:
+                        compacted[key] = item
+                return compacted
+            return value
+
+        return compact(page_structure)  # type: ignore[arg-type]
+
+    def _split_page_structure(self, page_structure: dict, target_chars: int | None = None) -> list[dict]:
+        target_chars = max(200, target_chars or settings.LLM_DOM_CHUNK_TARGET_CHARS)
         serialized = json.dumps(page_structure, ensure_ascii=False, separators=(",", ":"))
         if len(serialized) <= target_chars:
             return [page_structure]

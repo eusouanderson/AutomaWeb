@@ -32,6 +32,16 @@
       <input type="checkbox" id="exec-headless" checked />
       <span>Modo silencioso (sem abrir o navegador)</span>
     </label>
+
+    <div class="form-group">
+      <label for="exec-timeout">Timeout da execucao (segundos)</label>
+      <input id="exec-timeout" type="number" min="30" max="3600" step="1" value="300" />
+    </div>
+
+    <div class="form-group">
+      <label for="exec-speed">Velocidade entre acoes (ms)</label>
+      <input id="exec-speed" type="number" min="0" max="10000" step="50" value="0" />
+    </div>
   </form>
 
   <div id="execution-loading" class="gen-progress hidden" aria-live="polite" role="status"></div>
@@ -74,11 +84,8 @@
     </p>
     <div class="form-group">
       <label for="execution-feedback">Feedback para IA</label>
-      <textarea
-        id="execution-feedback"
-        rows="6"
-        placeholder="Descreva o que falhou para a IA corrigir o teste"
-      ></textarea>
+      <textarea id="execution-feedback" rows="6"
+        placeholder="Descreva o que falhou para a IA corrigir o teste"></textarea>
     </div>
     <button id="recreate-test-btn" class="btn btn-primary">🤖 Pedir para IA recriar o teste</button>
   </div>

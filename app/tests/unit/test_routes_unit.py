@@ -37,10 +37,10 @@ async def test_create_project_route(monkeypatch) -> None:
     payload = routes.ProjectCreate(
         name="Test",
         description="Desc",
-        url="https://example.com",
+        url="https://example.com", # type: ignore[arg-type]
         test_directory="/tmp/tests",
     )
-    result = await routes.create_project(payload, session=None)
+    result = await routes.create_project(payload, session=None) # type: ignore[arg-type]
 
     assert result.id == 1
     assert result.url == "https://example.com/"
@@ -60,10 +60,10 @@ async def test_create_project_route_unique_error(monkeypatch) -> None:
         raise Exception("UNIQUE constraint failed: projects.name")
 
     monkeypatch.setattr(routes.ProjectService, "create_project", fake_create_project)
-    payload = routes.ProjectCreate(name="Teste", description="Desc", url="https://example.com", test_directory="/tmp/tests")
+    payload = routes.ProjectCreate(name="Teste", description="Desc", url="https://example.com", test_directory="/tmp/tests") # type: ignore[arg-type]
 
     with pytest.raises(HTTPException) as exc:
-        await routes.create_project(payload, session=None)
+        await routes.create_project(payload, session=None) # type: ignore[arg-type]
 
     assert exc.value.status_code == 400
 
@@ -81,33 +81,37 @@ async def test_create_project_route_generic_error(monkeypatch) -> None:
         raise Exception("Boom")
 
     monkeypatch.setattr(routes.ProjectService, "create_project", fake_create_project)
-    payload = routes.ProjectCreate(name="Teste", description="Desc", url="https://example.com", test_directory="/tmp/tests")
+    payload = routes.ProjectCreate(name="Teste", description="Desc", url="https://example.com", test_directory="/tmp/tests") # type: ignore[arg-type]
 
     with pytest.raises(HTTPException) as exc:
-        await routes.create_project(payload, session=None)
+        await routes.create_project(payload, session=None) # type: ignore[arg-type]
 
     assert exc.value.status_code == 500
 
 
 @pytest.mark.asyncio
 async def test_list_projects_route(monkeypatch) -> None:
-    async def fake_list_projects(self, session: AsyncSession):
+    async def fake_list_projects_with_test_count(self, session: AsyncSession):
         return [
-            Project(
-                id=1,
-                name="P1",
-                description=None,
-                url="https://example.com",
-                test_directory=None,
-                created_at=datetime.utcnow(),
+            (
+                Project(
+                    id=1,
+                    name="P1",
+                    description=None,
+                    url="https://example.com",
+                    test_directory=None,
+                    created_at=datetime.utcnow(),
+                ),
+                3,
             )
         ]
 
-    monkeypatch.setattr(routes.ProjectService, "list_projects", fake_list_projects)
-    result = await routes.list_projects(session=None)
+    monkeypatch.setattr(routes.ProjectService, "list_projects_with_test_count", fake_list_projects_with_test_count)
+    result = await routes.list_projects(session=None) # type: ignore[arg-type]
 
     assert len(result) == 1
     assert result[0].name == "P1"
+    assert result[0].test_count == 3
 
 
 @pytest.mark.asyncio
@@ -123,7 +127,7 @@ async def test_generate_test_route_success(monkeypatch, tmp_path) -> None:
 
     monkeypatch.setattr(routes.TestService, "generate_test", fake_generate_test)
     payload = routes.TestGenerateRequest(project_id=1, prompt="Teste ok", context="CTX")
-    result = await routes.generate_test(payload, session=None)
+    result = await routes.generate_test(payload, session=None) # type: ignore[arg-type]
 
     assert result.id == 1
     assert result.content == "Test"
@@ -138,7 +142,7 @@ async def test_generate_test_route_error(monkeypatch) -> None:
     payload = routes.TestGenerateRequest(project_id=999, prompt="Teste ok")
 
     with pytest.raises(HTTPException) as exc:
-        await routes.generate_test(payload, session=None)
+        await routes.generate_test(payload, session=None) # type: ignore[arg-type]
 
     assert exc.value.status_code == 404
 
@@ -155,7 +159,7 @@ async def test_get_test_route_success(monkeypatch, tmp_path) -> None:
         )
 
     monkeypatch.setattr(routes.TestService, "get_generated_test", fake_get_generated_test)
-    result = await routes.get_test(1, session=None)
+    result = await routes.get_test(1, session=None) # type: ignore[arg-type]
 
     assert result.id == 1
 
@@ -168,7 +172,7 @@ async def test_get_test_route_not_found(monkeypatch) -> None:
     monkeypatch.setattr(routes.TestService, "get_generated_test", fake_get_generated_test)
 
     with pytest.raises(HTTPException) as exc:
-        await routes.get_test(999, session=None)
+        await routes.get_test(999, session=None) # type: ignore[arg-type]
 
     assert exc.value.status_code == 404
 
@@ -188,7 +192,7 @@ async def test_download_test_route_success(monkeypatch, tmp_path) -> None:
         )
 
     monkeypatch.setattr(routes.TestService, "get_generated_test", fake_get_generated_test)
-    response = await routes.download_test(1, session=None)
+    response = await routes.download_test(1, session=None) # type: ignore[arg-type]
 
     assert response.path == str(test_file)
 
@@ -201,7 +205,7 @@ async def test_download_test_route_not_found(monkeypatch) -> None:
     monkeypatch.setattr(routes.TestService, "get_generated_test", fake_get_generated_test)
 
     with pytest.raises(HTTPException) as exc:
-        await routes.download_test(999, session=None)
+        await routes.download_test(999, session=None) # type: ignore[arg-type]
 
     assert exc.value.status_code == 404
 
@@ -212,7 +216,7 @@ async def test_delete_test_route_success(monkeypatch) -> None:
         return True
 
     monkeypatch.setattr(routes.TestService, "delete_generated_test", fake_delete_generated_test)
-    result = await routes.delete_test(1, session=None)
+    result = await routes.delete_test(1, session=None) # type: ignore[arg-type]
 
     assert result["message"] == "Teste deletado com sucesso"
 
@@ -225,7 +229,7 @@ async def test_delete_test_route_not_found(monkeypatch) -> None:
     monkeypatch.setattr(routes.TestService, "delete_generated_test", fake_delete_generated_test)
 
     with pytest.raises(HTTPException) as exc:
-        await routes.delete_test(999, session=None)
+        await routes.delete_test(999, session=None) # type: ignore[arg-type]
 
     assert exc.value.status_code == 404
 
@@ -244,7 +248,7 @@ async def test_delete_project_route_success(monkeypatch) -> None:
         return True
 
     monkeypatch.setattr(routes.ProjectService, "delete_project", fake_delete_project)
-    result = await routes.delete_project(1, session=None)
+    result = await routes.delete_project(1, session=None) # type: ignore[arg-type]
 
     assert result["message"] == "Projeto deletado com sucesso"
 
@@ -257,14 +261,23 @@ async def test_delete_project_route_not_found(monkeypatch) -> None:
     monkeypatch.setattr(routes.ProjectService, "delete_project", fake_delete_project)
 
     with pytest.raises(HTTPException) as exc:
-        await routes.delete_project(999, session=None)
+        await routes.delete_project(999, session=None) # type: ignore[arg-type]
 
     assert exc.value.status_code == 404
 
 
 @pytest.mark.asyncio
 async def test_execute_tests_route_success(monkeypatch) -> None:
-    async def fake_execute_tests(self, session: AsyncSession, project_id: int, test_ids=None, ai_debug: bool = False, headless: bool = True):
+    async def fake_execute_tests(
+        self,
+        session: AsyncSession,
+        project_id: int,
+        test_ids=None,
+        ai_debug: bool = False,
+        headless: bool = True,
+        timeout_seconds: int = 300,
+        speed_ms: int = 0,
+    ):
         return TestExecution(
             id=1,
             project_id=project_id,
@@ -281,7 +294,7 @@ async def test_execute_tests_route_success(monkeypatch) -> None:
 
     monkeypatch.setattr(routes.TestExecutionService, "execute_tests", fake_execute_tests)
     payload = routes.TestExecutionRequest(project_id=1, test_ids=[1])
-    result = await routes.execute_tests(payload, session=None)
+    result = await routes.execute_tests(payload, session=None) # type: ignore[arg-type]
 
     assert result.status == "completed"
     assert result.passed == 2
@@ -289,14 +302,23 @@ async def test_execute_tests_route_success(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_execute_tests_route_error(monkeypatch) -> None:
-    async def fake_execute_tests(self, session: AsyncSession, project_id: int, test_ids=None, ai_debug: bool = False, headless: bool = True):
+    async def fake_execute_tests(
+        self,
+        session: AsyncSession,
+        project_id: int,
+        test_ids=None,
+        ai_debug: bool = False,
+        headless: bool = True,
+        timeout_seconds: int = 300,
+        speed_ms: int = 0,
+    ):
         raise ValueError("Project not found")
 
     monkeypatch.setattr(routes.TestExecutionService, "execute_tests", fake_execute_tests)
     payload = routes.TestExecutionRequest(project_id=999, test_ids=[1])
 
     with pytest.raises(HTTPException) as exc:
-        await routes.execute_tests(payload, session=None)
+        await routes.execute_tests(payload, session=None) # type: ignore[arg-type]
 
     assert exc.value.status_code == 404
 
@@ -316,7 +338,7 @@ async def test_list_project_tests_route_success(monkeypatch) -> None:
 
     monkeypatch.setattr(routes.TestService, "list_generated_tests_by_project", fake_list_generated_tests_by_project)
 
-    result = await routes.list_project_tests(1, session=None)
+    result = await routes.list_project_tests(1, session=None) # type: ignore[arg-type]
 
     assert len(result) == 1
     assert result[0].id == 10
@@ -331,7 +353,7 @@ async def test_list_project_tests_route_not_found(monkeypatch) -> None:
     monkeypatch.setattr(routes.TestService, "list_generated_tests_by_project", fake_list_generated_tests_by_project)
 
     with pytest.raises(HTTPException) as exc:
-        await routes.list_project_tests(999, session=None)
+        await routes.list_project_tests(999, session=None) # type: ignore[arg-type]
 
     assert exc.value.status_code == 404
     assert exc.value.detail == "Project not found"
@@ -346,7 +368,7 @@ async def test_generate_test_route_llm_unavailable(monkeypatch) -> None:
     payload = routes.TestGenerateRequest(project_id=1, prompt="Teste")
 
     with pytest.raises(HTTPException) as exc:
-        await routes.generate_test(payload, session=None)
+        await routes.generate_test(payload, session=None) # type: ignore[arg-type]
 
     assert exc.value.status_code == 503
 
@@ -360,7 +382,7 @@ async def test_generate_test_route_scan_unavailable(monkeypatch) -> None:
     payload = routes.TestGenerateRequest(project_id=1, prompt="Teste")
 
     with pytest.raises(HTTPException) as exc:
-        await routes.generate_test(payload, session=None)
+        await routes.generate_test(payload, session=None) # type: ignore[arg-type]
 
     assert exc.value.status_code == 502
     assert "scan failed" in exc.value.detail
@@ -385,7 +407,7 @@ async def test_get_llm_health_success(monkeypatch) -> None:
         status_code = 200
 
     response = DummyResponse()
-    result = await routes.get_llm_health(response=response)
+    result = await routes.get_llm_health(response=response) # type: ignore[arg-type]
 
     assert result["ok"] is True
     assert response.status_code == 200
@@ -410,7 +432,7 @@ async def test_get_llm_health_sets_503_when_unhealthy(monkeypatch) -> None:
         status_code = 200
 
     response = DummyResponse()
-    result = await routes.get_llm_health(response=response)
+    result = await routes.get_llm_health(response=response) # type: ignore[arg-type]
 
     assert result["ok"] is False
     assert response.status_code == 503
@@ -428,7 +450,7 @@ async def test_get_llm_health_handles_missing_configuration(monkeypatch) -> None
         status_code = 200
 
     response = DummyResponse()
-    result = await routes.get_llm_health(response=response)
+    result = await routes.get_llm_health(response=response) # type: ignore[arg-type]
 
     assert result["ok"] is False
     assert result["source"] == "config"
@@ -443,16 +465,16 @@ async def test_scan_page_stream_success(monkeypatch) -> None:
 
     class DummyScanner:
         async def scan_url(self, _url: str, progress_callback=None):
-            await progress_callback("step-1")
+            await progress_callback("step-1") # type: ignore[arg-type]
             return DummyScanResult()
 
     monkeypatch.setattr(routes, "ElementScannerService", lambda: DummyScanner())
 
-    response = await routes.scan_page(routes.ScanRequest(url="https://example.com"))
+    response = await routes.scan_page(routes.ScanRequest(url="https://example.com")) # type: ignore[arg-type]
     body_iter = response.body_iterator
 
-    first = await anext(body_iter)
-    second = await anext(body_iter)
+    first = await anext(body_iter) # type: ignore[arg-type]
+    second = await anext(body_iter) # type: ignore[arg-type]
 
     progress = json.loads(first.removeprefix("data: ").strip())
     result = json.loads(second.removeprefix("data: ").strip())
@@ -463,7 +485,7 @@ async def test_scan_page_stream_success(monkeypatch) -> None:
     assert result["data"]["title"] == "Home"
 
     with pytest.raises(StopAsyncIteration):
-        await anext(body_iter)
+        await anext(body_iter) # type: ignore[arg-type]
 
 
 @pytest.mark.asyncio
@@ -474,16 +496,16 @@ async def test_scan_page_stream_error(monkeypatch) -> None:
 
     monkeypatch.setattr(routes, "ElementScannerService", lambda: DummyScanner())
 
-    response = await routes.scan_page(routes.ScanRequest(url="https://example.com"), session=None)
+    response = await routes.scan_page(routes.ScanRequest(url="https://example.com"), session=None) # type: ignore[arg-type]
     body_iter = response.body_iterator
-    event = await anext(body_iter)
+    event = await anext(body_iter) # type: ignore[arg-type]
     payload = json.loads(event.removeprefix("data: ").strip())
 
     assert payload["type"] == "error"
     assert payload["message"] == "scan boom"
 
     with pytest.raises(StopAsyncIteration):
-        await anext(body_iter)
+        await anext(body_iter) # type: ignore[arg-type]
 
 
 @pytest.mark.asyncio
@@ -492,20 +514,20 @@ async def test_scan_page_stream_cancels_running_task_on_close(monkeypatch) -> No
 
     class DummyScanner:
         async def scan_url(self, _url: str, progress_callback=None):
-            await progress_callback("starting")
+            await progress_callback("starting") # type: ignore[arg-type]
             await release_scan.wait()
             return type("Result", (), {"model_dump": lambda self: {"ok": True}})()
 
     monkeypatch.setattr(routes, "ElementScannerService", lambda: DummyScanner())
 
-    response = await routes.scan_page(routes.ScanRequest(url="https://example.com"), session=None)
+    response = await routes.scan_page(routes.ScanRequest(url="https://example.com"), session=None) # type: ignore[arg-type]
     body_iter = response.body_iterator
 
-    first = await anext(body_iter)
+    first = await anext(body_iter) # type: ignore[arg-type]
     payload = json.loads(first.removeprefix("data: ").strip())
     assert payload["type"] == "progress"
 
-    await body_iter.aclose()
+    await body_iter.aclose() # type: ignore[arg-type]
     release_scan.set()
 
 
@@ -529,7 +551,7 @@ async def test_list_project_executions_route_returns_list(monkeypatch) -> None:
         return [execution]
 
     monkeypatch.setattr(routes.TestExecutionService, "list_executions_by_project", fake_list_executions)
-    result = await routes.list_project_executions(1, session=None)
+    result = await routes.list_project_executions(1, session=None) # type: ignore[arg-type]
 
     assert len(result) == 1
     assert result[0].id == 5
@@ -543,7 +565,7 @@ async def test_list_project_executions_route_returns_empty(monkeypatch) -> None:
         return []
 
     monkeypatch.setattr(routes.TestExecutionService, "list_executions_by_project", fake_list_executions)
-    result = await routes.list_project_executions(99, session=None)
+    result = await routes.list_project_executions(99, session=None) # type: ignore[arg-type]
 
     assert result == []
 
@@ -558,7 +580,7 @@ async def test_improve_robot_test_route_success(monkeypatch) -> None:
     monkeypatch.setattr(routes.TestService, "improve_robot_test", fake_improve_robot_test)
 
     payload = routes.RobotImproveRequest(content="*** Test Cases ***\nOld Test")
-    result = await routes.improve_robot_test(1, payload, session=None)
+    result = await routes.improve_robot_test(1, payload, session=None) # type: ignore[arg-type]
 
     assert result.content == "*** Test Cases ***\nImproved Test\n    Log    improved"
 
@@ -572,7 +594,7 @@ async def test_improve_robot_test_route_not_found(monkeypatch) -> None:
 
     payload = routes.RobotImproveRequest(content="*** Test Cases ***")
     with pytest.raises(HTTPException) as exc:
-        await routes.improve_robot_test(999, payload, session=None)
+        await routes.improve_robot_test(999, payload, session=None) # type: ignore[arg-type]
 
     assert exc.value.status_code == 404
     assert exc.value.detail == "Test not found"
@@ -596,7 +618,7 @@ async def test_update_robot_test_content_route_success(monkeypatch) -> None:
     monkeypatch.setattr(routes.TestService, "save_robot_test_content", fake_save_robot_test_content)
 
     payload = routes.RobotImproveRequest(content="*** Test Cases ***\nEdited")
-    result = await routes.update_robot_test_content(2, payload, session=None)
+    result = await routes.update_robot_test_content(2, payload, session=None) # type: ignore[arg-type]
 
     assert result.id == 2
     assert result.content == "*** Test Cases ***\nEdited"
@@ -611,7 +633,7 @@ async def test_update_robot_test_content_route_not_found(monkeypatch) -> None:
 
     payload = routes.RobotImproveRequest(content="*** Test Cases ***")
     with pytest.raises(HTTPException) as exc:
-        await routes.update_robot_test_content(999, payload, session=None)
+        await routes.update_robot_test_content(999, payload, session=None) # type: ignore[arg-type]
 
     assert exc.value.status_code == 404
     assert exc.value.detail == "Test not found"
@@ -650,14 +672,14 @@ async def test_scan_page_persists_scan_cache_when_project_found(monkeypatch) -> 
 
     dummy_session = DummySession()
     response = await routes.scan_page(
-        routes.ScanRequest(url="https://example.com", project_id=1),
-        session=dummy_session,
+        routes.ScanRequest(url="https://example.com", project_id=1), # type: ignore[arg-type]
+        session=dummy_session, # type: ignore[arg-type]
     )
     body_iter = response.body_iterator
 
-    result_event = await anext(body_iter)
+    result_event = await anext(body_iter) # type: ignore[arg-type]
     data = json.loads(result_event.removeprefix("data: ").strip())
-    await body_iter.aclose()
+    await body_iter.aclose() # type: ignore[arg-type]
 
     assert data["type"] == "result"
     assert data["data"]["title"] == "Home"
@@ -692,14 +714,14 @@ async def test_scan_page_skips_cache_when_project_not_found(monkeypatch) -> None
 
     dummy_session = DummySession()
     response = await routes.scan_page(
-        routes.ScanRequest(url="https://example.com", project_id=99),
-        session=dummy_session,
+        routes.ScanRequest(url="https://example.com", project_id=99), # type: ignore[arg-type]
+        session=dummy_session, # type: ignore[arg-type]
     )
     body_iter = response.body_iterator
 
-    result_event = await anext(body_iter)
+    result_event = await anext(body_iter) # type: ignore[arg-type]
     data = json.loads(result_event.removeprefix("data: ").strip())
-    await body_iter.aclose()
+    await body_iter.aclose() # type: ignore[arg-type]
 
     assert data["type"] == "result"
     assert dummy_session.committed is False

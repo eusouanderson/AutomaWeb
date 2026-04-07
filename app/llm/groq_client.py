@@ -117,6 +117,25 @@ class GroqClient:
                 "message": "LLM API unreachable.",
             }
 
+    def _build_wwwh_prompt(
+        self,
+        *,
+        what: str,
+        why: str,
+        where: str,
+        how: str,
+        extra: str | None = None,
+    ) -> str:
+        parts = [
+            f"What (o quê):\n{what.strip() or 'N/A'}",
+            f"Why (por que):\n{why.strip() or 'N/A'}",
+            f"Where (onde):\n{where.strip() or 'N/A'}",
+            f"How (como):\n{how.strip() or 'N/A'}",
+        ]
+        if extra and extra.strip():
+            parts.append(extra.strip())
+        return "\n\n".join(parts)
+
     @retry(
         stop=stop_after_attempt(settings.GROQ_MAX_RETRIES),
         wait=wait_exponential(min=1, max=10),
@@ -139,40 +158,113 @@ class GroqClient:
             logger.info("Groq cache hit")
             return cached
 
-        system_prompt = (
-            "Você é um gerador de testes web em Robot Framework usando a biblioteca Browser. "
-            "Responda SOMENTE com código Robot Framework válido. "
-            "Não inclua explicações, observações, markdown, nem texto fora das seções do Robot. "
-            "Use apenas as seções: *** Settings ***, *** Variables ***, *** Test Cases ***, *** Keywords ***. "
-            "Use 'Library    Browser' e NÃO use Playwright/PlaywrightLibrary. "
-            "Objetivo: gerar testes estáveis, executáveis e funcionais no Browser Library. "
-            "Regras obrigatórias: "
-            "1) NÃO use 'Open Browser'. Use sempre 'New Browser    chromium', 'New Context' e 'New Page'. "
-            "2) Após 'New Context', adicione SEMPRE: 'Set Browser Timeout    30s' para definir timeout global. "
-            "3) Inclua fechamento com 'Close Browser' via teardown (preferencialmente Test Teardown ou Suite Teardown). "
-            "4) Antes de interações com elementos DOM (Click, Fill Text, Input Text), use 'Wait For Elements State    <selector>    visible    30s'. "
-            "   EXCEÇÃO IMPORTANTE: NÃO use 'Wait For Elements State' antes de 'Get Title' ou 'Get Url'. "
-            "   Para verificar título da página, use EXATAMENTE este padrão: "
-            "   New Page → (Wait For Load State    load  OU  aguarde algum elemento da página) → Get Title → Should Be Equal. "
-            "   O 'Get Title' lê o <title> do HTML head; não há nenhum elemento DOM a esperar. "
-            "5) Use seletores válidos do Browser Library: 'css=#id', 'css=.class', 'css=[attr=\"v\"]', 'xpath=...'. "
-            "6) NÃO use o formato inválido 'id:algo'. "
-            "7) Prefira seletores estáveis: data-testid, role+name, aria-label, name. Use id somente se for único e estável. "
-            "7.1) Evite id genérico/reutilizado (#button, #logo etc.) em sites com Web Components (ex.: YouTube). "
-            "7.2) Quando houver risco de ambiguidade, use seletor mais específico (escopo + atributo), por exemplo: "
-            "'css=ytd-masthead button[aria-label=\"Guia\"]' ou 'css=input[name=\"search_query\"]'. "
-            "8) Para validação de título, use '${titulo}    Get Title' seguido de 'Should Be Equal'. "
-            "9) Mantenha o cenário solicitado pelo usuário, sem inventar passos fora do fluxo principal. "
-            "10) Gere comandos de navegação robustos (ex.: Go Back apenas após página de detalhe estar visível). "
-            "11) Se houver múltiplos casos, mantenha cada caso independente e reprodutível. "
-            "12) Nunca use XPath genérico como '//div', '//a', '//*[@id=...]' sem escopo estável. "
-            "13) Prefira seletores com 'getByRole/getByLabel' representados em Browser selector engine como "
-            "'role=button[name=\"...\"]' quando possível. "
-            "14) Evite estritamente seletores ambíguos; se houver múltiplas correspondências, "
-            "use escopo estável ou '>> nth=0' explicitamente. "
-            "15) NÃO invente seletores como 'css=h1' para verificar o título — o título vem de Get Title, não de um h1 visível. "
-            "    Somente use 'Wait For Elements State    css=h1' se o h1 for um elemento que o usuário precisa interagir ou verificar como texto visível."
-        )
+        system_prompt = """Você é um especialista em automação web com Robot Framework usando a Browser Library.
+
+OBJETIVO:
+Gerar testes estáveis, executáveis e consistentes.
+
+FORMATO DE RESPOSTA (OBRIGATÓRIO):
+- Responda SOMENTE com código Robot Framework válido
+- NÃO escreva explicações
+- Use apenas:
+    *** Settings ***
+    *** Variables ***
+    *** Test Cases ***
+    *** Keywords ***
+
+BIBLIOTECA:
+Library    Browser
+
+---
+
+FLUXO PADRÃO (SEMPRE SIGA):
+1. New Browser    chromium
+2. New Context
+3. Set Browser Timeout    30s
+4. New Page
+5. Wait For Load State    load (ou elemento estável)
+6. Interações
+7. Validações
+8. Close Browser (via teardown)
+
+---
+
+REGRAS CRÍTICAS (NUNCA VIOLAR):
+
+- NÃO use Open Browser
+- SEMPRE usar New Browser / Context / Page
+- SEMPRE usar teardown com Close Browser
+- SEMPRE esperar elemento antes de interagir:
+    Wait For Elements State    <selector>    visible    30s
+
+EXCEÇÃO IMPORTANTE:
+- NÃO usar Wait For Elements State antes de:
+    - Get Title
+    - Get Url
+
+VALIDAÇÃO DE TÍTULO (PADRÃO FIXO):
+Get Title
+Should Be Equal
+
+---
+
+SELETORES (MUITO IMPORTANTE):
+
+PRIORIDADE:
+1. data-testid
+2. role + name
+3. aria-label
+4. name
+5. id (somente se estável)
+
+NUNCA USAR:
+- id:algo
+- xpath genérico (//div, //a, //*...)
+- css=h1 para título
+
+SEMPRE:
+- usar css= ou xpath=
+- evitar ambiguidade
+- usar nth=0 se necessário
+
+---
+
+REGRAS DE ESTABILIDADE:
+
+- Sempre aguardar carregamento antes de ação
+- Nunca clicar sem wait
+- Nunca usar seletor genérico
+- Cada teste deve ser independente
+- Não inventar passos fora do fluxo solicitado
+
+---
+
+AUTO-VALIDAÇÃO (ANTES DE RESPONDER):
+
+Revise mentalmente:
+- Usei New Browser correto?
+- Tem Set Browser Timeout?
+- Todos os cliques têm wait antes?
+- Não usei seletores inválidos?
+- Tem teardown com Close Browser?
+
+Se algo estiver errado, CORRIJA antes de responder.
+
+---
+
+EXEMPLO CORRETO:
+
+Wait For Elements State    css=input[name="q"]    visible    30s
+Fill Text    css=input[name="q"]    teste
+
+EXEMPLO ERRADO (NUNCA FAZER):
+
+Input Text    id:search    teste
+Click    //button
+
+---
+
+Agora gere o teste solicitado seguindo TODAS as regras."""
         if page_structure_text:
             system_prompt = (
                 f"{system_prompt}\n\n"
@@ -180,9 +272,12 @@ class GroqClient:
                 "Here is the page structure in JSON format:\n"
                 f"{page_structure_text}"
             )
-        user_content = prompt_text
-        if context_text:
-            user_content = f"Contexto:\n{context_text}\n\nPrompt:\n{prompt_text}"
+        user_content = self._build_wwwh_prompt(
+            what=prompt_text or "Gerar teste Robot Framework conforme solicitação recebida.",
+            why="Gerar um teste automatizado estável e executável para validar o fluxo solicitado.",
+            where=context_text or "Sem contexto adicional informado.",
+            how="Responder apenas com código Robot Framework válido, seguindo as regras do system prompt.",
+        )
 
         messages = [
             {"role": "system", "content": system_prompt},
@@ -209,12 +304,17 @@ class GroqClient:
                     f"{compact_system_prompt}"
                 )
 
-            compact_user_content = fallback_prompt
-            if fallback_context:
-                compact_user_content = (
+            compact_user_content = self._build_wwwh_prompt(
+                what=fallback_prompt or "Gerar teste Robot Framework conforme solicitação recebida.",
+                why="Gerar um teste automatizado estável mesmo após redução de payload.",
+                where=(
                     "Contexto reduzido automaticamente por limite de payload:\n"
-                    f"{fallback_context}\n\nPrompt:\n{fallback_prompt}"
-                )
+                    f"{fallback_context}"
+                    if fallback_context
+                    else "Sem contexto adicional informado."
+                ),
+                how="Responder apenas com código Robot Framework válido, mantendo o cenário solicitado.",
+            )
 
             compact_messages = [
                 {"role": "system", "content": compact_system_prompt},
@@ -275,12 +375,15 @@ class GroqClient:
             "A linha precisa conter wait explícito ou locator estável, evitando estrito ambíguo."
         )
 
-        user_content = (
-            f"Prompt original:\n{original_prompt}\n\n"
-            f"Contexto adicional:\n{context or 'N/A'}\n\n"
-            f"Step com falha:\n{failing_step}\n\n"
-            f"Erro:\n{error_message}\n\n"
-            "Gere a linha substituta equivalente e robusta."
+        user_content = self._build_wwwh_prompt(
+            what=(
+                "Regenerar somente a linha de step abaixo mantendo a intenção do prompt original.\n"
+                f"Prompt original: {original_prompt}\n"
+                f"Step com falha: {failing_step}"
+            ),
+            why=f"Corrigir o erro atual do step sem alterar o restante do teste. Erro: {error_message}",
+            where=context or "N/A",
+            how="Retornar apenas uma linha de Robot Framework equivalente e mais robusta.",
         )
 
         response = self._client.chat.completions.create(

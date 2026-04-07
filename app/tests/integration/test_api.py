@@ -21,14 +21,14 @@ class DummyGroqClient:
 
 
 @pytest_asyncio.fixture()
-async def session(tmp_path) -> AsyncSession:
+async def session(tmp_path) -> AsyncSession:  # type: ignore[arg-type]
     settings.STATIC_DIR = str(tmp_path)
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     async_session = async_sessionmaker(engine, expire_on_commit=False)
     async with async_session() as session:
-        yield session
+        yield session  # type: ignore[arg-type]
 
 
 @pytest.fixture(autouse=True)

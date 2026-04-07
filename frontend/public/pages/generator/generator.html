@@ -36,28 +36,33 @@
     </div>
     <div class="form-group">
       <label for="test-prompt">Prompt (o que deseja testar)</label>
-      <textarea
-        id="test-prompt"
-        rows="4"
-        required
-        minlength="5"
-        placeholder="Ex: Testar login no sistema com usuário válido e inválido"
-      ></textarea>
+      <textarea id="test-prompt" rows="4" required minlength="5"
+        placeholder="Ex: Testar login no sistema com usuário válido e inválido"></textarea>
     </div>
     <div class="form-group">
       <label for="test-context">Contexto Adicional (opcional)</label>
-      <textarea
-        id="test-context"
-        rows="3"
-        placeholder="Ex: URL: https://example.com, Seletores específicos, etc."
-      ></textarea>
+      <textarea id="test-context" rows="3"
+        placeholder="Ex: URL: https://example.com, Seletores específicos, etc."></textarea>
     </div>
-    <button type="submit" class="btn btn-primary">Gerar Teste</button>
+    <button id="generate-submit-btn" type="submit" class="btn btn-primary">Gerar Teste</button>
   </form>
+</div>
+
+<div id="generation-status" class="generation-status hidden" role="status" aria-live="polite">
+  <span class="generation-status-spinner" aria-hidden="true"></span>
+  <div class="generation-status-body">
+    <span id="generation-status-label" class="generation-status-label">Gerando teste...</span>
+    <span id="generation-status-detail" class="generation-status-detail"></span>
+  </div>
+  <span id="generation-status-timer" class="generation-status-timer">0s</span>
 </div>
 
 <div id="generated-result" class="section hidden">
   <h2>Teste Gerado</h2>
+  <div id="generation-parts" class="generation-parts hidden" aria-live="polite">
+    <p id="generation-parts-summary" class="generation-parts-summary"></p>
+    <ul id="generation-parts-list" class="generation-parts-list"></ul>
+  </div>
   <div class="result-actions">
     <button id="copy-test-btn" class="btn btn-secondary">Copiar Código</button>
     <button id="download-test-btn" class="btn btn-secondary">Download .robot</button>

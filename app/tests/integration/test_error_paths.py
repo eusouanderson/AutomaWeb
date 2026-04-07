@@ -9,14 +9,14 @@ from app.services.test_service import TestService
 
 
 @pytest_asyncio.fixture()
-async def error_session(tmp_path) -> AsyncSession:
+async def error_session(tmp_path) -> AsyncSession:  # type: ignore[arg-type]
     settings.STATIC_DIR = str(tmp_path)
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     async_session = async_sessionmaker(engine, expire_on_commit=False)
     async with async_session() as session:
-        yield session
+        yield session  # type: ignore[arg-type]
 
 
 async def test_generate_test_project_not_found(error_session: AsyncSession) -> None:

@@ -7,7 +7,7 @@ import {
   listGeneratedTests,
   listProjectExecutions,
   listProjects,
-  runTests
+  runTests,
 } from '../api/automaweb.api.js';
 import { isValidUrl, requiredText } from '../utils/validators.js';
 
@@ -45,19 +45,31 @@ export async function generateTestFromPrompt({ projectId, prompt, context, force
     project_id: projectId,
     prompt,
     context: context?.trim() || null,
-    force_rescan: forceRescan
+    force_rescan: forceRescan,
   });
 }
 
-export async function executeProjectTests(projectId, testIds = null, headless = true) {
+export async function executeProjectTests(projectId, testIds = null, options = {}) {
   if (!projectId) {
     throw new Error('Project is required for execution');
   }
 
+  const normalizedOptions = typeof options === 'boolean' ? { headless: options } : options || {};
+
+  const headless = normalizedOptions.headless ?? true;
+  const timeoutSeconds = Number.isFinite(Number(normalizedOptions.timeoutSeconds))
+    ? Math.min(3600, Math.max(30, Number(normalizedOptions.timeoutSeconds)))
+    : 300;
+  const speedMs = Number.isFinite(Number(normalizedOptions.speedMs))
+    ? Math.min(10000, Math.max(0, Number(normalizedOptions.speedMs)))
+    : 0;
+
   return runTests({
     project_id: projectId,
     test_ids: testIds?.length ? testIds : null,
-    headless
+    headless,
+    timeout_seconds: timeoutSeconds,
+    speed_ms: speedMs,
   });
 }
 

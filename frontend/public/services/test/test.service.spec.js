@@ -9,7 +9,7 @@ vi.mock('../../api/automaweb.api.js', () => ({
   listGeneratedTests: vi.fn(),
   deleteGeneratedTest: vi.fn(),
   getTestById: vi.fn(),
-  listProjectExecutions: vi.fn()
+  listProjectExecutions: vi.fn(),
 }));
 
 import {
@@ -21,7 +21,7 @@ import {
   listGeneratedTests,
   listProjectExecutions,
   listProjects,
-  runTests
+  runTests,
 } from '../../api/automaweb.api.js';
 
 import {
@@ -33,7 +33,7 @@ import {
   getProjectExecutions,
   getProjectGeneratedTests,
   getProjects,
-  getTestContent
+  getTestContent,
 } from '../test.service.js';
 
 beforeEach(() => vi.clearAllMocks());
@@ -103,7 +103,7 @@ describe('generateTestFromPrompt', () => {
       project_id: 1,
       prompt: 'Login flow test',
       context: 'some ctx',
-      force_rescan: false
+      force_rescan: false,
     });
   });
 
@@ -141,14 +141,22 @@ describe('executeProjectTests', () => {
     expect(runTests).toHaveBeenCalledWith({
       project_id: 3,
       test_ids: null,
-      headless: true
+      headless: true,
+      timeout_seconds: 300,
+      speed_ms: 0,
     });
   });
 
   it('passes test_ids when provided', async () => {
     runTests.mockResolvedValue({ status: 'ok' });
     await executeProjectTests(3, [1, 2]);
-    expect(runTests).toHaveBeenCalledWith({ project_id: 3, test_ids: [1, 2], headless: true });
+    expect(runTests).toHaveBeenCalledWith({
+      project_id: 3,
+      test_ids: [1, 2],
+      headless: true,
+      timeout_seconds: 300,
+      speed_ms: 0,
+    });
   });
 
   it('sends null test_ids for an empty array', async () => {
@@ -161,6 +169,18 @@ describe('executeProjectTests', () => {
     runTests.mockResolvedValue({ status: 'ok' });
     await executeProjectTests(3, null, false);
     expect(runTests).toHaveBeenCalledWith(expect.objectContaining({ headless: false }));
+  });
+
+  it('passes timeout and speed when provided in options', async () => {
+    runTests.mockResolvedValue({ status: 'ok' });
+    await executeProjectTests(3, [1], { headless: false, timeoutSeconds: 420, speedMs: 250 });
+    expect(runTests).toHaveBeenCalledWith({
+      project_id: 3,
+      test_ids: [1],
+      headless: false,
+      timeout_seconds: 420,
+      speed_ms: 250,
+    });
   });
 
   it('throws when projectId is falsy', async () => {
