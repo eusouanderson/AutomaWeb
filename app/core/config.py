@@ -24,6 +24,17 @@ class Settings(BaseSettings):
     LLM_DOM_CHUNKING_ENABLED: bool = True
     LLM_DOM_CHUNK_TARGET_CHARS: int = 12000
     LLM_DOM_CHUNK_MAX_PARTS: int = 8
+    
+    # Chunked generation settings
+    GROQ_CHUNK_TOKEN_BUDGET: int = 100000  # Total tokens budget for all chunks
+    LLM_MAX_CHUNKS_PER_REQUEST: int = 10  # Max chunks to process per request
+    LLM_MAX_CONCURRENT_CHUNKS: int = 3  # Max concurrent LLM calls
+    LLM_CHUNK_RESERVE_CHARS: int = 500  # Reserve chars for prompts
+    
+    # DOM preprocessing settings
+    DOM_MAX_TEXT_PER_ELEMENT: int = 200  # Max text chars per element
+    DOM_CACHE_MAX_ENTRIES: int = 100  # Max cached segmentations
+    
     CACHE_TTL_SECONDS: int = 300
     SCAN_CACHE_TTL_SECONDS: int = 3600
     STATIC_DIR: str = "app/static"
