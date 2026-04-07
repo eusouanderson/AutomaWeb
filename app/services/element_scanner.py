@@ -4,6 +4,7 @@ import asyncio
 import logging
 from collections import Counter
 from typing import Any, Awaitable, Callable
+from urllib.parse import parse_qs, urlparse
 
 import httpx
 from selectolax.parser import HTMLParser, Node
@@ -30,6 +31,14 @@ _MAX_XPATH = 80
 # If selectolax returns fewer elements than this, the page is likely a SPA
 # and a Playwright browser-based scan will be attempted automatically.
 _SPA_THRESHOLD = 30
+
+# How long to wait (ms) for the user to complete login in the visible browser.
+_AUTH_TIMEOUT_MS = 120_000
+
+# Login domains that require opening an auth tab before scanning protected pages.
+_DEFAULT_LOGIN_HOST_HINTS: tuple[str, ...] = (
+    "login-hmg.comerc.com.br",
+)
 
 _TYPE_CAPS: dict[str, int] = {
     "input": 35,
@@ -489,6 +498,7 @@ class ElementScannerService:
         self._navigation_timeout_ms = min(timeout_ms, 4_000)
         self._network_idle_timeout_ms = min(timeout_ms, 1_200)
         self._spa_threshold = spa_threshold
+        self._login_host_hints = _DEFAULT_LOGIN_HOST_HINTS
 
     # ------------------------------------------------------------------
     # Shared Playwright browser lifecycle
@@ -581,6 +591,103 @@ class ElementScannerService:
     # Playwright browser scan (SPA fallback)
     # ------------------------------------------------------------------
 
+    def _is_login_url(self, candidate_url: str) -> bool:
+        host = urlparse(candidate_url).netloc.lower()
+        return any(hint in host for hint in self._login_host_hints)
+
+    def _extract_redirect_target(self, login_url: str) -> str | None:
+        query = parse_qs(urlparse(login_url).query)
+        redirect_values = query.get("redirect_uri")
+        if not redirect_values:
+            return None
+        return redirect_values[0]
+
+    async def _handle_login_flow(
+        self,
+        context: Any,
+        login_url: str,
+        original_url: str,
+        progress_callback: ProgressCallback | None,
+    ) -> None:
+        """
+        Opens a **visible** (non-headless) browser so the user can complete the
+        corporate Cognito login, then transfers the resulting session cookies to
+        *context* (the headless scanning browser context).
+
+        Degrades gracefully when no display is available (Docker / CI).
+        """
+        redirect_target = self._extract_redirect_target(login_url)
+        redirect_netloc = urlparse(redirect_target).netloc if redirect_target else None
+
+        await self._progress(
+            progress_callback,
+            "Login corporativo detectado. Abrindo janela de autenticação — "
+            "faça login e aguarde...",
+        )
+
+        auth_pw = await async_playwright().start()  # type: ignore[misc]
+        try:
+            try:
+                auth_browser = await auth_pw.chromium.launch(headless=False)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Cannot open non-headless browser for login: %s", exc)
+                await self._progress(
+                    progress_callback,
+                    "Não foi possível abrir janela de login (ambiente sem display). "
+                    "Faça login manualmente e tente novamente.",
+                )
+                return
+
+            try:
+                auth_ctx = await auth_browser.new_context(ignore_https_errors=True)
+                try:
+                    auth_page = await auth_ctx.new_page()
+                    auth_page.set_default_timeout(_AUTH_TIMEOUT_MS)
+                    try:
+                        await auth_page.goto(
+                            login_url,
+                            wait_until="domcontentloaded",
+                            timeout=15_000,
+                        )
+                    except PlaywrightTimeoutError:
+                        pass
+
+                    wait_pattern = (
+                        f"https://{redirect_netloc}/**" if redirect_netloc else "**"
+                    )
+                    try:
+                        await self._progress(
+                            progress_callback,
+                            "Aguardando autenticação do usuário (máx. 2 min)...",
+                        )
+                        await auth_page.wait_for_url(wait_pattern, timeout=_AUTH_TIMEOUT_MS)
+                        try:
+                            await auth_page.wait_for_load_state("networkidle", timeout=5_000)
+                        except PlaywrightTimeoutError:
+                            pass
+
+                        cookies = await auth_ctx.cookies()
+                        if cookies:
+                            await context.add_cookies(cookies)
+                            await self._progress(
+                                progress_callback,
+                                f"Autenticação concluída. Sessão transferida "
+                                f"({len(cookies)} cookie(s)).",
+                            )
+                    except PlaywrightTimeoutError:
+                        await self._progress(
+                            progress_callback,
+                            "Timeout de autenticação (2 min). Continuando sem sessão autenticada.",
+                        )
+                    finally:
+                        await auth_page.close()
+                finally:
+                    await auth_ctx.close()
+            finally:
+                await auth_browser.close()
+        finally:
+            await auth_pw.stop()
+
     async def _playwright_scan(
         self,
         url: str,
@@ -600,6 +707,14 @@ class ElementScannerService:
                     await page.goto(url, wait_until="domcontentloaded", timeout=self._navigation_timeout_ms)
                 except PlaywrightTimeoutError:
                     await self._progress(progress_callback, "Timeout de navegação — continuando com DOM parcial...")
+
+                current_url = page.url
+                if self._is_login_url(current_url):
+                    await self._handle_login_flow(context, current_url, url, progress_callback)
+                    try:
+                        await page.goto(url, wait_until="domcontentloaded", timeout=self._navigation_timeout_ms)
+                    except PlaywrightTimeoutError:
+                        await self._progress(progress_callback, "Timeout ao recarregar página após login...")
 
                 await self._progress(progress_callback, "Aguardando rede ociosa...")
                 try:

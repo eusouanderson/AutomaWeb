@@ -1222,3 +1222,123 @@ async def test_save_robot_test_content_writes_file_and_updates_content(tmp_path)
     assert result is not None
     assert result.content == new_content
     assert robot_file.read_text(encoding="utf-8") == new_content
+
+
+# ---------------------------------------------------------------------------
+# _fix_robot_syntax_errors – variable corrections, assertion arity, empty kw
+# ---------------------------------------------------------------------------
+
+def test_fix_robot_syntax_errors_corrects_output_variable() -> None:
+    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    content = (
+        "*** Test Cases ***\n"
+        "My Test\n"
+        "    Log    ${OUTPUT}\n"
+    )
+    fixed = service._fix_robot_syntax_errors(content)
+    assert "${OUTPUT_DIR}" in fixed
+    assert "${OUTPUT}" not in fixed.replace("${OUTPUT_DIR}", "").replace("${OUTPUT_FILE}", "")
+
+
+def test_fix_robot_syntax_errors_corrects_log_variable() -> None:
+    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    content = "*** Test Cases ***\nT\n    Log    ${LOG}\n"
+    fixed = service._fix_robot_syntax_errors(content)
+    assert "${LOG_FILE}" in fixed
+
+
+def test_fix_robot_syntax_errors_drops_should_be_equal_with_one_arg() -> None:
+    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    content = (
+        "*** Test Cases ***\n"
+        "Header Test\n"
+        "    ${title}=    Get Title\n"
+        "    Should Be Equal    ${title}\n"
+    )
+    fixed = service._fix_robot_syntax_errors(content)
+    assert "Should Be Equal" not in fixed
+
+
+def test_fix_robot_syntax_errors_keeps_should_be_equal_with_two_args() -> None:
+    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    content = (
+        "*** Test Cases ***\n"
+        "Header Test\n"
+        "    ${title}=    Get Title\n"
+        "    Should Be Equal    ${title}    Meu Título\n"
+    )
+    fixed = service._fix_robot_syntax_errors(content)
+    assert "Should Be Equal    ${title}    Meu Título" in fixed
+
+
+def test_fix_robot_syntax_errors_drops_should_contain_with_one_arg() -> None:
+    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    content = (
+        "*** Test Cases ***\n"
+        "T\n"
+        "    Should Contain    ${text}\n"
+    )
+    fixed = service._fix_robot_syntax_errors(content)
+    assert "Should Contain" not in fixed
+
+
+def test_fix_robot_syntax_errors_adds_no_operation_to_empty_keyword() -> None:
+    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    content = (
+        "*** Keywords ***\n"
+        "Empty Keyword\n"
+        "    [Documentation]    This keyword has no steps\n"
+    )
+    fixed = service._fix_robot_syntax_errors(content)
+    assert "No Operation" in fixed
+
+
+def test_fix_robot_syntax_errors_keeps_keyword_with_steps_intact() -> None:
+    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    content = (
+        "*** Keywords ***\n"
+        "My Keyword\n"
+        "    [Documentation]    Has a step\n"
+        "    Log    hello\n"
+    )
+    fixed = service._fix_robot_syntax_errors(content)
+    assert "Log    hello" in fixed
+    # No Operation should NOT be added
+    assert "No Operation" not in fixed
+
+
+def test_sanitize_robot_output_e2e_fixes_all_three_error_classes() -> None:
+    """Regression: reproduce the exact three failure modes from the Mercado test report."""
+    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    content = (
+        "*** Settings ***\n"
+        "Library    Browser\n"
+        "Suite Teardown    Close Browser\n"
+        "\n"
+        "*** Test Cases ***\n"
+        "Validate Header Elements\n"
+        "    Log    ${OUTPUT}\n"
+        "    ${t}=    Get Title\n"
+        "    Should Be Equal    ${t}\n"
+        "\n"
+        "Header - Validate Elements And Title\n"
+        "    Should Be Equal    ${t}\n"
+        "\n"
+        "*** Keywords ***\n"
+        "Suite Teardown Keyword\n"
+        "    [Documentation]    Tears down suite\n"
+    )
+    fixed = service._sanitize_robot_output(content)
+    # 1. ${OUTPUT} is gone
+    assert "${OUTPUT}" not in fixed.replace("${OUTPUT_DIR}", "").replace("${OUTPUT_FILE}", "")
+    # 2. broken Should Be Equal (1 arg) are gone
+    lines_with_should = [l for l in fixed.splitlines() if "Should Be Equal" in l]
+    for line in lines_with_should:
+        parts = [p for p in line.split("    ") if p.strip()]
+        # Remove keyword name from count
+        kw_idx = next((i for i, p in enumerate(parts) if "Should Be Equal" in p), None)
+        assert kw_idx is not None
+        assert len(parts) - kw_idx - 1 >= 2, f"Should Be Equal has too few args: {line!r}"
+    # 3. empty keyword got No Operation
+    assert "No Operation" in fixed
+

@@ -202,9 +202,30 @@ EXCEÇÃO IMPORTANTE:
     - Get Title
     - Get Url
 
+VARIÁVEIS BUILT-IN (CRÍTICO):
+- NUNCA usar ${OUTPUT}   → use ${OUTPUT_DIR} ou ${OUTPUT_FILE}
+- NUNCA usar ${LOG}      → use ${LOG_FILE}
+- NUNCA usar ${REPORT}   → use ${REPORT_FILE}
+
+ASSERTIONS (OBRIGATÓRIO — ERROS FATAIS SE VIOLADO):
+- Should Be Equal SEMPRE requer 2 argumentos: actual E expected
+  CORRETO:  Should Be Equal    ${title}    Título Esperado
+  ERRADO:   Should Be Equal    ${title}
+- Mesma regra para: Should Contain, Should Match, Should Not Be Equal, etc.
+
+KEYWORDS NUNCA PUEDEN SER VAZIAS:
+- Toda keyword definida em *** Keywords *** DEVE ter ao menos 1 step executável
+  ERRADO:
+    My Keyword
+        [Documentation]    Descrição
+  CORRETO:
+    My Keyword
+        [Documentation]    Descrição
+        No Operation
+
 VALIDAÇÃO DE TÍTULO (PADRÃO FIXO):
-Get Title
-Should Be Equal
+${title}=    Get Title
+Should Be Equal    ${title}    Título Esperado
 
 ---
 
@@ -247,6 +268,9 @@ Revise mentalmente:
 - Todos os cliques têm wait antes?
 - Não usei seletores inválidos?
 - Tem teardown com Close Browser?
+- Should Be Equal tem EXATAMENTE 2 argumentos (actual e expected)?
+- Não usei ${OUTPUT} nem ${LOG} nem ${REPORT}?
+- Todas as keywords definidas têm pelo menos 1 step executável (não apenas [Documentation])?
 
 Se algo estiver errado, CORRIJA antes de responder.
 

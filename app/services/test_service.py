@@ -6,6 +6,46 @@ import asyncio
 from datetime import datetime
 from pathlib import Path
 
+# ---------------------------------------------------------------------------
+# Robot Framework syntax-correction constants
+# ---------------------------------------------------------------------------
+
+# LLM frequently emits wrong names for RF built-in variables.
+_ROBOT_VAR_CORRECTIONS: dict[str, str] = {
+    "${OUTPUT}": "${OUTPUT_DIR}",
+    "${LOG}": "${LOG_FILE}",
+    "${REPORT}": "${REPORT_FILE}",
+    "${DEBUG}": "${DEBUG_FILE}",
+}
+
+# Assertion keywords that REQUIRE at least 2 positional arguments.
+_ASSERTIONS_MIN_2_ARGS: frozenset[str] = frozenset({
+    "Should Be Equal",
+    "Should Be Equal As Numbers",
+    "Should Be Equal As Integers",
+    "Should Be Equal As Strings",
+    "Should Contain",
+    "Should Not Contain",
+    "Should Match",
+    "Should Match Regexp",
+    "Should Not Match Regexp",
+    "Should Not Be Equal",
+    "Should Not Be Equal As Integers",
+    "Should Not Be Equal As Numbers",
+})
+
+# Keyword "metadata" settings lines — a keyword with ONLY these is empty.
+_KW_METADATA_TAGS: frozenset[str] = frozenset({
+    "[documentation]",
+    "[arguments]",
+    "[tags]",
+    "[return]",
+    "[timeout]",
+    "[setup]",
+    "[teardown]",
+    "[template]",
+})
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from tenacity import RetryError
 
@@ -553,7 +593,90 @@ class TestService:
 
         cleaned = self._harden_robot_lines(cleaned, context=context)
 
-        return "\n".join(cleaned).strip() + "\n"
+        result = "\n".join(cleaned).strip() + "\n"
+        return self._fix_robot_syntax_errors(result)
+
+    # ------------------------------------------------------------------
+    # Syntax error fixing — runs AFTER _harden_robot_lines
+    # ------------------------------------------------------------------
+
+    def _fix_robot_syntax_errors(self, content: str) -> str:
+        """
+        Deterministic post-processing that catches three classes of LLM errors:
+
+        1. Wrong built-in variable names  (${OUTPUT} → ${OUTPUT_DIR}, etc.)
+        2. Assertion keywords with fewer than 2 positional args
+           (e.g. ``Should Be Equal    ${title}`` missing the expected value)
+        3. Keyword definitions that have no executable steps
+           (only metadata lines like [Documentation]) → inject ``No Operation``
+        """
+        # Fix 1 — variable name corrections
+        for wrong, correct in _ROBOT_VAR_CORRECTIONS.items():
+            content = content.replace(wrong, correct)
+
+        # Fix 2 — drop assertion calls with too few arguments
+        lines: list[str] = []
+        for line in content.splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or stripped.startswith("***"):
+                lines.append(line)
+                continue
+            parts = re.split(r"  +", stripped)
+            kw = parts[0]
+            args = parts[1:]
+            # Handle variable assignment prefix: ${var}=    Keyword    arg
+            if re.match(r"^\$\{[^}]+\}=?$", kw) and len(parts) > 1:
+                kw = parts[1]
+                args = parts[2:]
+            if kw in _ASSERTIONS_MIN_2_ARGS and len(args) < 2:
+                logger.debug("Removed assertion with too few args: %s", stripped)
+                continue
+            lines.append(line)
+        content = "\n".join(lines)
+
+        # Fix 3 — empty keyword bodies
+        return self._fix_empty_keywords(content)
+
+    def _fix_empty_keywords(self, content: str) -> str:
+        """Inject ``No Operation`` into keyword definitions that have no executable steps."""
+        kw_match = re.search(
+            r"(\*\*\* Keywords \*\*\*[ \t]*\n)(.*?)(\Z|(?=\n\*\*\*))",
+            content,
+            re.DOTALL,
+        )
+        if not kw_match:
+            return content
+        prefix = content[: kw_match.start(2)]
+        body = kw_match.group(2)
+        suffix = content[kw_match.end(2) :]
+        return prefix + self._patch_keyword_bodies(body) + suffix
+
+    def _patch_keyword_bodies(self, body: str) -> str:
+        """Ensure each keyword block in a *** Keywords *** section has executable steps."""
+        # Split at lines that start at column 0 (= keyword name lines)
+        blocks = re.split(r"(?m)(?=^[^\s\n])", body)
+        patched: list[str] = []
+        for block in blocks:
+            if not block.strip():
+                patched.append(block)
+                continue
+            block_lines = block.splitlines(keepends=True)
+            step_lines = block_lines[1:]  # everything after the keyword name
+            has_executable = any(
+                ln.strip() and not ln.strip().lower().startswith(tuple(_KW_METADATA_TAGS))
+                for ln in step_lines
+            )
+            if not has_executable:
+                indent = "    "
+                for ln in step_lines:
+                    if ln.strip():
+                        indent = ln[: len(ln) - len(ln.lstrip())]
+                        break
+                # Append No Operation as the only real step
+                patched.append("".join(block_lines) + f"{indent}No Operation\n")
+            else:
+                patched.append(block)
+        return "".join(patched)
 
     def _harden_robot_lines(self, lines: list[str], context: str | None = None) -> list[str]:
         strict_selectors = self._extract_strict_mode_selectors(context)

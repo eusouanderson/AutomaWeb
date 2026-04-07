@@ -12,6 +12,9 @@ from app.services.element_scanner import ElementScannerError, ElementScannerServ
 # ---------------------------------------------------------------------------
 
 class FakePage:
+    def __init__(self):
+        self.url = "https://example.com"
+
     def set_default_timeout(self, timeout):
         self.timeout = timeout
 
@@ -20,6 +23,12 @@ class FakePage:
 
     async def wait_for_load_state(self, state, timeout):
         pass
+
+    async def wait_for_url(self, pattern, timeout):
+        return None
+
+    async def close(self):
+        return None
 
     async def evaluate(self, script):
         return [
@@ -45,11 +54,16 @@ class FakePage:
 
 
 class FakeContext:
+    def __init__(self):
+        self.pages = []
+
     async def route(self, pattern, handler):
         pass
 
     async def new_page(self):
-        return FakePage()
+        page = FakePage()
+        self.pages.append(page)
+        return page
 
     async def close(self):
         pass
@@ -104,10 +118,18 @@ class ErrorOnEvaluatePage(FakePage):
 
 class CustomPageContext(FakeContext):
     def __init__(self, page):
+        super().__init__()
         self._page = page
+        self._returned_first_page = False
 
     async def new_page(self):
-        return self._page
+        if not self._returned_first_page:
+            self._returned_first_page = True
+            self.pages.append(self._page)
+            return self._page
+        page = FakePage()
+        self.pages.append(page)
+        return page
 
 
 class CustomPageBrowser(FakeBrowser):
@@ -358,6 +380,250 @@ async def test_scan_url_spa_hint_triggers_playwright(monkeypatch):
     # Playwright returns 2 elements from FakePage.evaluate
     assert result.title == "Login"
     assert result.total_elements == 2
+
+
+@pytest.mark.asyncio
+async def test_playwright_scan_triggers_login_tab_flow(monkeypatch):
+    class LoginRedirectPage(FakePage):
+        def __init__(self):
+            super().__init__()
+            self.goto_calls = []
+
+        async def goto(self, url, wait_until, timeout):
+            self.goto_calls.append(url)
+            if len(self.goto_calls) == 1:
+                self.url = (
+                    "https://login-hmg.comerc.com.br/login?"
+                    "client_id=abc&redirect_uri=https%3A%2F%2Fexample.com%2Fcallback"
+                )
+            else:
+                self.url = url
+
+    login_page = LoginRedirectPage()
+    scanner = ElementScannerService(timeout_ms=5000)
+    login_calls = []
+
+    async def login_spy(context, login_url, original_url, progress_callback):
+        login_calls.append(login_url)
+
+    monkeypatch.setattr(scanner_module, "_fetch_and_parse", _fake_fetch())
+    monkeypatch.setattr(scanner_module, "_PLAYWRIGHT_AVAILABLE", True)
+    monkeypatch.setattr(
+        scanner_module,
+        "async_playwright",
+        lambda: CustomPagePlaywrightManager(login_page),
+    )
+    monkeypatch.setattr(scanner, "_handle_login_flow", login_spy)
+
+    await scanner.scan_url("https://example.com")
+
+    assert len(login_calls) == 1
+    assert "login-hmg.comerc.com.br" in login_calls[0]
+    assert login_page.goto_calls.count("https://example.com") == 2
+
+
+@pytest.mark.asyncio
+async def test_handle_login_flow_transfers_cookies(monkeypatch):
+    """_handle_login_flow launches a visible browser, waits for URL change, transfers cookies."""
+
+    class _AuthPage:
+        def __init__(self):
+            self.goto_url = None
+            self.closed = False
+            self.url = "https://app.example.com/"
+
+        def set_default_timeout(self, t):
+            pass
+
+        async def goto(self, url, wait_until, timeout):
+            self.goto_url = url
+
+        async def wait_for_url(self, pattern, timeout):
+            pass
+
+        async def wait_for_load_state(self, state, timeout):
+            pass
+
+        async def close(self):
+            self.closed = True
+
+    class _AuthCtx:
+        def __init__(self, page):
+            self._page = page
+            self.closed = False
+
+        async def new_page(self):
+            return self._page
+
+        async def cookies(self):
+            return [{"name": "session", "value": "abc", "domain": ".example.com"}]
+
+        async def close(self):
+            self.closed = True
+
+    class _AuthBrowser:
+        def __init__(self, page):
+            self._page = page
+            self.closed = False
+
+        async def new_context(self, **kw):
+            return _AuthCtx(self._page)
+
+        async def close(self):
+            self.closed = True
+
+    class _ChromiumLauncher:
+        def __init__(self, page):
+            self._page = page
+
+        async def launch(self, headless):
+            return _AuthBrowser(self._page)
+
+    class _PW:
+        def __init__(self, page):
+            self.chromium = _ChromiumLauncher(page)
+            self.stopped = False
+
+        async def stop(self):
+            self.stopped = True
+
+    auth_page = _AuthPage()
+
+    class _PWManager:
+        async def start(self):
+            return _PW(auth_page)
+
+    monkeypatch.setattr(scanner_module, "async_playwright", lambda: _PWManager())
+
+    class _ScanContext:
+        def __init__(self):
+            self.added = []
+
+        async def add_cookies(self, cookies):
+            self.added.extend(cookies)
+
+    sc = ElementScannerService(timeout_ms=5000)
+    ctx = _ScanContext()
+
+    await sc._handle_login_flow(
+        ctx,
+        "https://login-hmg.comerc.com.br/login?redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback",
+        "https://app.example.com/",
+        progress_callback=None,
+    )
+
+    assert "login-hmg.comerc.com.br" in (auth_page.goto_url or "")
+    assert auth_page.closed is True
+    assert any(c["name"] == "session" for c in ctx.added)
+
+
+@pytest.mark.asyncio
+async def test_handle_login_flow_degrades_when_launch_fails(monkeypatch):
+    """If headless=False launch fails (no display), a progress message is logged and we return."""
+    progress = []
+
+    async def _progress(msg):
+        progress.append(msg)
+
+    class _PW:
+        class chromium:
+            @staticmethod
+            async def launch(headless):
+                raise OSError("no display")
+
+        @staticmethod
+        async def stop():
+            pass
+
+    class _PWManager:
+        async def start(self):
+            return _PW()
+
+    monkeypatch.setattr(scanner_module, "async_playwright", lambda: _PWManager())
+
+    class _ScanContext:
+        async def add_cookies(self, cookies):
+            pass
+
+    sc = ElementScannerService(timeout_ms=5000)
+    # Should not raise
+    await sc._handle_login_flow(
+        _ScanContext(),
+        "https://login-hmg.comerc.com.br/login",
+        "https://app.example.com/",
+        progress_callback=_progress,
+    )
+
+    assert any("sem display" in m for m in progress)
+
+
+@pytest.mark.asyncio
+async def test_handle_login_flow_timeout_logs_message(monkeypatch):
+    """A PlaywrightTimeoutError from wait_for_url is caught and logged, not raised."""
+    progress = []
+
+    async def _progress(msg):
+        progress.append(msg)
+
+    class _AuthPage:
+        def set_default_timeout(self, t):
+            pass
+
+        async def goto(self, url, wait_until, timeout):
+            pass
+
+        async def wait_for_url(self, pattern, timeout):
+            raise scanner_module.PlaywrightTimeoutError("timeout")
+
+        async def close(self):
+            pass
+
+    class _AuthCtx:
+        async def new_page(self):
+            return _AuthPage()
+
+        async def cookies(self):
+            return []
+
+        async def close(self):
+            pass
+
+    class _AuthBrowser:
+        async def new_context(self, **kw):
+            return _AuthCtx()
+
+        async def close(self):
+            pass
+
+    class _PW:
+        class chromium:
+            @staticmethod
+            async def launch(headless):
+                return _AuthBrowser()
+
+        @staticmethod
+        async def stop():
+            pass
+
+    class _PWManager:
+        async def start(self):
+            return _PW()
+
+    monkeypatch.setattr(scanner_module, "async_playwright", lambda: _PWManager())
+
+    class _ScanContext:
+        async def add_cookies(self, cookies):
+            pass
+
+    sc = ElementScannerService(timeout_ms=5000)
+    await sc._handle_login_flow(
+        _ScanContext(),
+        "https://login-hmg.comerc.com.br/login",
+        "https://app.example.com/",
+        progress_callback=_progress,
+    )
+
+    assert any("Timeout" in m for m in progress)
 
 
 # ---------------------------------------------------------------------------
@@ -988,3 +1254,194 @@ def test_extract_form_contexts_form_with_class_no_id():
     contexts = scanner_module._extract_form_contexts(tree)
     assert len(contexts) == 1
     assert contexts[0]["form_selector"] == "form.login-form"
+
+
+# ---------------------------------------------------------------------------
+# _handle_login_flow coverage – lines 652-653, 666-667, 716-717
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_handle_login_flow_goto_timeout_is_swallowed(monkeypatch):
+    """Lines 652-653: PlaywrightTimeoutError from auth_page.goto is caught silently."""
+
+    class _AuthPage:
+        def __init__(self):
+            self.closed = False
+
+        def set_default_timeout(self, t):
+            pass
+
+        async def goto(self, url, wait_until, timeout):
+            raise scanner_module.PlaywrightTimeoutError("nav timeout")
+
+        async def wait_for_url(self, pattern, timeout):
+            pass
+
+        async def wait_for_load_state(self, state, timeout):
+            pass
+
+        async def close(self):
+            self.closed = True
+
+    class _AuthCtx:
+        async def new_page(self):
+            return _AuthPage()
+
+        async def cookies(self):
+            return []
+
+        async def close(self):
+            pass
+
+    class _AuthBrowser:
+        async def new_context(self, **kw):
+            return _AuthCtx()
+
+        async def close(self):
+            pass
+
+    class _PW:
+        class chromium:
+            @staticmethod
+            async def launch(headless):
+                return _AuthBrowser()
+
+        @staticmethod
+        async def stop():
+            pass
+
+    class _PWManager:
+        async def start(self):
+            return _PW()
+
+    monkeypatch.setattr(scanner_module, "async_playwright", lambda: _PWManager())
+
+    class _ScanCtx:
+        async def add_cookies(self, c):
+            pass
+
+    sc = ElementScannerService(timeout_ms=5000)
+    # Must not raise even though goto raised PlaywrightTimeoutError
+    await sc._handle_login_flow(
+        _ScanCtx(),
+        "https://login-hmg.comerc.com.br/login",
+        "https://app.example.com/",
+        progress_callback=None,
+    )
+
+
+@pytest.mark.asyncio
+async def test_handle_login_flow_networkidle_timeout_after_auth_is_swallowed(monkeypatch):
+    """Lines 666-667: PlaywrightTimeoutError from wait_for_load_state('networkidle')
+    after successful wait_for_url is caught silently."""
+
+    class _AuthPage:
+        def set_default_timeout(self, t):
+            pass
+
+        async def goto(self, url, wait_until, timeout):
+            pass
+
+        async def wait_for_url(self, pattern, timeout):
+            pass  # auth succeeds
+
+        async def wait_for_load_state(self, state, timeout):
+            raise scanner_module.PlaywrightTimeoutError("idle timeout")
+
+        async def close(self):
+            pass
+
+    class _AuthCtx:
+        async def new_page(self):
+            return _AuthPage()
+
+        async def cookies(self):
+            return []
+
+        async def close(self):
+            pass
+
+    class _AuthBrowser:
+        async def new_context(self, **kw):
+            return _AuthCtx()
+
+        async def close(self):
+            pass
+
+    class _PW:
+        class chromium:
+            @staticmethod
+            async def launch(headless):
+                return _AuthBrowser()
+
+        @staticmethod
+        async def stop():
+            pass
+
+    class _PWManager:
+        async def start(self):
+            return _PW()
+
+    monkeypatch.setattr(scanner_module, "async_playwright", lambda: _PWManager())
+
+    class _ScanCtx:
+        async def add_cookies(self, c):
+            pass
+
+    sc = ElementScannerService(timeout_ms=5000)
+    await sc._handle_login_flow(
+        _ScanCtx(),
+        "https://login-hmg.comerc.com.br/login?redirect_uri=https%3A%2F%2Fapp.example.com%2F",
+        "https://app.example.com/",
+        progress_callback=None,
+    )
+
+
+@pytest.mark.asyncio
+async def test_playwright_scan_page_goto_timeout_after_login_logs_message(monkeypatch):
+    """Lines 716-717: PlaywrightTimeoutError from page.goto after _handle_login_flow
+    is caught and a progress message is emitted."""
+
+    class LoginThenTimeoutPage(FakePage):
+        def __init__(self):
+            super().__init__()
+            self.goto_calls = []
+            self.progress = []
+
+        async def goto(self, url, wait_until, timeout):
+            self.goto_calls.append(url)
+            if len(self.goto_calls) == 1:
+                # First goto: simulate login redirect
+                self.url = (
+                    "https://login-hmg.comerc.com.br/login?"
+                    "client_id=x&redirect_uri=https%3A%2F%2Fexample.com%2F"
+                )
+            else:
+                # Second goto (after login): timeout
+                raise scanner_module.PlaywrightTimeoutError("reload timeout")
+
+    progress_msgs: list[str] = []
+
+    async def _capture(msg: str) -> None:
+        progress_msgs.append(msg)
+
+    page = LoginThenTimeoutPage()
+    scanner = ElementScannerService(timeout_ms=5000)
+
+    async def _no_op_login(context, login_url, original_url, cb):
+        pass  # skip actual login so only the reload path is exercised
+
+    monkeypatch.setattr(scanner_module, "_fetch_and_parse", _fake_fetch())
+    monkeypatch.setattr(scanner_module, "_PLAYWRIGHT_AVAILABLE", True)
+    monkeypatch.setattr(
+        scanner_module,
+        "async_playwright",
+        lambda: CustomPagePlaywrightManager(page),
+    )
+    monkeypatch.setattr(scanner, "_handle_login_flow", _no_op_login)
+
+    result = await scanner.scan_url("https://example.com", progress_callback=_capture)
+
+    assert any("Timeout ao recarregar" in m for m in progress_msgs)
+    assert result is not None
+

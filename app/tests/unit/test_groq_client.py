@@ -543,3 +543,46 @@ def test__is_payload_too_large_with_response_status_code():
 
     exc2 = DummyExc2()
     assert client._is_payload_too_large(exc2) is False
+
+
+# ---------------------------------------------------------------------------
+# _build_wwwh_prompt – line 136: extra param appended when non-empty
+# ---------------------------------------------------------------------------
+
+def test_build_wwwh_prompt_includes_extra_when_provided() -> None:
+    """Line 136: when a non-empty `extra` is passed its content appears in the output."""
+    from app.llm.groq_client import GroqClient
+
+    client = GroqClient()
+    result = client._build_wwwh_prompt(
+        what="what text",
+        why="why text",
+        where="where text",
+        how="how text",
+        extra="extra note",
+    )
+    assert "extra note" in result
+    assert result.count("\n\n") == 4  # 4 separators → 5 parts
+
+
+def test_build_wwwh_prompt_excludes_extra_when_none() -> None:
+    """extra=None (default) → only 4 parts, no trailing separator."""
+    from app.llm.groq_client import GroqClient
+
+    client = GroqClient()
+    result = client._build_wwwh_prompt(
+        what="w", why="y", where="o", how="h"
+    )
+    assert result.count("\n\n") == 3  # 3 separators → 4 parts
+
+
+def test_build_wwwh_prompt_excludes_extra_when_whitespace_only() -> None:
+    """extra='   ' is treated as absent (branch: extra.strip() is falsy)."""
+    from app.llm.groq_client import GroqClient
+
+    client = GroqClient()
+    result = client._build_wwwh_prompt(
+        what="w", why="y", where="o", how="h", extra="   "
+    )
+    assert result.count("\n\n") == 3
+
