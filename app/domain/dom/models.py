@@ -7,6 +7,7 @@ from typing import Any
 
 class DOMSectionType(str, Enum):
     """Logical sections of a page DOM."""
+
     HEADER = "header"
     NAVIGATION = "navigation"
     MAIN_CONTENT = "main_content"
@@ -20,6 +21,7 @@ class DOMSectionType(str, Enum):
 @dataclass
 class ProcessedElement:
     """A preprocessed DOM element with minimal essential attributes."""
+
     tag: str
     text: str | None = None
     id: str | None = None
@@ -34,7 +36,7 @@ class ProcessedElement:
     xpath: str | None = None
     visible: bool = True
     children: list["ProcessedElement"] = field(default_factory=list)
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary, excluding None values and empty lists."""
         data = {}
@@ -67,7 +69,7 @@ class ProcessedElement:
         if self.children:
             data["children"] = [child.to_dict() for child in self.children]
         return data
-    
+
     def estimate_char_size(self) -> int:
         """Estimate character size for token calculation."""
         size = len(self.tag) + 10  # tag and minimal structure
@@ -85,18 +87,19 @@ class ProcessedElement:
 @dataclass
 class DOMSection:
     """A logical section of the DOM with related elements."""
+
     section_type: DOMSectionType
     name: str  # Human-readable name
     elements: list[ProcessedElement] = field(default_factory=list)
     raw_html: str = ""  # Original HTML snippet
-    
+
     def estimate_char_size(self) -> int:
         """Estimate total character size."""
         size = len(self.raw_html)
         for elem in self.elements:
             size += elem.estimate_char_size()
         return size
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Convert section to dictionary."""
         return {
@@ -110,10 +113,11 @@ class DOMSection:
 @dataclass
 class DOMSegmentationResult:
     """Result of DOM segmentation into sections."""
+
     sections: list[DOMSection] = field(default_factory=list)
     total_char_size: int = 0
     segmentation_metadata: dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
@@ -127,13 +131,14 @@ class DOMSegmentationResult:
 @dataclass
 class DOMChunk:
     """A chunk of DOM small enough for LLM processing."""
+
     chunk_id: str
     section_type: DOMSectionType
     section_name: str
     elements: list[ProcessedElement]
     char_size: int
     priority: int = 0  # Higher priority first
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
@@ -149,6 +154,7 @@ class DOMChunk:
 @dataclass
 class ChunkProcessingResult:
     """Result from processing a single DOM chunk through LLM."""
+
     chunk_id: str
     section_type: DOMSectionType
     section_name: str

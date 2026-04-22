@@ -5,7 +5,10 @@ import re
 from typing import Any
 
 from app.domain.dom.models import (
-    DOMSection, DOMSectionType, DOMSegmentationResult, ProcessedElement
+    DOMSection,
+    DOMSectionType,
+    DOMSegmentationResult,
+    ProcessedElement,
 )
 
 logger = logging.getLogger(__name__)
@@ -60,28 +63,28 @@ class DOMSegmenter:
 
     def segment_page(self, page_structure: dict) -> DOMSegmentationResult:
         """Segment page into logical sections.
-        
+
         Args:
             page_structure: Page structure dict
-            
+
         Returns:
             DOMSegmentationResult with identified sections
         """
         self._processed_elements = {}
         result = DOMSegmentationResult()
-        
+
         if "dom_tree" not in page_structure:
             logger.warning("No dom_tree in page_structure")
             return result
-        
+
         # First pass: identify known sections by semantic tags/ids/classes
         dom_tree = page_structure["dom_tree"]
         self._extract_semantic_sections(dom_tree, result)
-        
+
         # Second pass: collect remaining interactive elements into appropriate sections
         remaining = self._collect_interactive_elements(dom_tree)
         self._classify_remaining_elements(remaining, result)
-        
+
         # Add unclassified elements to unknown section if any
         if remaining:
             unknown_section = DOMSection(
@@ -90,16 +93,16 @@ class DOMSegmenter:
                 elements=remaining,
             )
             result.sections.append(unknown_section)
-        
+
         # Calculate total size
         result.total_char_size = sum(s.estimate_char_size() for s in result.sections)
-        
+
         logger.info(
             "Segmented page into %d sections (total size: %d chars)",
             len(result.sections),
             result.total_char_size,
         )
-        
+
         return result
 
     def _extract_semantic_sections(
@@ -110,10 +113,10 @@ class DOMSegmenter:
             for child in elem:
                 self._extract_semantic_sections(child, result)
             return
-        
+
         if not isinstance(elem, dict):
             return
-        
+
         # Check if this element matches a known section pattern
         section_type = self._match_section_pattern(elem)
         if section_type:
@@ -121,7 +124,7 @@ class DOMSegmenter:
             if section:
                 result.sections.append(section)
                 return  # Don't process children further
-        
+
         # Recurse into children
         for child in elem.get("children", []):
             self._extract_semantic_sections(child, result)
@@ -132,13 +135,15 @@ class DOMSegmenter:
         elem_id = elem.get("id", "").lower()
         elem_class = elem.get("class", "").lower()
         elem_role = elem.get("role", "").lower()
-        
+
         for section_type, patterns in self.SECTION_PATTERNS.items():
             for pattern in patterns:
-                if not self._match_pattern(pattern, tag, elem_id, elem_class, elem_role):
+                if not self._match_pattern(
+                    pattern, tag, elem_id, elem_class, elem_role
+                ):
                     continue
                 return section_type
-        
+
         return None
 
     def _match_pattern(
@@ -147,34 +152,36 @@ class DOMSegmenter:
         """Check if element matches pattern."""
         if pattern.get("tag") and pattern["tag"] != tag:
             return False
-        
+
         if pattern.get("id_pattern"):
             if not elem_id or not re.search(pattern["id_pattern"], elem_id):
                 return False
-        
+
         if pattern.get("class_pattern"):
             if not elem_class or not re.search(pattern["class_pattern"], elem_class):
                 return False
-        
+
         if pattern.get("role"):
             if pattern["role"] != elem_role:
                 return False
-        
+
         return True
 
-    def _extract_section(self, elem: dict, section_type: DOMSectionType) -> DOMSection | None:
+    def _extract_section(
+        self, elem: dict, section_type: DOMSectionType
+    ) -> DOMSection | None:
         """Extract a complete section (elem + children) as DOM elements."""
         if not isinstance(elem, dict):
             return None
-        
+
         processed_elem = self._dict_to_element(elem)
         if not processed_elem:
             return None
-        
+
         # Flatten element tree to list for easier processing
         elements = []
         self._flatten_elements(processed_elem, elements)
-        
+
         name = self._get_section_name(section_type, elem)
         return DOMSection(
             section_type=section_type,
@@ -183,7 +190,9 @@ class DOMSegmenter:
             raw_html=elem.get("tag", ""),
         )
 
-    def _collect_interactive_elements(self, elem: dict | list) -> list[ProcessedElement]:
+    def _collect_interactive_elements(
+        self, elem: dict | list
+    ) -> list[ProcessedElement]:
         """Collect all interactive elements from the tree."""
         elements = []
         self._collect_interactive_recursive(elem, elements)
@@ -197,22 +206,29 @@ class DOMSegmenter:
             for child in elem:
                 self._collect_interactive_recursive(child, result)
             return
-        
+
         if not isinstance(elem, dict):
             return
-        
+
         tag = elem.get("tag", "").lower()
         interactive_tags = {
-            "button", "a", "input", "select", "textarea", "form",
-            "label", "option", "fieldset"
+            "button",
+            "a",
+            "input",
+            "select",
+            "textarea",
+            "form",
+            "label",
+            "option",
+            "fieldset",
         }
-        
+
         # Add interactive elements directly
         if tag in interactive_tags:
             processed = self._dict_to_element(elem)
             if processed:
                 result.append(processed)
-        
+
         # Recurse into children
         for child in elem.get("children", []):
             self._collect_interactive_recursive(child, result)
@@ -224,7 +240,7 @@ class DOMSegmenter:
         form_elements = []
         nav_elements = []
         other_elements = []
-        
+
         for elem in elements:
             if elem.tag in {"input", "textarea", "select", "label", "fieldset"}:
                 form_elements.append(elem)
@@ -232,21 +248,25 @@ class DOMSegmenter:
                 nav_elements.append(elem)
             else:
                 other_elements.append(elem)
-        
+
         if form_elements:
-            result.sections.append(DOMSection(
-                section_type=DOMSectionType.FORMS,
-                name="Form Elements",
-                elements=form_elements,
-            ))
-        
+            result.sections.append(
+                DOMSection(
+                    section_type=DOMSectionType.FORMS,
+                    name="Form Elements",
+                    elements=form_elements,
+                )
+            )
+
         if nav_elements:
-            result.sections.append(DOMSection(
-                section_type=DOMSectionType.NAVIGATION,
-                name="Navigation Links",
-                elements=nav_elements,
-            ))
-        
+            result.sections.append(
+                DOMSection(
+                    section_type=DOMSectionType.NAVIGATION,
+                    name="Navigation Links",
+                    elements=nav_elements,
+                )
+            )
+
         # Store other elements for later
         for elem in other_elements:
             elements.remove(elem)
@@ -255,7 +275,7 @@ class DOMSegmenter:
         """Convert dict element to ProcessedElement."""
         if not elem_dict:
             return None
-        
+
         return ProcessedElement(
             tag=elem_dict.get("tag", ""),
             text=elem_dict.get("text"),
@@ -270,8 +290,11 @@ class DOMSegmenter:
             onclick=elem_dict.get("onclick"),
             xpath=elem_dict.get("xpath"),
             visible=elem_dict.get("visible", True),
-            children=[self._dict_to_element(child) 
-                     for child in elem_dict.get("children", []) if child],
+            children=[
+                self._dict_to_element(child)
+                for child in elem_dict.get("children", [])
+                if child
+            ],
         )
 
     def _flatten_elements(

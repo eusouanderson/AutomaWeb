@@ -15,7 +15,7 @@ async def test_engine():
 
 async def test_init_db(test_engine) -> None:
     await init_db(test_engine)
-    
+
     # Verify tables were created
     async with test_engine.begin() as conn:
         result = await conn.run_sync(
@@ -28,7 +28,7 @@ async def test_get_async_session() -> None:
     gen = get_async_session()
     session = await gen.__anext__()
     assert isinstance(session, AsyncSession)
-    
+
     try:
         await gen.__anext__()
     except StopAsyncIteration:

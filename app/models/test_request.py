@@ -19,4 +19,9 @@ class TestRequest(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     project = relationship("Project", back_populates="test_requests")
-    generated_test = relationship("GeneratedTest", back_populates="test_request", uselist=False, cascade="all, delete-orphan")
+    generated_test = relationship(
+        "GeneratedTest",
+        back_populates="test_request",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )

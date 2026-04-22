@@ -21,7 +21,7 @@ def test_settings_custom_values() -> None:
         GROQ_TIMEOUT_SECONDS=60,
         GROQ_MAX_RETRIES=5,
         CACHE_TTL_SECONDS=600,
-        STATIC_DIR="custom/static"
+        STATIC_DIR="custom/static",
     )
     assert settings.APP_NAME == "CustomApp"
     assert settings.DATABASE_URL == "postgresql://test"

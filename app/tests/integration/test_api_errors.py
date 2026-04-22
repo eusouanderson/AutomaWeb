@@ -10,7 +10,7 @@ from app.models.project import Project
 from app.repositories.project_repository import ProjectRepository
 from app.services.test_service import TestService
 
- 
+
 class DummyGroqClient:
     def generate_robot_test(
         self,
@@ -46,16 +46,20 @@ def override_dependencies(session: AsyncSession):
         original_init(self, *args, **kwargs)
 
     TestService.__init__ = patched_init
-    
+
     yield
-    
+
     app.dependency_overrides.clear()
     TestService.__init__ = original_init
 
 
 async def test_create_project_with_description(session: AsyncSession) -> None:
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        resp = await client.post("/projects", json={"name": "Project 1", "description": "A description"})
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        resp = await client.post(
+            "/projects", json={"name": "Project 1", "description": "A description"}
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["name"] == "Project 1"
@@ -64,19 +68,26 @@ async def test_create_project_with_description(session: AsyncSession) -> None:
 
 async def test_get_nonexistent_project(session: AsyncSession) -> None:
     from app.services.project_service import ProjectService
+
     service = ProjectService()
     project = await service.get_project(session, 9999)
     assert project is None
 
 
 async def test_generate_with_context(session: AsyncSession) -> None:
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         project_resp = await client.post("/projects", json={"name": "P1"})
         project_id = project_resp.json()["id"]
 
         gen_resp = await client.post(
             "/tests/generate",
-            json={"project_id": project_id, "prompt": "Test login", "context": "Use Chrome browser"},
+            json={
+                "project_id": project_id,
+                "prompt": "Test login",
+                "context": "Use Chrome browser",
+            },
         )
         assert gen_resp.status_code == 200
         assert gen_resp.json()["content"] is not None
@@ -95,15 +106,23 @@ async def test_generate_returns_503_when_llm_unavailable(
         api_error = type("APIConnectionError", (Exception,), {})
         raise api_error("connection failed")
 
-    monkeypatch.setattr(DummyGroqClient, "generate_robot_test", failing_generate_robot_test)
+    monkeypatch.setattr(
+        DummyGroqClient, "generate_robot_test", failing_generate_robot_test
+    )
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         project_resp = await client.post("/projects", json={"name": "P2"})
         project_id = project_resp.json()["id"]
 
         gen_resp = await client.post(
             "/tests/generate",
-            json={"project_id": project_id, "prompt": "Test login", "context": "Use Chrome browser"},
+            json={
+                "project_id": project_id,
+                "prompt": "Test login",
+                "context": "Use Chrome browser",
+            },
         )
         assert gen_resp.status_code == 503
         assert "Groq" in gen_resp.json()["detail"]

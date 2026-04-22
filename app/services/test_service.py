@@ -19,32 +19,36 @@ _ROBOT_VAR_CORRECTIONS: dict[str, str] = {
 }
 
 # Assertion keywords that REQUIRE at least 2 positional arguments.
-_ASSERTIONS_MIN_2_ARGS: frozenset[str] = frozenset({
-    "Should Be Equal",
-    "Should Be Equal As Numbers",
-    "Should Be Equal As Integers",
-    "Should Be Equal As Strings",
-    "Should Contain",
-    "Should Not Contain",
-    "Should Match",
-    "Should Match Regexp",
-    "Should Not Match Regexp",
-    "Should Not Be Equal",
-    "Should Not Be Equal As Integers",
-    "Should Not Be Equal As Numbers",
-})
+_ASSERTIONS_MIN_2_ARGS: frozenset[str] = frozenset(
+    {
+        "Should Be Equal",
+        "Should Be Equal As Numbers",
+        "Should Be Equal As Integers",
+        "Should Be Equal As Strings",
+        "Should Contain",
+        "Should Not Contain",
+        "Should Match",
+        "Should Match Regexp",
+        "Should Not Match Regexp",
+        "Should Not Be Equal",
+        "Should Not Be Equal As Integers",
+        "Should Not Be Equal As Numbers",
+    }
+)
 
 # Keyword "metadata" settings lines — a keyword with ONLY these is empty.
-_KW_METADATA_TAGS: frozenset[str] = frozenset({
-    "[documentation]",
-    "[arguments]",
-    "[tags]",
-    "[return]",
-    "[timeout]",
-    "[setup]",
-    "[teardown]",
-    "[template]",
-})
+_KW_METADATA_TAGS: frozenset[str] = frozenset(
+    {
+        "[documentation]",
+        "[arguments]",
+        "[tags]",
+        "[return]",
+        "[timeout]",
+        "[setup]",
+        "[teardown]",
+        "[template]",
+    }
+)
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from tenacity import RetryError
@@ -107,8 +111,12 @@ class TestService:
         if not project:
             raise ValueError("Project not found")
 
-        test_request = TestRequest(project_id=project_id, prompt=prompt, context=context, status="processing")
-        test_request = await self._test_repository.create_test_request(session, test_request)
+        test_request = TestRequest(
+            project_id=project_id, prompt=prompt, context=context, status="processing"
+        )
+        test_request = await self._test_repository.create_test_request(
+            session, test_request
+        )
 
         page_structure: dict | None = None
         if project.url:
@@ -125,8 +133,12 @@ class TestService:
                     scan_result = await self._element_scanner.scan_url(str(project.url))
                 except ElementScannerError as exc:
                     test_request.status = "failed"
-                    await self._test_repository.update_test_request(session, test_request)
-                    logger.error("Failed to scan project URL before generating test: %s", exc)
+                    await self._test_repository.update_test_request(
+                        session, test_request
+                    )
+                    logger.error(
+                        "Failed to scan project URL before generating test: %s", exc
+                    )
                     raise ScanUnavailableError(str(exc)) from exc
                 page_structure = scan_result.model_dump()
                 # Persist updated scan in project cache
@@ -154,7 +166,10 @@ class TestService:
             raise LLMServiceUnavailableError("LLM provider connection failed") from exc
         except PayloadTooLargeError as exc:
             if page_structure and settings.LLM_DOM_CHUNKING_ENABLED:
-                logger.warning("LLM payload too large. Trying DOM chunked generation for project %s", project_id)
+                logger.warning(
+                    "LLM payload too large. Trying DOM chunked generation for project %s",
+                    project_id,
+                )
                 try:
                     content = await asyncio.to_thread(
                         self._generate_robot_test_chunked,
@@ -164,21 +179,36 @@ class TestService:
                     )
                 except PayloadTooLargeError:
                     test_request.status = "failed"
-                    await self._test_repository.update_test_request(session, test_request)
-                    logger.error("Failed to generate test: LLM payload too large even after chunked generation")
-                    raise LLMServiceUnavailableError("LLM request payload too large") from exc
+                    await self._test_repository.update_test_request(
+                        session, test_request
+                    )
+                    logger.error(
+                        "Failed to generate test: LLM payload too large even after chunked generation"
+                    )
+                    raise LLMServiceUnavailableError(
+                        "LLM request payload too large"
+                    ) from exc
             else:
                 test_request.status = "failed"
                 await self._test_repository.update_test_request(session, test_request)
-                logger.error("Failed to generate test: LLM payload too large even after fallback")
-                raise LLMServiceUnavailableError("LLM request payload too large") from exc
+                logger.error(
+                    "Failed to generate test: LLM payload too large even after fallback"
+                )
+                raise LLMServiceUnavailableError(
+                    "LLM request payload too large"
+                ) from exc
         except Exception as exc:
             error_name = exc.__class__.__name__
             if "APIConnectionError" in error_name or "APITimeoutError" in error_name:
                 test_request.status = "failed"
                 await self._test_repository.update_test_request(session, test_request)
-                logger.error("Failed to generate test due to LLM connectivity issue: %s", error_name)
-                raise LLMServiceUnavailableError("LLM provider connection failed") from exc
+                logger.error(
+                    "Failed to generate test due to LLM connectivity issue: %s",
+                    error_name,
+                )
+                raise LLMServiceUnavailableError(
+                    "LLM provider connection failed"
+                ) from exc
             raise
 
         content = self._sanitize_robot_output(content, context=context)
@@ -197,23 +227,32 @@ class TestService:
         test_request.status = "completed"
         await self._test_repository.update_test_request(session, test_request)
 
-        file_path = self._write_robot_file(test_request.id, content, project.name, project.test_directory)
+        file_path = self._write_robot_file(
+            test_request.id, content, project.name, project.test_directory
+        )
         generated_test = GeneratedTest(
             test_request_id=test_request.id,
             content=content,
             file_path=str(file_path),
         )
-        return await self._test_repository.create_generated_test(session, generated_test)
+        return await self._test_repository.create_generated_test(
+            session, generated_test
+        )
 
-
-    async def get_generated_test(self, session: AsyncSession, test_id: int) -> GeneratedTest | None:
+    async def get_generated_test(
+        self, session: AsyncSession, test_id: int
+    ) -> GeneratedTest | None:
         return await self._test_repository.get_generated_test(session, test_id)
 
-    async def list_generated_tests_by_project(self, session: AsyncSession, project_id: int) -> list[GeneratedTest]:
+    async def list_generated_tests_by_project(
+        self, session: AsyncSession, project_id: int
+    ) -> list[GeneratedTest]:
         project = await self._project_repository.get(session, project_id)
         if not project:
             raise ValueError("Project not found")
-        return await self._test_repository.list_generated_tests_by_project(session, project_id)
+        return await self._test_repository.list_generated_tests_by_project(
+            session, project_id
+        )
 
     async def delete_generated_test(self, session: AsyncSession, test_id: int) -> bool:
         generated = await self._test_repository.get_generated_test(session, test_id)
@@ -230,15 +269,23 @@ class TestService:
         await self._test_repository.delete_generated_test(session, generated)
         return True
 
-    async def improve_robot_test(self, session: AsyncSession, test_id: int, content: str) -> str | None:
+    async def improve_robot_test(
+        self, session: AsyncSession, test_id: int, content: str
+    ) -> str | None:
         """Send Robot Framework content to the AI (with page scan context) and return improved version."""
         generated = await self._test_repository.get_generated_test(session, test_id)
         if not generated:
             return None
 
         # Resolve project to get scan context
-        test_request = await self._test_repository.get_test_request(session, generated.test_request_id)
-        project = await self._project_repository.get(session, test_request.project_id) if test_request else None
+        test_request = await self._test_repository.get_test_request(
+            session, generated.test_request_id
+        )
+        project = (
+            await self._project_repository.get(session, test_request.project_id)
+            if test_request
+            else None
+        )
 
         page_structure: dict | None = None
         if project and project.url:
@@ -261,8 +308,14 @@ class TestService:
             )
         except Exception as exc:
             error_name = exc.__class__.__name__
-            if "APIConnectionError" in error_name or "APITimeoutError" in error_name or "RetryError" in error_name:
-                raise LLMServiceUnavailableError("LLM provider connection failed") from exc
+            if (
+                "APIConnectionError" in error_name
+                or "APITimeoutError" in error_name
+                or "RetryError" in error_name
+            ):
+                raise LLMServiceUnavailableError(
+                    "LLM provider connection failed"
+                ) from exc
             raise
         return self._sanitize_robot_output(improved)
 
@@ -313,7 +366,11 @@ class TestService:
         project_name: str,
         test_directory: str | None = None,
     ) -> Path:
-        base_dir = Path(test_directory) if test_directory else Path(settings.STATIC_DIR) / "projects"
+        base_dir = (
+            Path(test_directory)
+            if test_directory
+            else Path(settings.STATIC_DIR) / "projects"
+        )
         safe_name = self._safe_dir_name(project_name)
         project_dir = base_dir / safe_name
         os.makedirs(project_dir, exist_ok=True)
@@ -323,12 +380,23 @@ class TestService:
         return file_path
 
     def _safe_dir_name(self, name: str) -> str:
-        safe = "".join(c for c in name if c.isalnum() or c in ("-", "_", " ")).strip().replace(" ", "_") or "project"
+        safe = (
+            "".join(c for c in name if c.isalnum() or c in ("-", "_", " "))
+            .strip()
+            .replace(" ", "_")
+            or "project"
+        )
         return f"🧪_{safe}"
 
-    def _generate_robot_test_chunked(self, prompt: str, context: str | None, page_structure: dict) -> str:
+    def _generate_robot_test_chunked(
+        self, prompt: str, context: str | None, page_structure: dict
+    ) -> str:
         base_target = max(200, settings.LLM_DOM_CHUNK_TARGET_CHARS)
-        target_candidates = [base_target, max(800, base_target // 2), max(400, base_target // 4)]
+        target_candidates = [
+            base_target,
+            max(800, base_target // 2),
+            max(400, base_target // 4),
+        ]
 
         # Preserve order and avoid duplicate retries with the same target size.
         deduped_targets: list[int] = []
@@ -337,11 +405,16 @@ class TestService:
                 deduped_targets.append(target)
 
         last_payload_error: PayloadTooLargeError | None = None
-        structure_candidates = [page_structure, self._compact_page_structure(page_structure)]
+        structure_candidates = [
+            page_structure,
+            self._compact_page_structure(page_structure),
+        ]
 
         for structure_idx, candidate_structure in enumerate(structure_candidates):
             for target_chars in deduped_targets:
-                chunks = self._split_page_structure(candidate_structure, target_chars=target_chars)
+                chunks = self._split_page_structure(
+                    candidate_structure, target_chars=target_chars
+                )
                 if len(chunks) <= 1:
                     continue
 
@@ -374,7 +447,9 @@ class TestService:
             raise last_payload_error
         raise PayloadTooLargeError("Page structure cannot be split into smaller chunks")
 
-    def _generate_from_chunks(self, prompt: str, context: str | None, chunks: list[dict]) -> tuple[str, list[dict]]:
+    def _generate_from_chunks(
+        self, prompt: str, context: str | None, chunks: list[dict]
+    ) -> tuple[str, list[dict]]:
         partial_outputs: list[str] = []
         chunk_parts_meta: list[dict] = []
 
@@ -394,7 +469,9 @@ class TestService:
             chunk_parts_meta.append(
                 {
                     "index": idx,
-                    "approx_chars": len(json.dumps(chunk, ensure_ascii=False, separators=(",", ":"))),
+                    "approx_chars": len(
+                        json.dumps(chunk, ensure_ascii=False, separators=(",", ":"))
+                    ),
                     "keys": sorted(str(key) for key in chunk.keys()),
                 }
             )
@@ -420,7 +497,9 @@ class TestService:
                     if isinstance(item, str):
                         compacted[key] = item[:max_string_chars]
                     elif isinstance(item, list):
-                        compacted[key] = [compact(entry) for entry in item[:max_items_per_list]]
+                        compacted[key] = [
+                            compact(entry) for entry in item[:max_items_per_list]
+                        ]
                     elif isinstance(item, dict):
                         compacted[key] = compact(item)
                     else:
@@ -430,9 +509,13 @@ class TestService:
 
         return compact(page_structure)  # type: ignore[arg-type]
 
-    def _split_page_structure(self, page_structure: dict, target_chars: int | None = None) -> list[dict]:
+    def _split_page_structure(
+        self, page_structure: dict, target_chars: int | None = None
+    ) -> list[dict]:
         target_chars = max(200, target_chars or settings.LLM_DOM_CHUNK_TARGET_CHARS)
-        serialized = json.dumps(page_structure, ensure_ascii=False, separators=(",", ":"))
+        serialized = json.dumps(
+            page_structure, ensure_ascii=False, separators=(",", ":")
+        )
         if len(serialized) <= target_chars:
             return [page_structure]
 
@@ -451,8 +534,13 @@ class TestService:
 
         # Fallback when nothing is splittable: chunk a minified string payload.
         if not sequence_items:
-            text_chunks = [serialized[i:i + target_chars] for i in range(0, len(serialized), target_chars)]
-            return [{"chunk_text": t, "chunk_format": "json-minified"} for t in text_chunks]
+            text_chunks = [
+                serialized[i : i + target_chars]
+                for i in range(0, len(serialized), target_chars)
+            ]
+            return [
+                {"chunk_text": t, "chunk_format": "json-minified"} for t in text_chunks
+            ]
 
         chunks: list[dict] = []
         current: dict = dict(scalar_base)
@@ -472,7 +560,9 @@ class TestService:
         for dotted_key, value in sequence_items:
             candidate = json.loads(json.dumps(current, ensure_ascii=False))
             append_entry(candidate, dotted_key, value)
-            candidate_len = len(json.dumps(candidate, ensure_ascii=False, separators=(",", ":")))
+            candidate_len = len(
+                json.dumps(candidate, ensure_ascii=False, separators=(",", ":"))
+            )
 
             if candidate_len <= target_chars:
                 current = candidate
@@ -663,7 +753,8 @@ class TestService:
             block_lines = block.splitlines(keepends=True)
             step_lines = block_lines[1:]  # everything after the keyword name
             has_executable = any(
-                ln.strip() and not ln.strip().lower().startswith(tuple(_KW_METADATA_TAGS))
+                ln.strip()
+                and not ln.strip().lower().startswith(tuple(_KW_METADATA_TAGS))
                 for ln in step_lines
             )
             if not has_executable:
@@ -678,7 +769,9 @@ class TestService:
                 patched.append(block)
         return "".join(patched)
 
-    def _harden_robot_lines(self, lines: list[str], context: str | None = None) -> list[str]:
+    def _harden_robot_lines(
+        self, lines: list[str], context: str | None = None
+    ) -> list[str]:
         strict_selectors = self._extract_strict_mode_selectors(context)
         selector_keywords = {
             "Click",
@@ -703,7 +796,9 @@ class TestService:
 
             if keyword == "Open Browser" and len(parts) >= 2:
                 page_url = parts[1]
-                hardened.append(f"{indent}New Browser    chromium    headless=${{HEADLESS}}")
+                hardened.append(
+                    f"{indent}New Browser    chromium    headless=${{HEADLESS}}"
+                )
                 hardened.append(f"{indent}New Context")
                 hardened.append(f"{indent}Set Browser Timeout    30s")
                 hardened.append(f"{indent}New Page    {page_url}")
@@ -723,7 +818,10 @@ class TestService:
                 if self._is_class_only_css_selector(selector):
                     selector = self._make_selector_unique(selector)
 
-                if selector in strict_selectors or selector.replace("css=", "") in strict_selectors:
+                if (
+                    selector in strict_selectors
+                    or selector.replace("css=", "") in strict_selectors
+                ):
                     selector = self._make_selector_unique(selector)
 
                 parts[1] = selector
@@ -800,8 +898,10 @@ class TestService:
             return selector
         if selector.startswith("css="):
             return f"{selector} >> nth=0"
-        if selector.startswith("#") or selector.startswith("[") or re.match(
-            r"^[a-zA-Z][\w-]*(?:[\[\.:#].*)?$", selector
+        if (
+            selector.startswith("#")
+            or selector.startswith("[")
+            or re.match(r"^[a-zA-Z][\w-]*(?:[\[\.:#].*)?$", selector)
         ):
             return f"css={selector} >> nth=0"
         return selector

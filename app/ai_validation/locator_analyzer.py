@@ -48,11 +48,17 @@ class LocatorAnalyzer:
     def inspect(self, locator: str) -> LocatorInspection:
         normalized = self.normalize_locator(locator)
         xpath_value = normalized[6:] if normalized.startswith("xpath=") else ""
-        is_generic_xpath = bool(xpath_value and any(p.match(xpath_value) for p in GENERIC_XPATH_PATTERNS))
+        is_generic_xpath = bool(
+            xpath_value and any(p.match(xpath_value) for p in GENERIC_XPATH_PATTERNS)
+        )
 
         suggested = None
         if is_generic_xpath:
-            tag = xpath_value.replace("//", "").replace(".//", "").strip(" ()[]0123456789")
+            tag = (
+                xpath_value.replace("//", "")
+                .replace(".//", "")
+                .strip(" ()[]0123456789")
+            )
             suggested = f"css={tag}[data-testid]" if tag else "css=[data-testid]"
 
         return LocatorInspection(
@@ -89,9 +95,15 @@ class LocatorAnalyzer:
                         for locator in locators:
                             normalized = self.normalize_locator(locator)
                             try:
-                                results[locator] = int(await page.locator(normalized).count())
+                                results[locator] = int(
+                                    await page.locator(normalized).count()
+                                )
                             except Exception as exc:  # pragma: no cover
-                                logger.debug("count_matches_bulk: locator %r failed: %s", locator, exc)
+                                logger.debug(
+                                    "count_matches_bulk: locator %r failed: %s",
+                                    locator,
+                                    exc,
+                                )
                     finally:
                         await context.close()
                 finally:
@@ -99,12 +111,16 @@ class LocatorAnalyzer:
         except PlaywrightTimeoutError:
             logger.debug("count_matches_bulk: navigation to %s timed out", page_url)
         except Exception as exc:
-            logger.debug("count_matches_bulk: unexpected error for %s: %s", page_url, exc)
+            logger.debug(
+                "count_matches_bulk: unexpected error for %s: %s", page_url, exc
+            )
 
         return results
 
     # kept for backwards-compat with tests that call it directly
-    async def count_matches(self, page_url: str, locator: str, timeout_ms: int = 10_000) -> int | None:
+    async def count_matches(
+        self, page_url: str, locator: str, timeout_ms: int = 10_000
+    ) -> int | None:
         results = await self.count_matches_bulk(
             page_url=page_url,
             locators=[locator],

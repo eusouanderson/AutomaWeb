@@ -53,8 +53,12 @@ def override_dependencies(session: AsyncSession):
 async def test_create_project_endpoint(session: AsyncSession) -> None:
     from httpx import ASGITransport
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        response = await client.post("/projects", json={"name": "API Project", "description": "API Desc"})
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/projects", json={"name": "API Project", "description": "API Desc"}
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["name"] == "API Project"
@@ -65,10 +69,12 @@ async def test_create_project_endpoint(session: AsyncSession) -> None:
 async def test_list_projects_endpoint(session: AsyncSession) -> None:
     from httpx import ASGITransport
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         await client.post("/projects", json={"name": "P1"})
         await client.post("/projects", json={"name": "P2"})
-        
+
         response = await client.get("/projects")
         assert response.status_code == 200
         data = response.json()
@@ -78,8 +84,12 @@ async def test_list_projects_endpoint(session: AsyncSession) -> None:
 async def test_generate_test_endpoint(session: AsyncSession) -> None:
     from httpx import ASGITransport
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        project_resp = await client.post("/projects", json={"name": "P1", "description": "Desc"})
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        project_resp = await client.post(
+            "/projects", json={"name": "P1", "description": "Desc"}
+        )
         assert project_resp.status_code == 200
         project_id = project_resp.json()["id"]
 
@@ -94,7 +104,9 @@ async def test_generate_test_endpoint(session: AsyncSession) -> None:
 async def test_generate_test_nonexistent_project(session: AsyncSession) -> None:
     from httpx import ASGITransport
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         resp = await client.post(
             "/tests/generate",
             json={"project_id": 9999, "prompt": "Gerar"},
@@ -105,8 +117,12 @@ async def test_generate_test_nonexistent_project(session: AsyncSession) -> None:
 async def test_list_project_tests_endpoint(session: AsyncSession) -> None:
     from httpx import ASGITransport
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        project_resp = await client.post("/projects", json={"name": "ListTestsProject", "description": "Desc"})
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        project_resp = await client.post(
+            "/projects", json={"name": "ListTestsProject", "description": "Desc"}
+        )
         assert project_resp.status_code == 200
         project_id = project_resp.json()["id"]
 
@@ -126,25 +142,31 @@ async def test_list_project_tests_endpoint(session: AsyncSession) -> None:
 
 async def test_get_test_endpoint(session: AsyncSession) -> None:
     from httpx import ASGITransport
+
     # Create a test directly via repository
     from app.models.project import Project
     from app.models.test_request import TestRequest
     from app.models.generated_test import GeneratedTest
     from app.repositories.project_repository import ProjectRepository
     from app.repositories.test_repository import TestRepository
-    
+
     project_repo = ProjectRepository()
     test_repo = TestRepository()
-    
+
     project = await project_repo.create(session, Project(name="Test"))
     test_request = await test_repo.create_test_request(
         session, TestRequest(project_id=project.id, prompt="Test", status="completed")
     )
     generated = await test_repo.create_generated_test(
-        session, GeneratedTest(test_request_id=test_request.id, content="Test", file_path="/tmp/test.robot")
+        session,
+        GeneratedTest(
+            test_request_id=test_request.id, content="Test", file_path="/tmp/test.robot"
+        ),
     )
-    
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         resp = await client.get(f"/tests/{generated.id}")
         assert resp.status_code == 200
         assert resp.json()["id"] == generated.id
@@ -153,7 +175,9 @@ async def test_get_test_endpoint(session: AsyncSession) -> None:
 async def test_get_nonexistent_test_endpoint(session: AsyncSession) -> None:
     from httpx import ASGITransport
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         resp = await client.get("/tests/9999")
         assert resp.status_code == 404
 
@@ -166,23 +190,28 @@ async def test_download_test_endpoint(session: AsyncSession, tmp_path) -> None:
     from app.repositories.project_repository import ProjectRepository
     from app.repositories.test_repository import TestRepository
     from pathlib import Path
-    
+
     # Create test file
     test_file = tmp_path / "test.robot"
     test_file.write_text("*** Settings ***\nLibrary    Browser")
-    
+
     project_repo = ProjectRepository()
     test_repo = TestRepository()
-    
+
     project = await project_repo.create(session, Project(name="Test"))
     test_request = await test_repo.create_test_request(
         session, TestRequest(project_id=project.id, prompt="Test", status="completed")
     )
     generated = await test_repo.create_generated_test(
-        session, GeneratedTest(test_request_id=test_request.id, content="Test", file_path=str(test_file))
+        session,
+        GeneratedTest(
+            test_request_id=test_request.id, content="Test", file_path=str(test_file)
+        ),
     )
-    
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         resp = await client.get(f"/tests/{generated.id}/download")
         assert resp.status_code == 200
         assert "robot" in resp.headers.get("content-disposition", "")
@@ -191,7 +220,9 @@ async def test_download_test_endpoint(session: AsyncSession, tmp_path) -> None:
 async def test_download_nonexistent_test(session: AsyncSession) -> None:
     from httpx import ASGITransport
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         resp = await client.get("/tests/9999/download")
         assert resp.status_code == 404
 
@@ -210,7 +241,8 @@ async def test_delete_generated_test_endpoint(session: AsyncSession, tmp_path) -
 
     project = await project_repo.create(session, Project(name="DeleteGeneratedProject"))
     test_request = await test_repo.create_test_request(
-        session, TestRequest(project_id=project.id, prompt="Delete me", status="completed")
+        session,
+        TestRequest(project_id=project.id, prompt="Delete me", status="completed"),
     )
     generated = await test_repo.create_generated_test(
         session,
@@ -221,7 +253,9 @@ async def test_delete_generated_test_endpoint(session: AsyncSession, tmp_path) -
         ),
     )
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         delete_resp = await client.delete(f"/tests/{generated.id}")
         assert delete_resp.status_code == 200
 
@@ -229,7 +263,11 @@ async def test_delete_generated_test_endpoint(session: AsyncSession, tmp_path) -
         assert get_resp.status_code == 404
 
 
-async def test_delete_nonexistent_generated_test_endpoint(session: AsyncSession) -> None:
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+async def test_delete_nonexistent_generated_test_endpoint(
+    session: AsyncSession,
+) -> None:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         delete_resp = await client.delete("/tests/9999")
         assert delete_resp.status_code == 404

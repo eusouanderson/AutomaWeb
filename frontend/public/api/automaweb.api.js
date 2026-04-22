@@ -33,7 +33,7 @@ export function runTests(payload) {
     method: 'POST',
     url: '/executions/run',
     data: payload,
-    timeout: 600000
+    timeout: 600000,
   });
 }
 
@@ -51,4 +51,21 @@ export function improveRobotTest(testId, content) {
 
 export function saveRobotTestContent(testId, content) {
   return request({ method: 'PUT', url: `/tests/${testId}/content`, data: { content } });
+}
+
+export function startVisualBuilder(url) {
+  return request({ method: 'POST', url: '/builder/start', data: { url } });
+}
+
+export function getVisualBuilderSteps(sessionId = null) {
+  const query = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : '';
+  return request({ method: 'GET', url: `/builder/steps${query}` });
+}
+
+export function generateVisualBuilderCode(sessionId = null, prompt = null) {
+  return request({
+    method: 'POST',
+    url: '/builder/generate',
+    data: { session_id: sessionId, prompt },
+  });
 }

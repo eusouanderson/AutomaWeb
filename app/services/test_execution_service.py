@@ -1,4 +1,5 @@
 """Service for executing Robot Framework tests and generating reports"""
+
 import asyncio
 import logging
 import os
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 class TestExecutionService:
     """Service for executing tests and generating reports."""
 
-    _running_projects: set[int] = set() 
+    _running_projects: set[int] = set()
     _rfbrowser_ready = False
 
     def __init__(
@@ -46,16 +47,19 @@ class TestExecutionService:
         speed_ms: int = 0,
     ) -> TestExecution:
         """Execute Robot Framework tests for a project."""
-        
+
         if project_id in self.__class__._running_projects:
             raise ValueError(f"Tests are already running for project {project_id}")
 
         # DB guard — works across restarts and multiple workers
         if session is not None and hasattr(session, "execute"):
             from sqlalchemy import select as _sa_select
+
             _existing = await session.execute(
-                _sa_select(TestExecution)
-                .where(TestExecution.project_id == project_id, TestExecution.status == "running")
+                _sa_select(TestExecution).where(
+                    TestExecution.project_id == project_id,
+                    TestExecution.status == "running",
+                )
             )
             if _existing.scalars().first():
                 raise ValueError(
@@ -78,20 +82,31 @@ class TestExecutionService:
 
             # Get test files - search in project folder
             from app.services.test_service import TestService
+
             safe_name = TestService()._safe_dir_name(project.name)
-            base_dir = Path(project.test_directory) if project.test_directory else Path(settings.STATIC_DIR) / "projects"
+            base_dir = (
+                Path(project.test_directory)
+                if project.test_directory
+                else Path(settings.STATIC_DIR) / "projects"
+            )
             project_dir = base_dir / safe_name
 
             if test_ids:
-                selected_tests = await self._test_repository.list_generated_tests_by_ids_for_project(
-                    session=session,
-                    project_id=project_id,
-                    test_ids=test_ids,
+                selected_tests = (
+                    await self._test_repository.list_generated_tests_by_ids_for_project(
+                        session=session,
+                        project_id=project_id,
+                        test_ids=test_ids,
+                    )
                 )
                 test_files = [test.file_path for test in selected_tests]
             else:
                 # Get all .robot files from project folder
-                test_files = [str(path) for path in project_dir.glob("*.robot")] if project_dir.exists() else []
+                test_files = (
+                    [str(path) for path in project_dir.glob("*.robot")]
+                    if project_dir.exists()
+                    else []
+                )
 
             if not test_files:
                 raise ValueError(f"No test files found in {project_dir}")
@@ -131,7 +146,9 @@ class TestExecutionService:
             await asyncio.to_thread(self._ensure_rfbrowser)
 
             # Prepare temp copies with headless variable injected
-            prepared_files, temp_dir = self._prepare_test_files(test_files, headless, speed_ms)
+            prepared_files, temp_dir = self._prepare_test_files(
+                test_files, headless, speed_ms
+            )
             headless_var = "True" if headless else "False"
 
             # Execute Robot Framework tests
@@ -139,12 +156,18 @@ class TestExecutionService:
                 subprocess.run,
                 [
                     "robot",
-                    "--outputdir", str(output_dir),
-                    "--log", "log.html",
-                    "--report", "report.html",
-                    "--output", "output.xml",
-                    "--variable", f"HEADLESS:{headless_var}",
-                    "--variable", f"SPEED_MS:{int(speed_ms)}",
+                    "--outputdir",
+                    str(output_dir),
+                    "--log",
+                    "log.html",
+                    "--report",
+                    "report.html",
+                    "--output",
+                    "output.xml",
+                    "--variable",
+                    f"HEADLESS:{headless_var}",
+                    "--variable",
+                    f"SPEED_MS:{int(speed_ms)}",
                     *prepared_files,
                 ],
                 capture_output=True,
@@ -162,7 +185,9 @@ class TestExecutionService:
             execution.test_cases = stats.get("test_cases", [])
             execution.status = "completed" if result.returncode == 0 else "failed"
             if result.returncode != 0:
-                execution.error_output = (result.stderr or result.stdout or "").strip() or "Test execution failed"
+                execution.error_output = (
+                    result.stderr or result.stdout or ""
+                ).strip() or "Test execution failed"
             execution.completed_at = datetime.utcnow()
 
             # Ensure report files exist even on failure
@@ -200,7 +225,7 @@ class TestExecutionService:
             session.add(execution)
             await session.commit()
             await session.refresh(execution)
-        print('Execution completed', execution)
+        print("Execution completed", execution)
         return execution
 
     async def list_executions_by_project(
@@ -210,6 +235,7 @@ class TestExecutionService:
     ) -> list[TestExecution]:
         """Return all executions for a project, newest first."""
         from sqlalchemy import select
+
         result = await session.execute(
             select(TestExecution)
             .where(TestExecution.project_id == project_id)
@@ -217,7 +243,9 @@ class TestExecutionService:
         )
         return list(result.scalars().all())
 
-    def _prepare_test_files(self, test_files: list[str], headless: bool, speed_ms: int) -> tuple[list[str], Path]:
+    def _prepare_test_files(
+        self, test_files: list[str], headless: bool, speed_ms: int
+    ) -> tuple[list[str], Path]:
         """Copy test files to a temp dir, injecting headless=${HEADLESS} in every New Browser call."""
         temp_dir = Path(tempfile.mkdtemp(prefix="robot_run_"))
         prepared: list[str] = []
@@ -278,7 +306,9 @@ class TestExecutionService:
 
         # If rfbrowser is available, run init to ensure deps
         try:
-            result = subprocess.run(["rfbrowser", "init"], capture_output=True, text=True, timeout=120)
+            result = subprocess.run(
+                ["rfbrowser", "init"], capture_output=True, text=True, timeout=120
+            )
             if result.returncode == 0:
                 self.__class__._rfbrowser_ready = True
         except Exception as exc:
@@ -349,20 +379,24 @@ class TestExecutionService:
                 status_elem = test_elem.find("status")
                 if status_elem is not None:
                     msg = (status_elem.text or "").strip() or None
-                    test_cases.append({
-                        "name": test_elem.get("name", "Unknown"),
-                        "status": status_elem.get("status", "UNKNOWN"),
-                        "message": msg,
-                    })
+                    test_cases.append(
+                        {
+                            "name": test_elem.get("name", "Unknown"),
+                            "status": status_elem.get("status", "UNKNOWN"),
+                            "message": msg,
+                        }
+                    )
 
-            stats["test_cases"] = test_cases # type: ignore
+            stats["test_cases"] = test_cases  # type: ignore
             return stats
         except Exception as e:
             logger.error(f"Failed to parse output.xml: {e}")
 
         return empty
 
-    async def _generate_mkdocs_report(self, project, output_dir: Path, stats: dict) -> None:
+    async def _generate_mkdocs_report(
+        self, project, output_dir: Path, stats: dict
+    ) -> None:
         """Generate MkDocs documentation for test results."""
         docs_dir = output_dir / "mkdocs"
         docs_dir.mkdir(exist_ok=True)

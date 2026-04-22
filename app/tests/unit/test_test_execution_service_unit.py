@@ -29,8 +29,13 @@ class DummyTestRepo:
     async def get_generated_test(self, session: AsyncSession, test_id: int):
         return None
 
-    async def list_generated_tests_by_ids_for_project(self, session: AsyncSession, project_id: int, test_ids: list[int]):
-        return [_DummyGeneratedTest(f"/tmp/generated_{test_id}.robot") for test_id in test_ids]
+    async def list_generated_tests_by_ids_for_project(
+        self, session: AsyncSession, project_id: int, test_ids: list[int]
+    ):
+        return [
+            _DummyGeneratedTest(f"/tmp/generated_{test_id}.robot")
+            for test_id in test_ids
+        ]
 
 
 def _prepare_project(tmp_path, name: str = "Projeto") -> Project:
@@ -45,7 +50,7 @@ def _prepare_project(tmp_path, name: str = "Projeto") -> Project:
 
 def _create_robot_file(project: Project) -> Path:
     safe_name = TestService()._safe_dir_name(project.name)
-    project_dir = Path(project.test_directory) / safe_name # type: ignore[arg-type]
+    project_dir = Path(project.test_directory) / safe_name  # type: ignore[arg-type]
     project_dir.mkdir(parents=True, exist_ok=True)
     robot_file = project_dir / "sample.robot"
     robot_file.write_text("*** Test Cases ***\nExample\n    Log    Hello")
@@ -58,8 +63,8 @@ async def test_execute_tests_happy_path(tmp_path, monkeypatch) -> None:
     project = _prepare_project(tmp_path)
 
     service = TestExecutionService(
-        project_repository=DummyProjectRepo(project), # type: ignore[arg-type]
-        test_repository=DummyTestRepo(), # type: ignore[arg-type]
+        project_repository=DummyProjectRepo(project),  # type: ignore[arg-type]
+        test_repository=DummyTestRepo(),  # type: ignore[arg-type]
     )
 
     _create_robot_file(project)
@@ -76,11 +81,15 @@ async def test_execute_tests_happy_path(tmp_path, monkeypatch) -> None:
         return None
 
     monkeypatch.setattr(service, "_ensure_rfbrowser", lambda: None)
-    monkeypatch.setattr(service, "_parse_robot_output", lambda *_: {"total": 1, "passed": 1, "failed": 0, "skipped": 0})
+    monkeypatch.setattr(
+        service,
+        "_parse_robot_output",
+        lambda *_: {"total": 1, "passed": 1, "failed": 0, "skipped": 0},
+    )
     monkeypatch.setattr(service, "_generate_mkdocs_report", fake_generate_mkdocs_report)
     monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
 
-    execution = await service.execute_tests(session=None, project_id=1) # type: ignore[arg-type]
+    execution = await service.execute_tests(session=None, project_id=1)  # type: ignore[arg-type]
 
     assert execution.status == "completed"
     assert execution.passed == 1
@@ -93,8 +102,8 @@ async def test_execute_tests_runs_robot_non_interactive(tmp_path, monkeypatch) -
     project = _prepare_project(tmp_path)
 
     service = TestExecutionService(
-        project_repository=DummyProjectRepo(project), # type: ignore[arg-type]
-        test_repository=DummyTestRepo(), # type: ignore[arg-type]
+        project_repository=DummyProjectRepo(project),  # type: ignore[arg-type]
+        test_repository=DummyTestRepo(),  # type: ignore[arg-type]
     )
 
     _create_robot_file(project)
@@ -114,11 +123,15 @@ async def test_execute_tests_runs_robot_non_interactive(tmp_path, monkeypatch) -
         return None
 
     monkeypatch.setattr(service, "_ensure_rfbrowser", lambda: None)
-    monkeypatch.setattr(service, "_parse_robot_output", lambda *_: {"total": 1, "passed": 1, "failed": 0, "skipped": 0})
+    monkeypatch.setattr(
+        service,
+        "_parse_robot_output",
+        lambda *_: {"total": 1, "passed": 1, "failed": 0, "skipped": 0},
+    )
     monkeypatch.setattr(service, "_generate_mkdocs_report", fake_generate_mkdocs_report)
     monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
 
-    await service.execute_tests(session=None, project_id=1) # type: ignore[arg-type]
+    await service.execute_tests(session=None, project_id=1)  # type: ignore[arg-type]
 
     assert call_kwargs.get("stdin") is subprocess.DEVNULL
 
@@ -128,8 +141,8 @@ async def test_execute_tests_with_selected_test_ids(tmp_path, monkeypatch) -> No
     settings.STATIC_DIR = str(tmp_path / "static")
     project = _prepare_project(tmp_path)
     service = TestExecutionService(
-        project_repository=DummyProjectRepo(project), # type: ignore[arg-type]
-        test_repository=DummyTestRepo(), # type: ignore[arg-type]
+        project_repository=DummyProjectRepo(project),  # type: ignore[arg-type]
+        test_repository=DummyTestRepo(),  # type: ignore[arg-type]
     )
 
     def fake_run(*args, **kwargs):
@@ -144,11 +157,15 @@ async def test_execute_tests_with_selected_test_ids(tmp_path, monkeypatch) -> No
         return None
 
     monkeypatch.setattr(service, "_ensure_rfbrowser", lambda: None)
-    monkeypatch.setattr(service, "_parse_robot_output", lambda *_: {"total": 2, "passed": 2, "failed": 0, "skipped": 0})
+    monkeypatch.setattr(
+        service,
+        "_parse_robot_output",
+        lambda *_: {"total": 2, "passed": 2, "failed": 0, "skipped": 0},
+    )
     monkeypatch.setattr(service, "_generate_mkdocs_report", fake_generate_mkdocs_report)
     monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
 
-    execution = await service.execute_tests(session=None, project_id=1, test_ids=[10, 20]) # type: ignore[arg-type]
+    execution = await service.execute_tests(session=None, project_id=1, test_ids=[10, 20])  # type: ignore[arg-type]
 
     assert execution.status == "completed"
     assert execution.total_tests == 2
@@ -157,25 +174,25 @@ async def test_execute_tests_with_selected_test_ids(tmp_path, monkeypatch) -> No
 @pytest.mark.asyncio
 async def test_execute_tests_project_not_found() -> None:
     service = TestExecutionService(
-        project_repository=DummyProjectRepo(None), # type: ignore[arg-type]
-        test_repository=DummyTestRepo(), # type: ignore[arg-type]
+        project_repository=DummyProjectRepo(None),  # type: ignore[arg-type]
+        test_repository=DummyTestRepo(),  # type: ignore[arg-type]
     )
 
     with pytest.raises(ValueError, match="Project not found"):
-        await service.execute_tests(session=None, project_id=1) # type: ignore[arg-type]
+        await service.execute_tests(session=None, project_id=1)  # type: ignore[arg-type]
 
 
 @pytest.mark.asyncio
 async def test_execute_tests_raises_when_project_is_already_running() -> None:
     service = TestExecutionService(
-        project_repository=DummyProjectRepo(None), # type: ignore[arg-type]
-        test_repository=DummyTestRepo(), # type: ignore[arg-type]
+        project_repository=DummyProjectRepo(None),  # type: ignore[arg-type]
+        test_repository=DummyTestRepo(),  # type: ignore[arg-type]
     )
 
     service.__class__._running_projects.add(1)
     try:
         with pytest.raises(ValueError, match="Tests are already running for project 1"):
-            await service.execute_tests(session=None, project_id=1) # type: ignore[arg-type]
+            await service.execute_tests(session=None, project_id=1)  # type: ignore[arg-type]
     finally:
         service.__class__._running_projects.discard(1)
 
@@ -183,8 +200,8 @@ async def test_execute_tests_raises_when_project_is_already_running() -> None:
 @pytest.mark.asyncio
 async def test_execute_tests_raises_when_db_has_running_execution() -> None:
     service = TestExecutionService(
-        project_repository=DummyProjectRepo(None), # type: ignore[arg-type]
-        test_repository=DummyTestRepo(), # type: ignore[arg-type]
+        project_repository=DummyProjectRepo(None),  # type: ignore[arg-type]
+        test_repository=DummyTestRepo(),  # type: ignore[arg-type]
     )
 
     class _ScalarResult:
@@ -200,40 +217,42 @@ async def test_execute_tests_raises_when_db_has_running_execution() -> None:
             return _ExecuteResult()
 
     with pytest.raises(ValueError, match="already has a running execution"):
-        await service.execute_tests(session=_SessionWithExecute(), project_id=1) # type: ignore[arg-type]
+        await service.execute_tests(session=_SessionWithExecute(), project_id=1)  # type: ignore[arg-type]
 
 
 @pytest.mark.asyncio
 async def test_execute_tests_missing_test_directory() -> None:
     project = Project(id=1, name="Projeto", description="Desc", test_directory=None)
     service = TestExecutionService(
-        project_repository=DummyProjectRepo(project), # type: ignore[arg-type]
-        test_repository=DummyTestRepo(), # type: ignore[arg-type]
+        project_repository=DummyProjectRepo(project),  # type: ignore[arg-type]
+        test_repository=DummyTestRepo(),  # type: ignore[arg-type]
     )
 
     with pytest.raises(ValueError, match="Project test directory not configured"):
-        await service.execute_tests(session=None, project_id=1) # type: ignore[arg-type]
+        await service.execute_tests(session=None, project_id=1)  # type: ignore[arg-type]
 
 
 @pytest.mark.asyncio
 async def test_execute_tests_no_test_files(tmp_path) -> None:
     project = _prepare_project(tmp_path)
     service = TestExecutionService(
-        project_repository=DummyProjectRepo(project), # type: ignore[arg-type]
-        test_repository=DummyTestRepo(), # type: ignore[arg-type]
+        project_repository=DummyProjectRepo(project),  # type: ignore[arg-type]
+        test_repository=DummyTestRepo(),  # type: ignore[arg-type]
     )
 
     with pytest.raises(ValueError, match="No test files found"):
-        await service.execute_tests(session=None, project_id=1) # type: ignore[arg-type]
+        await service.execute_tests(session=None, project_id=1)  # type: ignore[arg-type]
 
 
 @pytest.mark.asyncio
-async def test_execute_tests_failed_returncode_with_default_message(tmp_path, monkeypatch) -> None:
+async def test_execute_tests_failed_returncode_with_default_message(
+    tmp_path, monkeypatch
+) -> None:
     settings.STATIC_DIR = str(tmp_path / "static")
     project = _prepare_project(tmp_path)
     service = TestExecutionService(
-        project_repository=DummyProjectRepo(project), # type: ignore[arg-type]
-        test_repository=DummyTestRepo(), # type: ignore[arg-type]
+        project_repository=DummyProjectRepo(project),  # type: ignore[arg-type]
+        test_repository=DummyTestRepo(),  # type: ignore[arg-type]
     )
     _create_robot_file(project)
 
@@ -249,11 +268,15 @@ async def test_execute_tests_failed_returncode_with_default_message(tmp_path, mo
         return None
 
     monkeypatch.setattr(service, "_ensure_rfbrowser", lambda: None)
-    monkeypatch.setattr(service, "_parse_robot_output", lambda *_: {"total": 1, "passed": 0, "failed": 1, "skipped": 0})
+    monkeypatch.setattr(
+        service,
+        "_parse_robot_output",
+        lambda *_: {"total": 1, "passed": 0, "failed": 1, "skipped": 0},
+    )
     monkeypatch.setattr(service, "_generate_mkdocs_report", fake_generate_mkdocs_report)
     monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
 
-    execution = await service.execute_tests(session=None, project_id=1) # type: ignore[arg-type]
+    execution = await service.execute_tests(session=None, project_id=1)  # type: ignore[arg-type]
 
     assert execution.status == "failed"
     assert execution.error_output == "Test execution failed"
@@ -264,8 +287,8 @@ async def test_execute_tests_timeout(tmp_path, monkeypatch) -> None:
     settings.STATIC_DIR = str(tmp_path / "static")
     project = _prepare_project(tmp_path)
     service = TestExecutionService(
-        project_repository=DummyProjectRepo(project), # type: ignore[arg-type]
-        test_repository=DummyTestRepo(), # type: ignore[arg-type]
+        project_repository=DummyProjectRepo(project),  # type: ignore[arg-type]
+        test_repository=DummyTestRepo(),  # type: ignore[arg-type]
     )
     _create_robot_file(project)
 
@@ -277,18 +300,20 @@ async def test_execute_tests_timeout(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(service, "_ensure_rfbrowser", lambda: None)
     monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
 
-    execution = await service.execute_tests(session=None, project_id=1) # type: ignore[arg-type]
+    execution = await service.execute_tests(session=None, project_id=1)  # type: ignore[arg-type]
     assert execution.status == "failed"
     assert execution.error_output == "Test execution timed out"
 
 
 @pytest.mark.asyncio
-async def test_execute_tests_handles_unexpected_exception(tmp_path, monkeypatch) -> None:
+async def test_execute_tests_handles_unexpected_exception(
+    tmp_path, monkeypatch
+) -> None:
     settings.STATIC_DIR = str(tmp_path / "static")
     project = _prepare_project(tmp_path)
     service = TestExecutionService(
-        project_repository=DummyProjectRepo(project), # type: ignore[arg-type]
-        test_repository=DummyTestRepo(), # type: ignore[arg-type]
+        project_repository=DummyProjectRepo(project),  # type: ignore[arg-type]
+        test_repository=DummyTestRepo(),  # type: ignore[arg-type]
     )
     _create_robot_file(project)
 
@@ -298,7 +323,7 @@ async def test_execute_tests_handles_unexpected_exception(tmp_path, monkeypatch)
     monkeypatch.setattr(service, "_ensure_rfbrowser", lambda: None)
     monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
 
-    execution = await service.execute_tests(session=None, project_id=1) # type: ignore[arg-type]
+    execution = await service.execute_tests(session=None, project_id=1)  # type: ignore[arg-type]
 
     assert execution.status == "failed"
     assert execution.error_output == "robot failed badly"
@@ -345,7 +370,9 @@ def test_sync_reports_for_static_handles_copy_error(tmp_path, monkeypatch) -> No
     def fake_copytree(*args, **kwargs):
         raise OSError("cannot copy")
 
-    monkeypatch.setattr("app.services.test_execution_service.shutil.copytree", fake_copytree)
+    monkeypatch.setattr(
+        "app.services.test_execution_service.shutil.copytree", fake_copytree
+    )
 
     service._sync_reports_for_static(source, target)
 
@@ -353,7 +380,13 @@ def test_sync_reports_for_static_handles_copy_error(tmp_path, monkeypatch) -> No
 def test_parse_robot_output_missing_file(tmp_path) -> None:
     service = TestExecutionService()
     stats = service._parse_robot_output(tmp_path / "output.xml")
-    assert stats == {"total": 0, "passed": 0, "failed": 0, "skipped": 0, "test_cases": []}
+    assert stats == {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 0,
+        "test_cases": [],
+    }
 
 
 def test_parse_robot_output_success(tmp_path) -> None:
@@ -386,7 +419,13 @@ def test_parse_robot_output_without_stat_returns_zeros(tmp_path) -> None:
 
     stats = service._parse_robot_output(output)
 
-    assert stats == {"total": 0, "passed": 0, "failed": 0, "skipped": 0, "test_cases": []}
+    assert stats == {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 0,
+        "test_cases": [],
+    }
 
 
 def test_parse_robot_output_invalid_xml(tmp_path) -> None:
@@ -396,7 +435,13 @@ def test_parse_robot_output_invalid_xml(tmp_path) -> None:
 
     stats = service._parse_robot_output(output)
 
-    assert stats == {"total": 0, "passed": 0, "failed": 0, "skipped": 0, "test_cases": []}
+    assert stats == {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 0,
+        "test_cases": [],
+    }
 
 
 def test_ensure_rfbrowser_handles_exception(monkeypatch) -> None:
@@ -427,7 +472,9 @@ def test_ensure_rfbrowser_handles_wrapper_path_resolution_error(monkeypatch) -> 
 
         return Result()
 
-    monkeypatch.setattr("app.services.test_execution_service.Path.resolve", fake_resolve)
+    monkeypatch.setattr(
+        "app.services.test_execution_service.Path.resolve", fake_resolve
+    )
     monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
 
     service._ensure_rfbrowser()
@@ -504,7 +551,9 @@ async def test_generate_mkdocs_report_handles_error(tmp_path, monkeypatch) -> No
 
 
 @pytest.mark.asyncio
-async def test_apply_pre_execution_healing_writes_when_content_changed(tmp_path) -> None:
+async def test_apply_pre_execution_healing_writes_when_content_changed(
+    tmp_path,
+) -> None:
     """Line 215: path.write_text is called when healed content differs from original."""
     from unittest.mock import AsyncMock, MagicMock
     from app.ai_validation.self_healing_service import HealedTestResult
@@ -526,7 +575,9 @@ async def test_apply_pre_execution_healing_writes_when_content_changed(tmp_path)
     service = TestExecutionService()
     service._self_healing = mock_healing
 
-    result = await service._apply_pre_execution_healing([str(robot_file)], page_url=None, ai_debug=False)
+    result = await service._apply_pre_execution_healing(
+        [str(robot_file)], page_url=None, ai_debug=False
+    )
 
     assert result == [str(robot_file)]
     assert robot_file.read_text(encoding="utf-8") == healed_result.final_content
@@ -601,13 +652,15 @@ def test_parse_robot_output_with_test_element_empty_message(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_execute_tests_persists_to_db_when_session_provided(tmp_path, monkeypatch) -> None:
+async def test_execute_tests_persists_to_db_when_session_provided(
+    tmp_path, monkeypatch
+) -> None:
     """Lines 175-177: session.add / commit / refresh are called when session is not None."""
     settings.STATIC_DIR = str(tmp_path / "static")
     project = _prepare_project(tmp_path)
     service = TestExecutionService(
-        project_repository=DummyProjectRepo(project), # type: ignore[arg-type]
-        test_repository=DummyTestRepo(), # type: ignore[arg-type]
+        project_repository=DummyProjectRepo(project),  # type: ignore[arg-type]
+        test_repository=DummyTestRepo(),  # type: ignore[arg-type]
     )
     _create_robot_file(project)
 
@@ -623,7 +676,11 @@ async def test_execute_tests_persists_to_db_when_session_provided(tmp_path, monk
         return None
 
     monkeypatch.setattr(service, "_ensure_rfbrowser", lambda: None)
-    monkeypatch.setattr(service, "_parse_robot_output", lambda *_: {"total": 1, "passed": 1, "failed": 0, "skipped": 0})
+    monkeypatch.setattr(
+        service,
+        "_parse_robot_output",
+        lambda *_: {"total": 1, "passed": 1, "failed": 0, "skipped": 0},
+    )
     monkeypatch.setattr(service, "_generate_mkdocs_report", fake_generate_mkdocs_report)
     monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
 
@@ -639,7 +696,7 @@ async def test_execute_tests_persists_to_db_when_session_provided(tmp_path, monk
         async def refresh(self, obj):
             calls.append(("refresh", obj))
 
-    execution = await service.execute_tests(session=FakeSession(), project_id=1) # type: ignore[arg-type]
+    execution = await service.execute_tests(session=FakeSession(), project_id=1)  # type: ignore[arg-type]
 
     assert execution.status == "completed"
     assert any(c[0] == "add" for c in calls)

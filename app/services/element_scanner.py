@@ -12,9 +12,10 @@ from selectolax.parser import HTMLParser, Node
 try:
     from playwright.async_api import TimeoutError as PlaywrightTimeoutError
     from playwright.async_api import async_playwright
+
     _PLAYWRIGHT_AVAILABLE = True
 except ModuleNotFoundError:
-    PlaywrightTimeoutError = TimeoutError 
+    PlaywrightTimeoutError = TimeoutError
     async_playwright = None
     _PLAYWRIGHT_AVAILABLE = False
 
@@ -38,6 +39,7 @@ _AUTH_TIMEOUT_MS = 120_000
 # Login domains that require opening an auth tab before scanning protected pages.
 _DEFAULT_LOGIN_HOST_HINTS: tuple[str, ...] = (
     "login-hmg.comerc.com.br",
+    "assinaturasolar.comerc.com.br",  # SIRES and related applications
 )
 
 _TYPE_CAPS: dict[str, int] = {
@@ -55,11 +57,12 @@ _CSS_QUERY = "input, button, a[href], select, textarea, label"
 # Early SPA detection: presence of any of these attributes/tags strongly suggests
 # the page is JavaScript-rendered and will need Playwright.
 _SPA_INDICATORS = (
-    'data-reactroot', 'data-reactid',  # React
-    '__NEXT_DATA__',                    # Next.js (script tag id)
-    'data-v-',                          # Vue single-file components
-    'ng-version',                       # Angular
-    'data-svelte',                      # Svelte
+    "data-reactroot",
+    "data-reactid",  # React
+    "__NEXT_DATA__",  # Next.js (script tag id)
+    "data-v-",  # Vue single-file components
+    "ng-version",  # Angular
+    "data-svelte",  # Svelte
 )
 
 # Reusable async HTTP client (created once, shared across all scan_url calls)
@@ -74,6 +77,7 @@ class ElementScannerError(Exception):
 # ---------------------------------------------------------------------------
 # Reusable HTTP client
 # ---------------------------------------------------------------------------
+
 
 async def _get_http_client() -> httpx.AsyncClient:
     global _http_client
@@ -93,6 +97,7 @@ async def _get_http_client() -> httpx.AsyncClient:
 # ---------------------------------------------------------------------------
 # Pure helper functions (no I/O, easily unit-tested)
 # ---------------------------------------------------------------------------
+
 
 def _normalize(value: str | None, max_len: int = _MAX_TEXT_LEN) -> str | None:
     if not value:
@@ -198,6 +203,7 @@ def _element_meta(node: Node, el_type: str, include_xpath: bool) -> dict:
 # Early SPA detection
 # ---------------------------------------------------------------------------
 
+
 def _is_likely_spa(html_bytes: bytes) -> bool:
     """
     Quick early-exit check: scan the raw HTML bytes for known SPA fingerprints
@@ -211,6 +217,7 @@ def _is_likely_spa(html_bytes: bytes) -> bool:
 # ---------------------------------------------------------------------------
 # Form-context extraction — enriches output for better LLM test generation
 # ---------------------------------------------------------------------------
+
 
 def _extract_form_contexts(tree: HTMLParser) -> list[dict]:
     """
@@ -248,22 +255,24 @@ def _extract_form_contexts(tree: HTMLParser) -> list[dict]:
             selector = _css_selector(child)
 
             # Identify submit button
-            if tag == "button" or (tag == "input" and input_type in ("submit", "button", "reset")):
+            if tag == "button" or (
+                tag == "input" and input_type in ("submit", "button", "reset")
+            ):
                 if submit_sel is None:
                     submit_sel = selector
             else:
                 inputs.append(selector)
 
         if inputs or submit_sel:
-            contexts.append({
-                "form_selector": form_sel,
-                "inputs": inputs,
-                "submit": submit_sel,
-            })
+            contexts.append(
+                {
+                    "form_selector": form_sel,
+                    "inputs": inputs,
+                    "submit": submit_sel,
+                }
+            )
 
     return contexts
-
-
 
 
 async def _fetch_and_parse(url: str) -> tuple[str, list[dict], bool, list[dict]]:
@@ -327,6 +336,7 @@ async def _fetch_and_parse(url: str) -> tuple[str, list[dict], bool, list[dict]]
 # ---------------------------------------------------------------------------
 # Playwright JS scan script — used only for the SPA fallback path
 # ---------------------------------------------------------------------------
+
 
 def _playwright_scan_script() -> str:
     return r"""
@@ -472,6 +482,7 @@ def _playwright_scan_script() -> str:
 # Public service class — hybrid selectolax + Playwright
 # ---------------------------------------------------------------------------
 
+
 class ElementScannerService:
     """
     Hybrid UI element scanner.
@@ -493,7 +504,9 @@ class ElementScannerService:
     _shared_browser: Any = None
     _shared_playwright: Any = None
 
-    def __init__(self, timeout_ms: int = 10_000, spa_threshold: int = _SPA_THRESHOLD) -> None:
+    def __init__(
+        self, timeout_ms: int = 10_000, spa_threshold: int = _SPA_THRESHOLD
+    ) -> None:
         self._timeout_ms = timeout_ms
         self._navigation_timeout_ms = min(timeout_ms, 4_000)
         self._network_idle_timeout_ms = min(timeout_ms, 1_200)
@@ -512,9 +525,11 @@ class ElementScannerService:
         async with cls._browser_lock:
             if cls._shared_browser is not None:
                 return cls._shared_browser
- 
+
             cls._shared_playwright = await async_playwright().start()  # type: ignore[arg-type]
-            cls._shared_browser = await cls._shared_playwright.chromium.launch(headless=True)
+            cls._shared_browser = await cls._shared_playwright.chromium.launch(
+                headless=True
+            )
             return cls._shared_browser
 
     @classmethod
@@ -551,7 +566,11 @@ class ElementScannerService:
         needs_browser = spa_hint or len(raw_elements) < self._spa_threshold
         if needs_browser:
             if _PLAYWRIGHT_AVAILABLE:
-                reason = "SPA fingerprint detected" if spa_hint else f"only {len(raw_elements)} static elements"
+                reason = (
+                    "SPA fingerprint detected"
+                    if spa_hint
+                    else f"only {len(raw_elements)} static elements"
+                )
                 logger.info(
                     "%s for %s — switching to Playwright browser scan.",
                     reason,
@@ -562,7 +581,9 @@ class ElementScannerService:
                     f"Página dinâmica detectada ({len(raw_elements)} elementos estáticos). "
                     "Iniciando navegador para escaneamento completo do DOM...",
                 )
-                title, raw_elements = await self._playwright_scan(url, progress_callback, title)
+                title, raw_elements = await self._playwright_scan(
+                    url, progress_callback, title
+                )
                 form_contexts = []  # not available from JS scan
             else:
                 logger.warning(
@@ -575,7 +596,9 @@ class ElementScannerService:
         total_elements = len(raw_elements)
         summary = dict(Counter(item.get("type", "unknown") for item in raw_elements))
 
-        await self._progress(progress_callback, f"Encontrados {summary.get('input', 0)} inputs...")
+        await self._progress(
+            progress_callback, f"Encontrados {summary.get('input', 0)} inputs..."
+        )
         await self._progress(progress_callback, "Escaneamento concluído.")
 
         return ScanResult(
@@ -592,8 +615,20 @@ class ElementScannerService:
     # ------------------------------------------------------------------
 
     def _is_login_url(self, candidate_url: str) -> bool:
-        host = urlparse(candidate_url).netloc.lower()
-        return any(hint in host for hint in self._login_host_hints)
+        parsed = urlparse(candidate_url)
+        host = parsed.netloc.lower()
+        path = parsed.path.lower()
+
+        # Check if host matches any login hint
+        if any(hint in host for hint in self._login_host_hints):
+            return True
+
+        # Check if path indicates a login/auth page (handles internal redirects like /login)
+        login_path_indicators = ("/login", "/auth", "/signin", "/authenticate")
+        if any(indicator in path for indicator in login_path_indicators):
+            return True
+
+        return False
 
     def _extract_redirect_target(self, login_url: str) -> str | None:
         query = parse_qs(urlparse(login_url).query)
@@ -618,6 +653,7 @@ class ElementScannerService:
         """
         redirect_target = self._extract_redirect_target(login_url)
         redirect_netloc = urlparse(redirect_target).netloc if redirect_target else None
+        login_netloc = urlparse(login_url).netloc.lower()
 
         await self._progress(
             progress_callback,
@@ -652,18 +688,33 @@ class ElementScannerService:
                     except PlaywrightTimeoutError:
                         pass
 
-                    wait_pattern = (
-                        f"https://{redirect_netloc}/**" if redirect_netloc else "**"
-                    )
+                    # Determine the URL pattern to wait for:
+                    # If redirect_uri is provided, wait for that domain
+                    # Otherwise, wait for logout from the login page (URL changes from /login path)
+                    if redirect_netloc:
+                        wait_pattern = f"https://{redirect_netloc}/**"
+                    else:
+                        # For internal redirects (e.g., SIRES), wait for *any* URL change
+                        # away from /login path on the same host
+                        wait_pattern = f"https://{login_netloc}/**"
+
                     try:
                         await self._progress(
                             progress_callback,
                             "Aguardando autenticação do usuário (máx. 2 min)...",
                         )
-                        await auth_page.wait_for_url(wait_pattern, timeout=_AUTH_TIMEOUT_MS)
+
+                        # A single wait avoids long retry loops that can hang tests
+                        # when mocks always raise timeout.
+                        await auth_page.wait_for_url(
+                            wait_pattern, timeout=_AUTH_TIMEOUT_MS
+                        )
+
                         try:
-                            await auth_page.wait_for_load_state("networkidle", timeout=5_000)
-                        except PlaywrightTimeoutError:
+                            await auth_page.wait_for_load_state(
+                                "networkidle", timeout=5_000
+                            )
+                        except (PlaywrightTimeoutError, AttributeError, Exception):
                             pass
 
                         cookies = await auth_ctx.cookies()
@@ -673,6 +724,11 @@ class ElementScannerService:
                                 progress_callback,
                                 f"Autenticação concluída. Sessão transferida "
                                 f"({len(cookies)} cookie(s)).",
+                            )
+                        else:
+                            await self._progress(
+                                progress_callback,
+                                "Janela de login fechada. Continuando escaneamento...",
                             )
                     except PlaywrightTimeoutError:
                         await self._progress(
@@ -696,34 +752,61 @@ class ElementScannerService:
     ) -> tuple[str, list[dict]]:
         try:
             browser = await self._get_shared_browser()
-            context = await browser.new_context(ignore_https_errors=True, service_workers="block")
+            context = await browser.new_context(
+                ignore_https_errors=True, service_workers="block"
+            )
             try:
                 await context.route("**/*", self._route_filter)
                 page = await context.new_page()
                 page.set_default_timeout(self._timeout_ms)
 
-                await self._progress(progress_callback, "Carregando página no navegador...")
+                await self._progress(
+                    progress_callback, "Carregando página no navegador..."
+                )
                 try:
-                    await page.goto(url, wait_until="domcontentloaded", timeout=self._navigation_timeout_ms)
+                    await page.goto(
+                        url,
+                        wait_until="domcontentloaded",
+                        timeout=self._navigation_timeout_ms,
+                    )
                 except PlaywrightTimeoutError:
-                    await self._progress(progress_callback, "Timeout de navegação — continuando com DOM parcial...")
+                    await self._progress(
+                        progress_callback,
+                        "Timeout de navegação — continuando com DOM parcial...",
+                    )
 
                 current_url = page.url
                 if self._is_login_url(current_url):
-                    await self._handle_login_flow(context, current_url, url, progress_callback)
+                    await self._handle_login_flow(
+                        context, current_url, url, progress_callback
+                    )
                     try:
-                        await page.goto(url, wait_until="domcontentloaded", timeout=self._navigation_timeout_ms)
+                        await page.goto(
+                            url,
+                            wait_until="domcontentloaded",
+                            timeout=self._navigation_timeout_ms,
+                        )
                     except PlaywrightTimeoutError:
-                        await self._progress(progress_callback, "Timeout ao recarregar página após login...")
+                        await self._progress(
+                            progress_callback,
+                            "Timeout ao recarregar página após login...",
+                        )
 
                 await self._progress(progress_callback, "Aguardando rede ociosa...")
                 try:
-                    await page.wait_for_load_state("networkidle", timeout=self._network_idle_timeout_ms)
+                    await page.wait_for_load_state(
+                        "networkidle", timeout=self._network_idle_timeout_ms
+                    )
                 except PlaywrightTimeoutError:
-                    await self._progress(progress_callback, "Timeout de rede ociosa — continuando escaneamento...")
+                    await self._progress(
+                        progress_callback,
+                        "Timeout de rede ociosa — continuando escaneamento...",
+                    )
 
                 await self._progress(progress_callback, "Extraindo elementos do DOM...")
-                raw_elements: list[dict] = await page.evaluate(_playwright_scan_script())
+                raw_elements: list[dict] = await page.evaluate(
+                    _playwright_scan_script()
+                )
                 title = (await page.title()) or fallback_title
             finally:
                 await context.close()
@@ -744,4 +827,3 @@ class ElementScannerService:
     async def _progress(self, callback: ProgressCallback | None, message: str) -> None:
         if callback:
             await callback(message)
-

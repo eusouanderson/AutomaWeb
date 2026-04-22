@@ -1,4 +1,5 @@
 """Tests to cover HTTPException raises and error paths"""
+
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -22,7 +23,7 @@ async def error_session(tmp_path) -> AsyncSession:  # type: ignore[arg-type]
 async def test_generate_test_project_not_found(error_session: AsyncSession) -> None:
     """Test ValueError raised when project not found - line 39 of test_service.py"""
     service = TestService()
-    
+
     with pytest.raises(ValueError, match="Project not found"):
         await service.generate_test(
             session=error_session,

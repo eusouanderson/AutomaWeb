@@ -1,4 +1,5 @@
 """Schema for test execution results"""
+
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -31,7 +32,7 @@ class TestExecutionResult(BaseModel):
     log_file: str
     report_file: str
     output_file: str
-    status: str  
+    status: str
     created_at: datetime | None = None
     completed_at: datetime | None = None
     error_output: str | None = None

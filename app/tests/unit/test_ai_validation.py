@@ -1,4 +1,5 @@
 """Tests for the AI Test Self-Healing / Validation Layer."""
+
 from __future__ import annotations
 
 import asyncio
@@ -11,9 +12,16 @@ import pytest
 
 from app.ai_validation.locator_analyzer import LocatorAnalyzer, LocatorInspection
 from app.ai_validation.metrics import AIMetrics, AIMetricsRegistry
-from app.ai_validation.self_healing_service import AITestSelfHealingService, HealedTestResult
+from app.ai_validation.self_healing_service import (
+    AITestSelfHealingService,
+    HealedTestResult,
+)
 from app.ai_validation.test_fixer import FixResult, TestFixer
-from app.ai_validation.test_validator import TestValidator, ValidationIssue, ValidationReport
+from app.ai_validation.test_validator import (
+    TestValidator,
+    ValidationIssue,
+    ValidationReport,
+)
 
 # ---------------------------------------------------------------------------
 # LocatorAnalyzer
@@ -46,7 +54,10 @@ class TestLocatorAnalyzerNormalize:
         assert self.analyzer.normalize_locator(".primary-btn") == "css=.primary-btn"
 
     def test_bracket_prefix_becomes_css(self):
-        assert self.analyzer.normalize_locator("[data-testid='foo']") == "css=[data-testid='foo']"
+        assert (
+            self.analyzer.normalize_locator("[data-testid='foo']")
+            == "css=[data-testid='foo']"
+        )
 
     def test_already_prefixed_passthrough(self):
         assert self.analyzer.normalize_locator("css=button") == "css=button"
@@ -98,6 +109,7 @@ class TestLocatorAnalyzerCountMatches:
     @pytest.mark.asyncio
     async def test_returns_none_when_playwright_not_available(self, monkeypatch):
         import app.ai_validation.locator_analyzer as la_module
+
         monkeypatch.setattr(la_module, "async_playwright", None)
         result = await self.analyzer.count_matches("http://example.com", "css=#ok")
         assert result is None
@@ -115,22 +127,32 @@ class TestLocatorAnalyzerCountMatches:
         mock_page.locator = MagicMock(return_value=mock_locator)
 
         class _Ctx:
-            async def close(self): pass
-            async def new_page(self): return mock_page
+            async def close(self):
+                pass
+
+            async def new_page(self):
+                return mock_page
 
         class _Browser:
-            async def close(self): pass
-            async def new_context(self): return _Ctx()
+            async def close(self):
+                pass
+
+            async def new_context(self):
+                return _Ctx()
 
         class _Chromium:
-            async def launch(self, **_): return _Browser()
+            async def launch(self, **_):
+                return _Browser()
 
         class _PW:
             chromium = _Chromium()
 
         class _PWCM:
-            async def __aenter__(self): return _PW()
-            async def __aexit__(self, *_): pass
+            async def __aenter__(self):
+                return _PW()
+
+            async def __aexit__(self, *_):
+                pass
 
         monkeypatch.setattr(la_module, "async_playwright", lambda: _PWCM())
         result = await self.analyzer.count_matches("http://example.com", "css=.btn")
@@ -143,12 +165,18 @@ class TestLocatorAnalyzerCountMatches:
         timeout_exc = la_module.PlaywrightTimeoutError("Timeout exceeded")
 
         class _Ctx:
-            async def close(self): pass
-            async def new_page(self): return None  # won't reach
+            async def close(self):
+                pass
+
+            async def new_page(self):
+                return None  # won't reach
 
         class _Browser:
-            async def close(self): pass
-            async def new_context(self): return _Ctx()
+            async def close(self):
+                pass
+
+            async def new_context(self):
+                return _Ctx()
 
         class _Chromium:
             async def launch(self, **_):
@@ -158,8 +186,11 @@ class TestLocatorAnalyzerCountMatches:
             chromium = _Chromium()
 
         class _PWCM:
-            async def __aenter__(self): return _PW()
-            async def __aexit__(self, *_): pass
+            async def __aenter__(self):
+                return _PW()
+
+            async def __aexit__(self, *_):
+                pass
 
         monkeypatch.setattr(la_module, "async_playwright", lambda: _PWCM())
         result = await self.analyzer.count_matches("http://example.com", "css=.btn")
@@ -170,8 +201,11 @@ class TestLocatorAnalyzerCountMatches:
         import app.ai_validation.locator_analyzer as la_module
 
         class _PWCM:
-            async def __aenter__(self): raise RuntimeError("network error")
-            async def __aexit__(self, *_): pass
+            async def __aenter__(self):
+                raise RuntimeError("network error")
+
+            async def __aexit__(self, *_):
+                pass
 
         monkeypatch.setattr(la_module, "async_playwright", lambda: _PWCM())
         result = await self.analyzer.count_matches("http://example.com", "css=.btn")
@@ -195,7 +229,12 @@ class TestAIMetrics:
     def test_as_dict_contains_all_keys(self):
         m = AIMetrics(tests_generated=5, tests_fixed=4, tests_failed=1)
         d = m.as_dict()
-        assert set(d.keys()) == {"tests_generated", "tests_fixed", "tests_failed", "fix_rate"}
+        assert set(d.keys()) == {
+            "tests_generated",
+            "tests_fixed",
+            "tests_failed",
+            "fix_rate",
+        }
         assert d["fix_rate"] == round(4 / 5, 4)
 
 
@@ -289,7 +328,9 @@ class TestTestValidator:
     async def test_no_issues_on_clean_robot_with_wait(self):
         report = await self.validator.validate(ROBOT_WITH_WAIT)
         # No generic xpath, wait is present before click
-        xpath_or_wait_issues = [i for i in report.issues if i.issue_type != "missing_wait"]
+        xpath_or_wait_issues = [
+            i for i in report.issues if i.issue_type != "missing_wait"
+        ]
         assert len(xpath_or_wait_issues) == 0
 
     @pytest.mark.asyncio
@@ -318,10 +359,21 @@ class TestTestValidator:
             return {loc: 3 for loc in locators}
 
         monkeypatch.setattr(LocatorAnalyzer, "count_matches_bulk", _bulk_many)
-        monkeypatch.setattr("app.ai_validation.test_validator.settings", type("S", (), {"AI_LIVE_CHECK_ENABLED": True, "AI_LIVE_CHECK_TIMEOUT_SECONDS": 15})())
+        monkeypatch.setattr(
+            "app.ai_validation.test_validator.settings",
+            type(
+                "S",
+                (),
+                {"AI_LIVE_CHECK_ENABLED": True, "AI_LIVE_CHECK_TIMEOUT_SECONDS": 15},
+            )(),
+        )
 
-        report = await self.validator.validate(BASIC_ROBOT, page_url="http://example.com")
-        strict_violations = [i for i in report.issues if i.issue_type == "strict_mode_violation"]
+        report = await self.validator.validate(
+            BASIC_ROBOT, page_url="http://example.com"
+        )
+        strict_violations = [
+            i for i in report.issues if i.issue_type == "strict_mode_violation"
+        ]
         assert len(strict_violations) >= 1
         assert ">> nth=0" in strict_violations[0].suggested_locator  # type: ignore[arg-type]
         assert report.has_errors is True
@@ -332,9 +384,18 @@ class TestTestValidator:
             return {loc: 0 for loc in locators}
 
         monkeypatch.setattr(LocatorAnalyzer, "count_matches_bulk", _bulk_zero)
-        monkeypatch.setattr("app.ai_validation.test_validator.settings", type("S", (), {"AI_LIVE_CHECK_ENABLED": True, "AI_LIVE_CHECK_TIMEOUT_SECONDS": 15})())
+        monkeypatch.setattr(
+            "app.ai_validation.test_validator.settings",
+            type(
+                "S",
+                (),
+                {"AI_LIVE_CHECK_ENABLED": True, "AI_LIVE_CHECK_TIMEOUT_SECONDS": 15},
+            )(),
+        )
 
-        report = await self.validator.validate(BASIC_ROBOT, page_url="http://example.com")
+        report = await self.validator.validate(
+            BASIC_ROBOT, page_url="http://example.com"
+        )
         not_found = [i for i in report.issues if i.issue_type == "element_not_found"]
         assert len(not_found) >= 1
         assert report.has_errors is True
@@ -354,39 +415,67 @@ Foo
     Click    css=#a
 """
         report = await self.validator.validate(content)
-        missing_waits = [i for i in report.issues if i.issue_type == "missing_wait" and i.locator == "css=#a"]
+        missing_waits = [
+            i
+            for i in report.issues
+            if i.issue_type == "missing_wait" and i.locator == "css=#a"
+        ]
         assert len(missing_waits) == 0
 
     @pytest.mark.asyncio
     async def test_live_check_timeout_falls_back_to_empty_counts(self, monkeypatch):
         """Lines 111-115: asyncio.TimeoutError in live-check is caught and counts set to {}."""
-        async def _bulk_timeout(self_la, page_url, locators, navigation_timeout_ms=10000):
+
+        async def _bulk_timeout(
+            self_la, page_url, locators, navigation_timeout_ms=10000
+        ):
             raise asyncio.TimeoutError()
 
         monkeypatch.setattr(LocatorAnalyzer, "count_matches_bulk", _bulk_timeout)
         monkeypatch.setattr(
             "app.ai_validation.test_validator.settings",
-            type("S", (), {"AI_LIVE_CHECK_ENABLED": True, "AI_LIVE_CHECK_TIMEOUT_SECONDS": 15})(),
+            type(
+                "S",
+                (),
+                {"AI_LIVE_CHECK_ENABLED": True, "AI_LIVE_CHECK_TIMEOUT_SECONDS": 15},
+            )(),
         )
 
-        report = await self.validator.validate(BASIC_ROBOT, page_url="http://example.com")
-        live_issues = [i for i in report.issues if i.issue_type in {"element_not_found", "strict_mode_violation"}]
+        report = await self.validator.validate(
+            BASIC_ROBOT, page_url="http://example.com"
+        )
+        live_issues = [
+            i
+            for i in report.issues
+            if i.issue_type in {"element_not_found", "strict_mode_violation"}
+        ]
         assert live_issues == []
 
     @pytest.mark.asyncio
     async def test_live_check_skips_when_count_is_none(self, monkeypatch):
         """Line 120: continue when locator is absent from the counts dict (count is None)."""
+
         async def _bulk_empty(self_la, page_url, locators, navigation_timeout_ms=10000):
             return {}  # all counts will be None
 
         monkeypatch.setattr(LocatorAnalyzer, "count_matches_bulk", _bulk_empty)
         monkeypatch.setattr(
             "app.ai_validation.test_validator.settings",
-            type("S", (), {"AI_LIVE_CHECK_ENABLED": True, "AI_LIVE_CHECK_TIMEOUT_SECONDS": 15})(),
+            type(
+                "S",
+                (),
+                {"AI_LIVE_CHECK_ENABLED": True, "AI_LIVE_CHECK_TIMEOUT_SECONDS": 15},
+            )(),
         )
 
-        report = await self.validator.validate(BASIC_ROBOT, page_url="http://example.com")
-        live_issues = [i for i in report.issues if i.issue_type in {"element_not_found", "strict_mode_violation"}]
+        report = await self.validator.validate(
+            BASIC_ROBOT, page_url="http://example.com"
+        )
+        live_issues = [
+            i
+            for i in report.issues
+            if i.issue_type in {"element_not_found", "strict_mode_violation"}
+        ]
         assert live_issues == []
 
     @pytest.mark.asyncio
@@ -400,7 +489,11 @@ Foo
             "    Click    css=#a\n"
         )
         report = await self.validator.validate(content)
-        missing_waits = [i for i in report.issues if i.issue_type == "missing_wait" and i.locator == "css=#a"]
+        missing_waits = [
+            i
+            for i in report.issues
+            if i.issue_type == "missing_wait" and i.locator == "css=#a"
+        ]
         assert len(missing_waits) == 0
 
 
@@ -518,9 +611,13 @@ class TestTestFixer:
         )
 
         mock_groq = MagicMock()
-        mock_groq.regenerate_robot_step = MagicMock(return_value="    Click    css=#real-btn")
+        mock_groq.regenerate_robot_step = MagicMock(
+            return_value="    Click    css=#real-btn"
+        )
 
-        result = await self.fixer.apply_fixes(content, [issue], groq_client=mock_groq, prompt="Test prompt")
+        result = await self.fixer.apply_fixes(
+            content, [issue], groq_client=mock_groq, prompt="Test prompt"
+        )
         assert "css=#real-btn" in result.content
         assert any("regenerado" in fix for fix in result.applied_fixes)
 
@@ -534,7 +631,9 @@ class TestTestFixer:
             issue_type="element_not_found",
             message="not found",
         )
-        result = await self.fixer.apply_fixes(content, [issue], groq_client=None, prompt="test")
+        result = await self.fixer.apply_fixes(
+            content, [issue], groq_client=None, prompt="test"
+        )
         assert result.applied_fixes == []
 
     @pytest.mark.asyncio
@@ -548,7 +647,9 @@ class TestTestFixer:
             message="not found",
         )
         mock_groq = MagicMock()
-        result = await self.fixer.apply_fixes(content, [issue], groq_client=mock_groq, prompt=None)
+        result = await self.fixer.apply_fixes(
+            content, [issue], groq_client=mock_groq, prompt=None
+        )
         assert result.applied_fixes == []
 
     @pytest.mark.asyncio
@@ -576,7 +677,9 @@ class TestTestFixer:
         assert self.fixer._line_is_wait("    Click    css=#x") is False
 
     @pytest.mark.asyncio
-    async def test_skips_locator_replacement_for_irrelevant_issue_type_with_suggestion(self):
+    async def test_skips_locator_replacement_for_irrelevant_issue_type_with_suggestion(
+        self,
+    ):
         """Line 35: continue when issue has suggested_locator but issue_type is not
         generic_xpath or strict_mode_violation."""
         content = "*** Test Cases ***\nFoo\n    Click    css=#ghost\n"
@@ -619,7 +722,9 @@ class TestTestFixer:
             message="not found",
         )
         mock_groq = MagicMock()
-        result = await self.fixer.apply_fixes(content, [issue], groq_client=mock_groq, prompt="test")
+        result = await self.fixer.apply_fixes(
+            content, [issue], groq_client=mock_groq, prompt="test"
+        )
         mock_groq.regenerate_robot_step.assert_not_called()
         assert result.applied_fixes == []
 
@@ -671,7 +776,9 @@ class TestAITestSelfHealingService:
         service = AITestSelfHealingService(metrics=reg)
         await service.heal_test(content=content)
         # fixes were applied (generic xpath) and second validation has no *errors* (only warnings)
-        assert reg.snapshot().tests_fixed >= 0  # may be 0 or 1 depending on second validation
+        assert (
+            reg.snapshot().tests_fixed >= 0
+        )  # may be 0 or 1 depending on second validation
 
     @pytest.mark.asyncio
     async def test_metrics_returns_dict(self):
@@ -702,7 +809,9 @@ class TestAITestSelfHealingService:
         assert "final_test" in payload
 
     @pytest.mark.asyncio
-    async def test_debug_log_written_when_settings_ai_debug_true(self, tmp_path, monkeypatch):
+    async def test_debug_log_written_when_settings_ai_debug_true(
+        self, tmp_path, monkeypatch
+    ):
         log_file = tmp_path / "ai_debug2.log"
         monkeypatch.setattr("app.core.config.settings.AI_DEBUG_LOG_PATH", str(log_file))
         monkeypatch.setattr("app.core.config.settings.AI_DEBUG", True)
@@ -772,7 +881,9 @@ class TestAITestSelfHealingService:
         mock_validator.validate = _mock_validate
 
         service = AITestSelfHealingService(validator=mock_validator, metrics=reg)
-        await service.heal_test(content="*** Test Cases ***\nFoo\n    Click    css=#x\n")
+        await service.heal_test(
+            content="*** Test Cases ***\nFoo\n    Click    css=#x\n"
+        )
         assert reg.snapshot().tests_failed == 1
 
 
@@ -788,16 +899,24 @@ class TestValidationReport:
 
     def test_has_errors_false_with_only_warnings(self):
         issue = ValidationIssue(
-            line_number=1, keyword="Click", locator="css=#x",
-            issue_type="missing_wait", message="no wait", severity="warning"
+            line_number=1,
+            keyword="Click",
+            locator="css=#x",
+            issue_type="missing_wait",
+            message="no wait",
+            severity="warning",
         )
         report = ValidationReport(issues=[issue])
         assert report.has_errors is False
 
     def test_has_errors_true_with_error_severity(self):
         issue = ValidationIssue(
-            line_number=1, keyword="Click", locator="css=#x",
-            issue_type="element_not_found", message="not found", severity="error"
+            line_number=1,
+            keyword="Click",
+            locator="css=#x",
+            issue_type="element_not_found",
+            message="not found",
+            severity="error",
         )
         report = ValidationReport(issues=[issue])
         assert report.has_errors is True
@@ -845,6 +964,7 @@ class TestHealedTestResult:
 @pytest.mark.asyncio
 async def test_get_ai_metrics_route():
     from app.api import routes
+
     AIMetricsRegistry._instance = None
     result = await routes.get_ai_metrics()
     assert "tests_generated" in result

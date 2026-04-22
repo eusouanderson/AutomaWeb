@@ -12,7 +12,11 @@ from pathlib import Path
 from app.api.deps import get_db
 from app.ai_validation.metrics import AIMetricsRegistry
 from app.repositories.project_repository import ProjectRepository
-from app.schemas.generated_test import GeneratedChunkPartOut, GeneratedTestOut, GeneratedTestSummaryOut
+from app.schemas.generated_test import (
+    GeneratedChunkPartOut,
+    GeneratedTestOut,
+    GeneratedTestSummaryOut,
+)
 from app.schemas.project import ProjectCreate, ProjectOut
 from app.schemas.scan import ScanRequest
 from app.schemas.test_execution import TestExecutionRequest, TestExecutionResult
@@ -20,13 +24,19 @@ from app.schemas.test_request import TestGenerateRequest
 from app.services.project_service import ProjectService
 from app.services.test_execution_service import TestExecutionService
 from app.services.element_scanner import ElementScannerError, ElementScannerService
-from app.services.test_service import LLMServiceUnavailableError, ScanUnavailableError, TestService
+from app.services.test_service import (
+    LLMServiceUnavailableError,
+    ScanUnavailableError,
+    TestService,
+)
 
 router = APIRouter()
 
 
 @router.post("/projects", response_model=ProjectOut)
-async def create_project(payload: ProjectCreate, session: AsyncSession = Depends(get_db)) -> ProjectOut:
+async def create_project(
+    payload: ProjectCreate, session: AsyncSession = Depends(get_db)
+) -> ProjectOut:
     service = ProjectService()
     try:
         project = await service.create_project(
@@ -39,7 +49,9 @@ async def create_project(payload: ProjectCreate, session: AsyncSession = Depends
         return ProjectOut.model_validate(project)
     except Exception as e:
         if "UNIQUE constraint failed" in str(e):
-            raise HTTPException(status_code=400, detail=f"Projeto com nome '{payload.name}' já existe")
+            raise HTTPException(
+                status_code=400, detail=f"Projeto com nome '{payload.name}' já existe"
+            )
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -53,8 +65,12 @@ async def list_projects(session: AsyncSession = Depends(get_db)) -> list[Project
     ]
 
 
-@router.get("/projects/{project_id}/tests", response_model=list[GeneratedTestSummaryOut])
-async def list_project_tests(project_id: int, session: AsyncSession = Depends(get_db)) -> list[GeneratedTestSummaryOut]:
+@router.get(
+    "/projects/{project_id}/tests", response_model=list[GeneratedTestSummaryOut]
+)
+async def list_project_tests(
+    project_id: int, session: AsyncSession = Depends(get_db)
+) -> list[GeneratedTestSummaryOut]:
     service = TestService()
     try:
         tests = await service.list_generated_tests_by_project(session, project_id)
@@ -72,7 +88,9 @@ async def list_project_tests(project_id: int, session: AsyncSession = Depends(ge
 
 
 @router.delete("/projects/{project_id}")
-async def delete_project(project_id: int, session: AsyncSession = Depends(get_db)) -> dict:
+async def delete_project(
+    project_id: int, session: AsyncSession = Depends(get_db)
+) -> dict:
     service = ProjectService()
     deleted = await service.delete_project(session, project_id)
     if not deleted:
@@ -81,7 +99,9 @@ async def delete_project(project_id: int, session: AsyncSession = Depends(get_db
 
 
 @router.post("/tests/generate", response_model=GeneratedTestOut)
-async def generate_test(payload: TestGenerateRequest, session: AsyncSession = Depends(get_db)) -> GeneratedTestOut:
+async def generate_test(
+    payload: TestGenerateRequest, session: AsyncSession = Depends(get_db)
+) -> GeneratedTestOut:
     service = TestService()
     try:
         generated = await service.generate_test(
@@ -119,7 +139,9 @@ async def generate_test(payload: TestGenerateRequest, session: AsyncSession = De
 
 
 @router.post("/scan")
-async def scan_page(payload: ScanRequest, session: AsyncSession = Depends(get_db)) -> StreamingResponse:
+async def scan_page(
+    payload: ScanRequest, session: AsyncSession = Depends(get_db)
+) -> StreamingResponse:
     scanner = ElementScannerService()
 
     async def event_stream():
@@ -130,7 +152,9 @@ async def scan_page(payload: ScanRequest, session: AsyncSession = Depends(get_db
 
         async def run_scan() -> None:
             try:
-                result = await scanner.scan_url(str(payload.url), progress_callback=on_progress)
+                result = await scanner.scan_url(
+                    str(payload.url), progress_callback=on_progress
+                )
                 scan_data = result.model_dump()
                 # Persist scan cache in the project if project_id was provided
                 if payload.project_id is not None:
@@ -161,7 +185,9 @@ async def scan_page(payload: ScanRequest, session: AsyncSession = Depends(get_db
 
 
 @router.get("/tests/{test_id}", response_model=GeneratedTestOut)
-async def get_test(test_id: int, session: AsyncSession = Depends(get_db)) -> GeneratedTestOut:
+async def get_test(
+    test_id: int, session: AsyncSession = Depends(get_db)
+) -> GeneratedTestOut:
     service = TestService()
     generated = await service.get_generated_test(session, test_id)
     if not generated:
@@ -179,7 +205,9 @@ async def delete_test(test_id: int, session: AsyncSession = Depends(get_db)) -> 
 
 
 @router.get("/tests/{test_id}/download")
-async def download_test(test_id: int, session: AsyncSession = Depends(get_db)) -> FileResponse:
+async def download_test(
+    test_id: int, session: AsyncSession = Depends(get_db)
+) -> FileResponse:
     service = TestService()
     generated = await service.get_generated_test(session, test_id)
     if not generated:
@@ -187,8 +215,12 @@ async def download_test(test_id: int, session: AsyncSession = Depends(get_db)) -
     return FileResponse(path=generated.file_path, filename=f"test_{test_id}.robot")
 
 
-@router.get("/projects/{project_id}/executions", response_model=list[TestExecutionResult])
-async def list_project_executions(project_id: int, session: AsyncSession = Depends(get_db)) -> list[TestExecutionResult]:
+@router.get(
+    "/projects/{project_id}/executions", response_model=list[TestExecutionResult]
+)
+async def list_project_executions(
+    project_id: int, session: AsyncSession = Depends(get_db)
+) -> list[TestExecutionResult]:
     """Return the execution history for a project."""
     service = TestExecutionService()
     executions = await service.list_executions_by_project(session, project_id)
@@ -196,7 +228,9 @@ async def list_project_executions(project_id: int, session: AsyncSession = Depen
 
 
 @router.post("/executions/run", response_model=TestExecutionResult)
-async def execute_tests(payload: TestExecutionRequest, session: AsyncSession = Depends(get_db)) -> TestExecutionResult:
+async def execute_tests(
+    payload: TestExecutionRequest, session: AsyncSession = Depends(get_db)
+) -> TestExecutionResult:
     """Execute Robot Framework tests for a project and generate MkDocs report."""
     service = TestExecutionService()
     try:
@@ -265,7 +299,9 @@ async def improve_robot_test(
 ) -> RobotImproveResponse:
     """Send current .robot content to the AI (with page scan context) and return an improved version."""
     service = TestService()
-    improved = await service.improve_robot_test(session=session, test_id=test_id, content=payload.content)
+    improved = await service.improve_robot_test(
+        session=session, test_id=test_id, content=payload.content
+    )
     if improved is None:
         raise HTTPException(status_code=404, detail="Test not found")
     return RobotImproveResponse(content=improved)

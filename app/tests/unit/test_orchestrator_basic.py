@@ -11,14 +11,18 @@ from app.domain.dom.models import (
     ProcessedElement,
     ChunkProcessingResult,
 )
-from app.infrastructure.llm_chunking.orchestrator import ChunkedTestGenerationOrchestrator
+from app.infrastructure.llm_chunking.orchestrator import (
+    ChunkedTestGenerationOrchestrator,
+)
 
 
 class TestChunkedTestGenerationOrchestratorBasic:
     """Coverage-focused tests for orchestrator."""
 
     def _build_orchestrator(self):
-        orch = ChunkedTestGenerationOrchestrator(groq_client=Mock(), test_repository=Mock())
+        orch = ChunkedTestGenerationOrchestrator(
+            groq_client=Mock(), test_repository=Mock()
+        )
         return orch
 
     @pytest.mark.asyncio
@@ -31,7 +35,9 @@ class TestChunkedTestGenerationOrchestratorBasic:
             name="forms",
             elements=[ProcessedElement(tag="input", id="email")],
         )
-        segmentation_result = DOMSegmentationResult(sections=[section], total_char_size=123)
+        segmentation_result = DOMSegmentationResult(
+            sections=[section], total_char_size=123
+        )
         chunks = [
             DOMChunk(
                 chunk_id="forms_0",
@@ -102,7 +108,9 @@ class TestChunkedTestGenerationOrchestratorBasic:
         """Test preprocess helper delegates to preprocessor."""
         orch = self._build_orchestrator()
         orch._preprocessor = Mock()
-        orch._preprocessor.preprocess_page_structure.return_value = {"dom_tree": {"tag": "html"}}
+        orch._preprocessor.preprocess_page_structure.return_value = {
+            "dom_tree": {"tag": "html"}
+        }
 
         result = orch._preprocess_dom({"dom_tree": {"tag": "body"}})
 
@@ -117,7 +125,9 @@ class TestChunkedTestGenerationOrchestratorBasic:
         orch._segmentation_cache = Mock()
         orch._segmentation_cache.get.return_value = cached
 
-        result = orch._segment_dom({"dom_tree": {}}, dom_hash="abc", page_url="https://x")
+        result = orch._segment_dom(
+            {"dom_tree": {}}, dom_hash="abc", page_url="https://x"
+        )
 
         assert result is cached
         orch._segmentation_cache.set.assert_not_called()

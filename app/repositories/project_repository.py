@@ -20,7 +20,9 @@ class ProjectRepository:
         result = await session.execute(select(Project))
         return list(result.scalars().all())
 
-    async def list_with_test_count(self, session: AsyncSession) -> Sequence[tuple[Project, int]]:
+    async def list_with_test_count(
+        self, session: AsyncSession
+    ) -> Sequence[tuple[Project, int]]:
         result = await session.execute(
             select(Project, func.count(GeneratedTest.id).label("test_count"))
             .outerjoin(TestRequest, TestRequest.project_id == Project.id)

@@ -1,4 +1,5 @@
 """Model for test execution results"""
+
 from datetime import datetime
 
 from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text
@@ -21,7 +22,9 @@ class TestExecution(Base):
     log_file: Mapped[str] = mapped_column(String(500), nullable=False)
     report_file: Mapped[str] = mapped_column(String(500), nullable=False)
     output_file: Mapped[str] = mapped_column(String(500), nullable=False)
-    status: Mapped[str] = mapped_column(String(50), default="running")  # running, completed, failed
+    status: Mapped[str] = mapped_column(
+        String(50), default="running"
+    )  # running, completed, failed
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     error_output: Mapped[str | None] = mapped_column(Text, nullable=True)

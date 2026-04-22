@@ -2,7 +2,12 @@
 
 import pytest
 from unittest.mock import Mock
-from app.domain.dom.models import DOMChunk, DOMSectionType, ProcessedElement, ChunkProcessingResult
+from app.domain.dom.models import (
+    DOMChunk,
+    DOMSectionType,
+    ProcessedElement,
+    ChunkProcessingResult,
+)
 from app.infrastructure.llm_chunking.chunk_processor import ChunkProcessor
 from app.llm.groq_client import PayloadTooLargeError
 
@@ -21,7 +26,7 @@ class TestChunkProcessorBasic:
     async def test_process_chunk_basic(self, mock_groq_client):
         """Test basic chunk processing."""
         processor = ChunkProcessor(groq_client=mock_groq_client)
-        
+
         chunk = DOMChunk(
             chunk_id="chunk_1",
             section_type=DOMSectionType.FORMS,
@@ -42,7 +47,7 @@ class TestChunkProcessorBasic:
     async def test_process_chunk_preserves_metadata(self, mock_groq_client):
         """Test that chunk metadata is preserved."""
         processor = ChunkProcessor(groq_client=mock_groq_client)
-        
+
         chunk = DOMChunk(
             chunk_id="chunk_test",
             section_type=DOMSectionType.HEADER,
@@ -64,7 +69,7 @@ class TestChunkProcessorBasic:
     async def test_process_chunks_batch_basic(self, mock_groq_client):
         """Test batch processing of chunks."""
         processor = ChunkProcessor(groq_client=mock_groq_client)
-        
+
         chunks = [
             DOMChunk(
                 chunk_id=f"chunk_{i}",
@@ -88,7 +93,7 @@ class TestChunkProcessorBasic:
     async def test_process_chunk_with_context(self, mock_groq_client):
         """Test chunk processing with context."""
         processor = ChunkProcessor(groq_client=mock_groq_client)
-        
+
         chunk = DOMChunk(
             chunk_id="chunk_1",
             section_type=DOMSectionType.FORMS,
@@ -224,7 +229,10 @@ class TestChunkProcessorBasic:
     async def test_process_chunk_raises_when_compacted_retry_also_too_large(self):
         groq = Mock()
         groq.generate_robot_test = Mock(
-            side_effect=[PayloadTooLargeError("too large"), PayloadTooLargeError("still too large")]
+            side_effect=[
+                PayloadTooLargeError("too large"),
+                PayloadTooLargeError("still too large"),
+            ]
         )
         processor = ChunkProcessor(groq_client=groq)
 

@@ -5,13 +5,14 @@ import pytest
 from app.domain.dom.segmenter import DOMSegmenter
 from app.domain.dom.models import DOMSectionType, DOMSegmentationResult
 
+
 class TestDOMSegmenter:
     """Tests for DOMSegmenter responsible for DOM segmentation."""
 
     def test_segment_simple_page_structure(self):
         """Test segmentation of a simple page."""
         segmenter = DOMSegmenter()
-        
+
         page = {
             "dom_tree": {
                 "tag": "html",
@@ -23,9 +24,7 @@ class TestDOMSegmenter:
                     },
                     {
                         "tag": "main",
-                        "children": [
-                            {"tag": "p", "text": "Main content"}
-                        ],
+                        "children": [{"tag": "p", "text": "Main content"}],
                     },
                     {
                         "tag": "footer",
@@ -43,7 +42,7 @@ class TestDOMSegmenter:
     def test_identify_header_section(self):
         """Test identification of header section."""
         segmenter = DOMSegmenter()
-        
+
         element = {
             "tag": "header",
             "id": "site-header",
@@ -60,7 +59,7 @@ class TestDOMSegmenter:
     def test_identify_navigation_section(self):
         """Test identification of navigation section."""
         segmenter = DOMSegmenter()
-        
+
         element = {
             "tag": "nav",
             "attributes": {"id": "main-nav"},
@@ -74,7 +73,7 @@ class TestDOMSegmenter:
     def test_identify_form_section(self):
         """Test identification of form section."""
         segmenter = DOMSegmenter()
-        
+
         element = {
             "tag": "form",
             "children": [
@@ -90,7 +89,7 @@ class TestDOMSegmenter:
     def test_identify_footer_section(self):
         """Test identification of footer section."""
         segmenter = DOMSegmenter()
-        
+
         element = {
             "tag": "footer",
         }
@@ -102,7 +101,7 @@ class TestDOMSegmenter:
     def test_segment_extracts_text_content(self):
         """Test that segmentation preserves text content."""
         segmenter = DOMSegmenter()
-        
+
         page = {
             "dom_tree": {
                 "tag": "body",
@@ -121,13 +120,15 @@ class TestDOMSegmenter:
         result = segmenter.segment_page(page)
 
         # Should have extracted content
-        all_text = " ".join([str(elem) for section in result.sections for elem in section.elements])
+        all_text = " ".join(
+            [str(elem) for section in result.sections for elem in section.elements]
+        )
         assert len(all_text) > 0
 
     def test_segment_with_nested_divs(self):
         """Test segmentation with deeply nested divs."""
         segmenter = DOMSegmenter()
-        
+
         page = {
             "dom_tree": {
                 "tag": "body",
@@ -161,7 +162,7 @@ class TestDOMSegmenter:
     def test_extract_section_from_element(self):
         """Test extraction of a section from an element."""
         segmenter = DOMSegmenter()
-        
+
         element = {
             "tag": "section",
             "id": "content",
@@ -180,7 +181,7 @@ class TestDOMSegmenter:
     def test_segment_multiple_sections(self):
         """Test segmentation returns multiple distinct sections."""
         segmenter = DOMSegmenter()
-        
+
         page = {
             "dom_tree": {
                 "tag": "body",
@@ -201,7 +202,7 @@ class TestDOMSegmenter:
     def test_match_section_pattern_by_id(self):
         """Test pattern matching by element ID."""
         segmenter = DOMSegmenter()
-        
+
         navigation_element = {
             "tag": "div",
             "id": "main-navigation",
@@ -214,7 +215,7 @@ class TestDOMSegmenter:
     def test_match_section_pattern_by_class(self):
         """Test pattern matching by element class."""
         segmenter = DOMSegmenter()
-        
+
         navbar_element = {
             "tag": "div",
             "class": "navbar navbar-expand-lg",
@@ -228,7 +229,7 @@ class TestDOMSegmenter:
     def test_estimate_section_size(self):
         """Test that section size is estimated."""
         segmenter = DOMSegmenter()
-        
+
         page = {
             "dom_tree": {
                 "tag": "body",
@@ -248,7 +249,7 @@ class TestDOMSegmenter:
     def test_ignore_script_tags_in_segmentation(self):
         """Test that script tags are ignored in segmentation."""
         segmenter = DOMSegmenter()
-        
+
         page = {
             "dom_tree": {
                 "tag": "body",
@@ -280,7 +281,7 @@ class TestDOMSegmenter:
     def test_extract_semantic_sections(self):
         """Test extraction of semantically meaningful sections."""
         segmenter = DOMSegmenter()
-        
+
         page = {
             "dom_tree": {
                 "tag": "body",
@@ -299,12 +300,15 @@ class TestDOMSegmenter:
         result = segmenter.segment_page(page)
 
         assert len(result.sections) > 0
-        assert any(s.section_type == DOMSectionType.MAIN_CONTENT for s in result.sections) or len(result.sections) > 0
+        assert (
+            any(s.section_type == DOMSectionType.MAIN_CONTENT for s in result.sections)
+            or len(result.sections) > 0
+        )
 
     def test_segment_page_preserves_xpath(self):
         """Test that segmentation preserves or generates XPath for elements."""
         segmenter = DOMSegmenter()
-        
+
         page = {
             "dom_tree": {
                 "tag": "body",
@@ -327,7 +331,7 @@ class TestDOMSegmenter:
     def test_empty_page_segmentation(self):
         """Test segmentation of empty page."""
         segmenter = DOMSegmenter()
-        
+
         page = {
             "dom_tree": {
                 "tag": "html",
@@ -343,7 +347,7 @@ class TestDOMSegmenter:
     def test_single_large_section(self):
         """Test segmentation of page with single large section."""
         segmenter = DOMSegmenter()
-        
+
         large_text = " ".join([f"Word{i}" for i in range(1000)])
         page = {
             "dom_tree": {
@@ -371,7 +375,9 @@ class TestDOMSegmenter:
     def test_extract_semantic_sections_accepts_list_input(self):
         segmenter = DOMSegmenter()
         page_list = [{"tag": "header"}, {"tag": "footer"}]
-        result = segmenter.segment_page({"dom_tree": {"tag": "body", "children": page_list}})
+        result = segmenter.segment_page(
+            {"dom_tree": {"tag": "body", "children": page_list}}
+        )
         assert len(result.sections) >= 1
 
     def test_extract_semantic_sections_ignores_non_dict(self):

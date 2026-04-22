@@ -6,7 +6,7 @@ def test_project_create_schema() -> None:
     project = ProjectCreate(
         name="Test Project",
         description="Test Description",
-        url="https://example.com", # type: ignore[arg-type]
+        url="https://example.com",  # type: ignore[arg-type]
         test_directory="/tmp/tests",
     )
     assert project.name == "Test Project"
@@ -31,7 +31,7 @@ def test_project_out_schema() -> None:
         description="Test Description",
         url="https://example.com",
         test_directory="/tmp/tests",
-        created_at=now
+        created_at=now,
     )
     assert project.id == 1
     assert project.name == "Test Project"

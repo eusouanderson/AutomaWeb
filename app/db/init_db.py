@@ -3,7 +3,14 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.db.base import Base
 from app.db.session import engine
-from app.models import generated_test, log, project, test_execution, test_request, user  # noqa: F401
+from app.models import (
+    generated_test,
+    log,
+    project,
+    test_execution,
+    test_request,
+    user,
+)  # noqa: F401
 
 
 async def init_db(db_engine: AsyncEngine | None = None) -> None:
@@ -55,9 +62,7 @@ def _ensure_project_url_column(sync_conn) -> None:
     if "url" in columns:
         return
 
-    sync_conn.execute(
-        text("ALTER TABLE projects ADD COLUMN url VARCHAR(1000)")
-    )
+    sync_conn.execute(text("ALTER TABLE projects ADD COLUMN url VARCHAR(1000)"))
 
 
 def _ensure_project_scan_cache_columns(sync_conn) -> None:
@@ -68,4 +73,6 @@ def _ensure_project_scan_cache_columns(sync_conn) -> None:
         sync_conn.execute(text("ALTER TABLE projects ADD COLUMN scan_cache TEXT"))
 
     if "scan_cached_at" not in columns:
-        sync_conn.execute(text("ALTER TABLE projects ADD COLUMN scan_cached_at DATETIME"))
+        sync_conn.execute(
+            text("ALTER TABLE projects ADD COLUMN scan_cached_at DATETIME")
+        )

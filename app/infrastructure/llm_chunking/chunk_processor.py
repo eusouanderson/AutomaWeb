@@ -19,7 +19,7 @@ class ChunkProcessor:
 
     def __init__(self, groq_client: GroqClient | None = None):
         """Initialize processor.
-        
+
         Args:
             groq_client: Optional GroqClient instance
         """
@@ -33,28 +33,28 @@ class ChunkProcessor:
         retry_on_large_payload: bool = True,
     ) -> ChunkProcessingResult:
         """Process a single DOM chunk through LLM.
-        
+
         Args:
             chunk: DOMChunk to process
             user_prompt: User's test generation prompt
             context: Optional context/additional instructions
             retry_on_large_payload: If True, retry with compact format on PayloadTooLargeError
-            
+
         Returns:
             ChunkProcessingResult with generated test
-            
+
         Raises:
             PayloadTooLargeError: If chunk still too large even after retries
             RetryError: If LLM call retries exhausted
         """
         logger.info("Processing chunk: %s (%d chars)", chunk.chunk_id, chunk.char_size)
-        
+
         # Create section-specific context
         section_context = self._create_section_context(chunk, user_prompt, context)
-        
+
         # Convert chunk to dict for LLM
         chunk_dict = chunk.to_dict()
-        
+
         try:
             # Generate test for this chunk
             content = await asyncio.to_thread(
@@ -63,7 +63,7 @@ class ChunkProcessor:
                 context=None,  # Context already included in section_context
                 page_structure={"chunk": chunk_dict},
             )
-            
+
             result = ChunkProcessingResult(
                 chunk_id=chunk.chunk_id,
                 section_type=chunk.section_type,
@@ -74,23 +74,23 @@ class ChunkProcessor:
                     "element_count": len(chunk.elements),
                 },
             )
-            
+
             logger.info("Successfully processed chunk: %s", chunk.chunk_id)
             return result
-            
+
         except PayloadTooLargeError as exc:
             if not retry_on_large_payload:
                 raise
-            
+
             logger.warning(
                 "Chunk %s exceeded token limit, retrying with compact format",
-                chunk.chunk_id
+                chunk.chunk_id,
             )
-            
+
             # Retry with minimal element data
             compact_chunk = self._compact_chunk(chunk)
             compact_dict = compact_chunk.to_dict()
-            
+
             try:
                 content = await asyncio.to_thread(
                     self._groq_client.generate_robot_test,
@@ -98,7 +98,7 @@ class ChunkProcessor:
                     context=None,
                     page_structure={"chunk": compact_dict},
                 )
-                
+
                 result = ChunkProcessingResult(
                     chunk_id=chunk.chunk_id,
                     section_type=chunk.section_type,
@@ -110,12 +110,16 @@ class ChunkProcessor:
                         "compacted": True,
                     },
                 )
-                
-                logger.info("Successfully processed (compacted) chunk: %s", chunk.chunk_id)
+
+                logger.info(
+                    "Successfully processed (compacted) chunk: %s", chunk.chunk_id
+                )
                 return result
-                
+
             except PayloadTooLargeError as retry_exc:
-                logger.error("Chunk %s still too large after compaction", chunk.chunk_id)
+                logger.error(
+                    "Chunk %s still too large after compaction", chunk.chunk_id
+                )
                 raise retry_exc from exc
 
     async def process_chunks_batch(
@@ -126,21 +130,23 @@ class ChunkProcessor:
         max_concurrent: int = 3,
     ) -> list[ChunkProcessingResult]:
         """Process multiple chunks concurrently.
-        
+
         Args:
             chunks: List of DOMChunk objects
             user_prompt: User's test generation prompt
             context: Optional context
             max_concurrent: Max concurrent chunk processing
-            
+
         Returns:
             List of ChunkProcessingResult objects
         """
-        logger.info("Processing %d chunks concurrently (max %d)", len(chunks), max_concurrent)
-        
+        logger.info(
+            "Processing %d chunks concurrently (max %d)", len(chunks), max_concurrent
+        )
+
         results = []
         semaphore = asyncio.Semaphore(max_concurrent)
-        
+
         async def process_with_semaphore(chunk):
             async with semaphore:
                 try:
@@ -155,21 +161,21 @@ class ChunkProcessor:
                         generated_test="",
                         metadata={"error": str(e)},
                     )
-        
+
         results = await asyncio.gather(
             *[process_with_semaphore(chunk) for chunk in chunks],
             return_exceptions=False,
         )
-        
+
         successful = [r for r in results if r.generated_test]
         failed = [r for r in results if not r.generated_test]
-        
+
         logger.info(
             "Batch processing complete: %d successful, %d failed",
             len(successful),
             len(failed),
         )
-        
+
         return results
 
     def _create_section_context(
@@ -179,36 +185,36 @@ class ChunkProcessor:
         context: str | None = None,
     ) -> str:
         """Create section-specific prompt context.
-        
+
         Args:
             chunk: DOMChunk being processed
             user_prompt: User's test prompt
             context: Optional user context
-            
+
         Returns:
             Section-specific prompt
         """
         section_desc = f"Generate Robot Framework tests for the {chunk.section_type.value.replace('_', ' ')} section"
-        
+
         prompt_parts = [
             section_desc,
             f"Section name: {chunk.section_name}",
             f"Number of elements: {len(chunk.elements)}",
         ]
-        
+
         if context:
             prompt_parts.append(f"Additional context:\n{context}")
-        
+
         prompt_parts.append(f"\nUser request:\n{user_prompt}")
-        
+
         return "\n\n".join(prompt_parts)
 
     def _compact_chunk(self, chunk: DOMChunk) -> DOMChunk:
         """Create a compacted version of chunk with minimal text.
-        
+
         Args:
             chunk: Original DOMChunk
-            
+
         Returns:
             Compacted DOMChunk
         """
@@ -217,7 +223,7 @@ class ChunkProcessor:
         for elem in chunk.elements:
             elem.text = None if elem.text and len(elem.text) > 50 else elem.text
             compacted_elements.append(elem)
-        
+
         return DOMChunk(
             chunk_id=chunk.chunk_id,
             section_type=chunk.section_type,

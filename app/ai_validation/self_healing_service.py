@@ -45,7 +45,9 @@ class AITestSelfHealingService:
     ) -> HealedTestResult:
         self._metrics.inc_generated()
 
-        first_report = await self._validator.validate(content=content, page_url=page_url)
+        first_report = await self._validator.validate(
+            content=content, page_url=page_url
+        )
         fixed_content = content
         applied_fixes: list[str] = []
 
@@ -60,7 +62,9 @@ class AITestSelfHealingService:
             fixed_content = fix_result.content
             applied_fixes = fix_result.applied_fixes
 
-        second_report = await self._validator.validate(content=fixed_content, page_url=page_url)
+        second_report = await self._validator.validate(
+            content=fixed_content, page_url=page_url
+        )
 
         if not second_report.has_errors and applied_fixes:
             self._metrics.inc_fixed()
@@ -75,7 +79,9 @@ class AITestSelfHealingService:
         )
 
         if settings.AI_DEBUG or ai_debug:
-            self._write_debug_log(result, second_report.issues, prompt=prompt, context=context)
+            self._write_debug_log(
+                result, second_report.issues, prompt=prompt, context=context
+            )
 
         return result
 

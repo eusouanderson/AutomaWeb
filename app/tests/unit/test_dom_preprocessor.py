@@ -240,7 +240,7 @@ class TestDOMPreprocessor:
     def test_dom_size_reduction(self):
         """Test that preprocessing reduces DOM size significantly."""
         preprocessor = DOMPreprocessor()
-        
+
         original = {
             "dom_tree": {
                 "tag": "div",
@@ -255,8 +255,9 @@ class TestDOMPreprocessor:
         }
 
         import json
+
         original_size = len(json.dumps(original))
-        
+
         preprocessed = preprocessor.preprocess_page_structure(original)
         preprocessed_size = len(json.dumps(preprocessed))
 

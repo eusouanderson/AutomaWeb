@@ -3,11 +3,14 @@ import {
   deleteGeneratedTest,
   deleteProject,
   generateRobotTest,
+  generateVisualBuilderCode,
   getTestById,
+  getVisualBuilderSteps,
   listGeneratedTests,
   listProjectExecutions,
   listProjects,
   runTests,
+  startVisualBuilder,
 } from '../api/automaweb.api.js';
 import { isValidUrl, requiredText } from '../utils/validators.js';
 
@@ -99,4 +102,19 @@ export async function getProjectExecutions(projectId) {
     return [];
   }
   return listProjectExecutions(projectId);
+}
+
+export async function startVisualBuilderSession(url) {
+  if (!isValidUrl(url)) {
+    throw new Error('Builder URL must be valid');
+  }
+  return startVisualBuilder(url);
+}
+
+export async function getVisualBuilderCapturedSteps(sessionId) {
+  return getVisualBuilderSteps(sessionId || null);
+}
+
+export async function generateVisualBuilderPlaywrightCode(sessionId, prompt = null) {
+  return generateVisualBuilderCode(sessionId || null, prompt || null);
 }

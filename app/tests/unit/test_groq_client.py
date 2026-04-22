@@ -6,7 +6,7 @@ from app.llm.groq_client import SimpleCache
 def test_cache_set_and_get() -> None:
     cache = SimpleCache(ttl_seconds=10)
     cache.set("key1", "value1")
-    
+
     assert cache.get("key1") == "value1"
 
 
@@ -17,25 +17,26 @@ def test_cache_miss() -> None:
 
 def test_cache_expiration() -> None:
     import time
-    
+
     cache = SimpleCache(ttl_seconds=1)
     cache.set("key1", "value1")
-    
+
     assert cache.get("key1") == "value1"
-    
+
     time.sleep(1.1)
-    
+
     assert cache.get("key1") is None
 
 
 def test_groq_client_initialization() -> None:
     from unittest.mock import patch
     from app.llm.groq_client import GroqClient
-    
+
     with patch.dict("os.environ", {"GROQ_API_KEY": "test_key"}):
         from app.core.config import Settings
+
         settings = Settings(GROQ_API_KEY="test_key")
-        
+
         with patch("app.llm.groq_client.settings", settings):
             client = GroqClient()
             assert client._client is not None
@@ -44,11 +45,12 @@ def test_groq_client_initialization() -> None:
 def test_groq_client_no_api_key() -> None:
     from unittest.mock import patch
     from app.llm.groq_client import GroqClient
-    
+
     with patch.dict("os.environ", {}, clear=True):
         from app.core.config import Settings
+
         settings = Settings(GROQ_API_KEY="")
-        
+
         with patch("app.llm.groq_client.settings", settings):
             with pytest.raises(ValueError, match="GROQ_API_KEY is not configured"):
                 GroqClient()
@@ -57,29 +59,32 @@ def test_groq_client_no_api_key() -> None:
 def test_groq_client_generate_with_cache() -> None:
     from unittest.mock import MagicMock, patch
     from app.llm.groq_client import GroqClient
-    
+
     with patch.dict("os.environ", {"GROQ_API_KEY": "test_key"}):
         from app.core.config import Settings
+
         settings = Settings(GROQ_API_KEY="test_key")
-        
+
         with patch("app.llm.groq_client.settings", settings):
             client = GroqClient()
-            
+
             # Mock Groq response
             mock_response = MagicMock()
             mock_response.choices = [MagicMock()]
             mock_response.choices[0].message.content = "Generated test code"
-            
-            client._client.chat.completions.create = MagicMock(return_value=mock_response)
-            
+
+            client._client.chat.completions.create = MagicMock(
+                return_value=mock_response
+            )
+
             # First call
             result1 = client.generate_robot_test("test prompt")
             assert result1 == "Generated test code"
-            
+
             # Second call should use cache
             result2 = client.generate_robot_test("test prompt")
             assert result2 == "Generated test code"
-            
+
             # Should only call API once due to cache
             assert client._client.chat.completions.create.call_count == 1
 
@@ -123,7 +128,10 @@ def test_groq_client_initialization_with_ca_bundle() -> None:
                 with patch("app.llm.groq_client.Groq", return_value=MagicMock()):
                     GroqClient()
 
-                assert mock_http_client.call_args.kwargs["verify"] == "/etc/ssl/custom-ca.pem"
+                assert (
+                    mock_http_client.call_args.kwargs["verify"]
+                    == "/etc/ssl/custom-ca.pem"
+                )
 
 
 def test_groq_client_generate_with_page_structure_in_system_prompt() -> None:
@@ -141,7 +149,9 @@ def test_groq_client_generate_with_page_structure_in_system_prompt() -> None:
             mock_response = MagicMock()
             mock_response.choices = [MagicMock()]
             mock_response.choices[0].message.content = "Generated test code"
-            client._client.chat.completions.create = MagicMock(return_value=mock_response)
+            client._client.chat.completions.create = MagicMock(
+                return_value=mock_response
+            )
 
             structure = {"buttons": [{"text": "Entrar"}]}
             result = client.generate_robot_test("test prompt", page_structure=structure)
@@ -207,7 +217,9 @@ def test_regenerate_robot_step_returns_first_line():
         client = GroqClient()
 
     mock_response = MagicMock()
-    mock_response.choices[0].message.content = "    Click    css=#real-btn\nsome extra line"
+    mock_response.choices[0].message.content = (
+        "    Click    css=#real-btn\nsome extra line"
+    )
     client._client.chat.completions.create = MagicMock(return_value=mock_response)
 
     result = client.regenerate_robot_step(
@@ -348,7 +360,9 @@ def test_check_api_health_uses_fallback_cache_on_failure():
     from app.core.config import Settings
     from app.llm.groq_client import GroqClient
 
-    settings_obj = Settings(GROQ_API_KEY="test_key", LLM_HEALTH_FALLBACK_WINDOW_SECONDS=300)
+    settings_obj = Settings(
+        GROQ_API_KEY="test_key", LLM_HEALTH_FALLBACK_WINDOW_SECONDS=300
+    )
     with patch("app.llm.groq_client.settings", settings_obj):
         client = GroqClient()
 
@@ -358,7 +372,9 @@ def test_check_api_health_uses_fallback_cache_on_failure():
     first = client.check_api_health()
     assert first["ok"] is True
 
-    client._client.chat.completions.create = MagicMock(side_effect=RuntimeError("network down"))
+    client._client.chat.completions.create = MagicMock(
+        side_effect=RuntimeError("network down")
+    )
     second = client.check_api_health()
 
     assert second["ok"] is True
@@ -371,11 +387,15 @@ def test_check_api_health_returns_not_ok_when_live_fails_without_recent_success(
     from app.core.config import Settings
     from app.llm.groq_client import GroqClient
 
-    settings_obj = Settings(GROQ_API_KEY="test_key", LLM_HEALTH_FALLBACK_WINDOW_SECONDS=300)
+    settings_obj = Settings(
+        GROQ_API_KEY="test_key", LLM_HEALTH_FALLBACK_WINDOW_SECONDS=300
+    )
     with patch("app.llm.groq_client.settings", settings_obj):
         client = GroqClient()
 
-    client._client.chat.completions.create = MagicMock(side_effect=RuntimeError("health down"))
+    client._client.chat.completions.create = MagicMock(
+        side_effect=RuntimeError("health down")
+    )
 
     result = client.check_api_health()
 
@@ -403,8 +423,12 @@ def test_generate_robot_test_retries_once_with_compact_payload_on_413():
         client = GroqClient()
 
     mock_response = MagicMock()
-    mock_response.choices[0].message.content = "*** Test Cases ***\nExample\n    Log    ok"
-    client._client.chat.completions.create = MagicMock(side_effect=[_PayloadTooLargeError(), mock_response])
+    mock_response.choices[0].message.content = (
+        "*** Test Cases ***\nExample\n    Log    ok"
+    )
+    client._client.chat.completions.create = MagicMock(
+        side_effect=[_PayloadTooLargeError(), mock_response]
+    )
 
     long_context = "ctx-" * 4000
     long_prompt = "prompt-" * 2000
@@ -417,8 +441,12 @@ def test_generate_robot_test_retries_once_with_compact_payload_on_413():
     assert "*** Test Cases ***" in result
     assert client._client.chat.completions.create.call_count == 2
 
-    first_messages = client._client.chat.completions.create.call_args_list[0].kwargs["messages"]
-    second_messages = client._client.chat.completions.create.call_args_list[1].kwargs["messages"]
+    first_messages = client._client.chat.completions.create.call_args_list[0].kwargs[
+        "messages"
+    ]
+    second_messages = client._client.chat.completions.create.call_args_list[1].kwargs[
+        "messages"
+    ]
     assert len(second_messages[1]["content"]) < len(first_messages[1]["content"])
     assert "Where (onde):" in second_messages[1]["content"]
     assert "Contexto reduzido automaticamente" in second_messages[1]["content"]
@@ -436,7 +464,9 @@ def test_generate_robot_test_raises_payload_too_large_after_compact_fallback():
     with patch("app.llm.groq_client.settings", settings_obj):
         client = GroqClient()
 
-    client._client.chat.completions.create = MagicMock(side_effect=[_PayloadTooLargeError(), _PayloadTooLargeError()])
+    client._client.chat.completions.create = MagicMock(
+        side_effect=[_PayloadTooLargeError(), _PayloadTooLargeError()]
+    )
 
     with pytest.raises(PayloadTooLargeError, match="payload exceeds provider limits"):
         client.generate_robot_test(
@@ -489,9 +519,12 @@ def test_generate_robot_test_raises_unexpected_exception():
     with patch("app.llm.groq_client.settings", settings_obj):
         client = GroqClient()
 
-    client._client.chat.completions.create = MagicMock(side_effect=_SomeOtherError("fail!"))
+    client._client.chat.completions.create = MagicMock(
+        side_effect=_SomeOtherError("fail!")
+    )
 
     import tenacity
+
     with pytest.raises(tenacity.RetryError) as excinfo:
         client.generate_robot_test("Prompt", context="ctx")
     # A causa original deve ser _SomeOtherError
@@ -524,6 +557,7 @@ def test__chat_completion_returns_empty_string_on_none():
 # --- Cobertura extra: _is_payload_too_large com response.status_code ---
 def test__is_payload_too_large_with_response_status_code():
     from app.llm.groq_client import GroqClient
+
     client = GroqClient()
 
     class DummyResponse:
@@ -549,6 +583,7 @@ def test__is_payload_too_large_with_response_status_code():
 # _build_wwwh_prompt – line 136: extra param appended when non-empty
 # ---------------------------------------------------------------------------
 
+
 def test_build_wwwh_prompt_includes_extra_when_provided() -> None:
     """Line 136: when a non-empty `extra` is passed its content appears in the output."""
     from app.llm.groq_client import GroqClient
@@ -570,9 +605,7 @@ def test_build_wwwh_prompt_excludes_extra_when_none() -> None:
     from app.llm.groq_client import GroqClient
 
     client = GroqClient()
-    result = client._build_wwwh_prompt(
-        what="w", why="y", where="o", how="h"
-    )
+    result = client._build_wwwh_prompt(what="w", why="y", where="o", how="h")
     assert result.count("\n\n") == 3  # 3 separators → 4 parts
 
 
@@ -585,4 +618,3 @@ def test_build_wwwh_prompt_excludes_extra_when_whitespace_only() -> None:
         what="w", why="y", where="o", how="h", extra="   "
     )
     assert result.count("\n\n") == 3
-

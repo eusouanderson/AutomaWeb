@@ -48,6 +48,44 @@
   </form>
 </div>
 
+<div class="section visual-builder-section">
+  <h2>Test Builder Visual (Robot Framework)</h2>
+  <p class="muted">
+    Inicie uma sessão visual, interaja na página aberta pelo navegador e gere steps para Robot Framework
+    automaticamente.
+  </p>
+
+  <form id="visual-builder-form" class="visual-builder-form">
+    <input id="builder-url" type="hidden" />
+    <div class="form-group">
+      <label for="builder-prompt">Objetivo do teste (opcional)</label>
+      <textarea id="builder-prompt" rows="2"
+        placeholder="Ex: validar login e mensagem de erro com credenciais inválidas"></textarea>
+    </div>
+    <div class="result-actions">
+      <button id="builder-start-btn" type="submit" class="btn btn-primary">Iniciar Captura Visual</button>
+      <button id="builder-refresh-steps-btn" type="button" class="btn btn-secondary">Atualizar Steps</button>
+      <button id="builder-generate-btn" type="button" class="btn btn-secondary">Gerar Código Robot</button>
+    </div>
+  </form>
+
+  <div id="builder-session-banner" class="scan-cache-notice hidden">
+    <span>Sessão ativa: <strong id="builder-session-id">-</strong></span>
+  </div>
+
+  <div id="builder-steps-panel" class="generation-parts hidden">
+    <p id="builder-steps-summary" class="generation-parts-summary">Nenhum step capturado ainda.</p>
+    <ul id="builder-steps-list" class="generation-parts-list"></ul>
+  </div>
+
+  <div id="builder-code-panel" class="hidden">
+    <div class="result-actions">
+      <button id="builder-copy-code-btn" type="button" class="btn btn-secondary">Copiar Código Robot</button>
+    </div>
+    <pre><code id="builder-code"></code></pre>
+  </div>
+</div>
+
 <div id="generation-status" class="generation-status hidden" role="status" aria-live="polite">
   <span class="generation-status-spinner" aria-hidden="true"></span>
   <div class="generation-status-body">

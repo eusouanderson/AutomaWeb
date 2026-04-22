@@ -8,7 +8,12 @@ from typing import Any
 
 import httpx
 from groq import Groq
-from tenacity import retry, retry_if_not_exception_type, stop_after_attempt, wait_exponential
+from tenacity import (
+    retry,
+    retry_if_not_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from app.core.config import settings
 
@@ -55,7 +60,9 @@ class GroqClient:
         verify: bool | str = True
         if settings.GROQ_INSECURE_SKIP_VERIFY:
             verify = False
-            logger.warning("GROQ_INSECURE_SKIP_VERIFY is enabled. SSL certificate verification is disabled.")
+            logger.warning(
+                "GROQ_INSECURE_SKIP_VERIFY is enabled. SSL certificate verification is disabled."
+            )
         elif settings.GROQ_CA_BUNDLE:
             verify = settings.GROQ_CA_BUNDLE
 
@@ -97,7 +104,10 @@ class GroqClient:
         except Exception as exc:
             self._last_health_error = f"{exc.__class__.__name__}: {exc}"
             fallback_window = settings.LLM_HEALTH_FALLBACK_WINDOW_SECONDS
-            if self._last_health_ok_at and now - self._last_health_ok_at <= fallback_window:
+            if (
+                self._last_health_ok_at
+                and now - self._last_health_ok_at <= fallback_window
+            ):
                 return {
                     "ok": True,
                     "source": "fallback_cache",
@@ -112,7 +122,9 @@ class GroqClient:
                 "source": "live",
                 "model": settings.GROQ_MODEL,
                 "checked_at_epoch": int(now),
-                "last_success_epoch": int(self._last_health_ok_at) if self._last_health_ok_at else None,
+                "last_success_epoch": (
+                    int(self._last_health_ok_at) if self._last_health_ok_at else None
+                ),
                 "error": self._last_health_error,
                 "message": "LLM API unreachable.",
             }
@@ -149,7 +161,9 @@ class GroqClient:
     ) -> str:
         prompt_text = self._truncate_text(prompt, settings.LLM_MAX_PROMPT_CHARS)
         context_text = self._truncate_text(context, settings.LLM_MAX_CONTEXT_CHARS)
-        page_structure_text = self._serialize_page_structure(page_structure, settings.LLM_MAX_PAGE_STRUCTURE_CHARS)
+        page_structure_text = self._serialize_page_structure(
+            page_structure, settings.LLM_MAX_PAGE_STRUCTURE_CHARS
+        )
 
         page_structure_key = page_structure_text
         cache_key = f"{settings.GROQ_MODEL}:{prompt_text}:{context_text or ''}:{page_structure_key}"
@@ -297,7 +311,8 @@ Agora gere o teste solicitado seguindo TODAS as regras."""
                 f"{page_structure_text}"
             )
         user_content = self._build_wwwh_prompt(
-            what=prompt_text or "Gerar teste Robot Framework conforme solicitação recebida.",
+            what=prompt_text
+            or "Gerar teste Robot Framework conforme solicitação recebida.",
             why="Gerar um teste automatizado estável e executável para validar o fluxo solicitado.",
             where=context_text or "Sem contexto adicional informado.",
             how="Responder apenas com código Robot Framework válido, seguindo as regras do system prompt.",
@@ -313,9 +328,18 @@ Agora gere o teste solicitado seguindo TODAS as regras."""
             if not self._is_payload_too_large(exc):
                 raise
 
-            logger.warning("LLM returned 413 payload too large. Retrying once with compact fallback payload.")
-            fallback_prompt = self._truncate_text(prompt_text, max(800, settings.LLM_MAX_PROMPT_CHARS // 3)) or ""
-            fallback_context = self._truncate_text(context_text, max(1200, settings.LLM_MAX_CONTEXT_CHARS // 3))
+            logger.warning(
+                "LLM returned 413 payload too large. Retrying once with compact fallback payload."
+            )
+            fallback_prompt = (
+                self._truncate_text(
+                    prompt_text, max(800, settings.LLM_MAX_PROMPT_CHARS // 3)
+                )
+                or ""
+            )
+            fallback_context = self._truncate_text(
+                context_text, max(1200, settings.LLM_MAX_CONTEXT_CHARS // 3)
+            )
             fallback_structure = self._serialize_page_structure(
                 page_structure,
                 max(2000, settings.LLM_MAX_PAGE_STRUCTURE_CHARS // 4),
@@ -329,7 +353,8 @@ Agora gere o teste solicitado seguindo TODAS as regras."""
                 )
 
             compact_user_content = self._build_wwwh_prompt(
-                what=fallback_prompt or "Gerar teste Robot Framework conforme solicitação recebida.",
+                what=fallback_prompt
+                or "Gerar teste Robot Framework conforme solicitação recebida.",
                 why="Gerar um teste automatizado estável mesmo após redução de payload.",
                 where=(
                     "Contexto reduzido automaticamente por limite de payload:\n"
@@ -370,7 +395,9 @@ Agora gere o teste solicitado seguindo TODAS as regras."""
             return value
         return value[:limit] + "\n...[TRUNCATED]"
 
-    def _serialize_page_structure(self, page_structure: dict | None, max_chars: int) -> str:
+    def _serialize_page_structure(
+        self, page_structure: dict | None, max_chars: int
+    ) -> str:
         if not page_structure:
             return ""
         as_text = json.dumps(page_structure, ensure_ascii=False)

@@ -2,7 +2,11 @@
 
 import pytest
 from app.domain.dom.models import DOMSection, DOMSectionType, ProcessedElement
-from app.infrastructure.llm_chunking.chunker import DOMChunker, AdaptiveChunker, ChunkingStrategy
+from app.infrastructure.llm_chunking.chunker import (
+    DOMChunker,
+    AdaptiveChunker,
+    ChunkingStrategy,
+)
 
 
 class TestDOMChunkerBasic:
@@ -11,7 +15,7 @@ class TestDOMChunkerBasic:
     def test_chunk_section_returns_list(self):
         """Test that chunk_section returns list of chunks."""
         chunker = DOMChunker(target_chunk_chars=500)
-        
+
         elements = [
             ProcessedElement(tag="input", id="email", text="email field"),
             ProcessedElement(tag="button", text="Submit"),
@@ -30,11 +34,11 @@ class TestDOMChunkerBasic:
     def test_chunk_preserves_section_type(self):
         """Test that chunks preserve section type."""
         chunker = DOMChunker()
-        
+
         elements = [ProcessedElement(tag="button", text="Click")]
         section = DOMSection(
             section_type=DOMSectionType.HEADER,
-                name="header",
+            name="header",
             elements=elements,
         )
 
@@ -78,16 +82,16 @@ class TestDOMChunkerBasic:
     def test_chunk_all_sections(self):
         """Test chunking multiple sections."""
         chunker = DOMChunker()
-        
+
         sections = [
             DOMSection(
                 section_type=DOMSectionType.HEADER,
-                    name="header",
+                name="header",
                 elements=[ProcessedElement(tag="h1", text="Title")],
             ),
             DOMSection(
                 section_type=DOMSectionType.FORMS,
-                    name="forms",
+                name="forms",
                 elements=[ProcessedElement(tag="input", text="field")],
             ),
         ]
@@ -102,20 +106,27 @@ class TestDOMChunkerBasic:
             ProcessedElement(tag="button", text="A" * 30),
             ProcessedElement(tag="button", text="B" * 30),
         ]
-        section = DOMSection(section_type=DOMSectionType.FORMS, name="forms", elements=elements)
+        section = DOMSection(
+            section_type=DOMSectionType.FORMS, name="forms", elements=elements
+        )
 
         chunks = chunker.chunk_section(section)
         assert len(chunks) >= 2
 
     def test_adaptive_chunker_trims_to_max_chunk_count(self):
-        strategy = ChunkingStrategy(target_chunk_chars=20, reserve_chars=0, max_chunk_count=1)
+        strategy = ChunkingStrategy(
+            target_chunk_chars=20, reserve_chars=0, max_chunk_count=1
+        )
         chunker = AdaptiveChunker(total_token_budget=1000, strategy=strategy)
 
         # Many elements to produce more than one chunk before trimming
         section = DOMSection(
             section_type=DOMSectionType.MAIN_CONTENT,
             name="content",
-            elements=[ProcessedElement(tag="p", text="X" * 3000), ProcessedElement(tag="p", text="Y" * 3000)],
+            elements=[
+                ProcessedElement(tag="p", text="X" * 3000),
+                ProcessedElement(tag="p", text="Y" * 3000),
+            ],
         )
 
         chunks = chunker.chunk_all_sections_adaptive([section])

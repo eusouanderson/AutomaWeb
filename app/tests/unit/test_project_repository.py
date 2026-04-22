@@ -10,13 +10,13 @@ from app.repositories.project_repository import ProjectRepository
 
 
 @pytest_asyncio.fixture()
-async def session() -> AsyncSession: # type: ignore[arg-type]
+async def session() -> AsyncSession:  # type: ignore[arg-type]
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     async_session = async_sessionmaker(engine, expire_on_commit=False)
     async with async_session() as session:
-        yield session # type: ignore[arg-type]
+        yield session  # type: ignore[arg-type]
 
 
 async def test_create_project(session: AsyncSession) -> None:
@@ -34,7 +34,7 @@ async def test_list_projects(session: AsyncSession) -> None:
     project2 = Project(name="Project 2", description="Desc 2")
     await repo.create(session, project1)
     await repo.create(session, project2)
-    
+
     projects = await repo.list(session)
     assert len(projects) == 2
 
@@ -43,7 +43,7 @@ async def test_get_project(session: AsyncSession) -> None:
     repo = ProjectRepository()
     project = Project(name="Get Test", description="Desc")
     created = await repo.create(session, project)
-    
+
     found = await repo.get(session, created.id)
     assert found is not None
     assert found.id == created.id
@@ -58,14 +58,24 @@ async def test_get_nonexistent_project(session: AsyncSession) -> None:
 
 async def test_list_projects_with_test_count(session: AsyncSession) -> None:
     repo = ProjectRepository()
-    project = await repo.create(session, Project(name="Project With Tests", description="Desc"))
+    project = await repo.create(
+        session, Project(name="Project With Tests", description="Desc")
+    )
 
-    request = TestRequest(project_id=project.id, prompt="Generate test", context=None, status="done")
+    request = TestRequest(
+        project_id=project.id, prompt="Generate test", context=None, status="done"
+    )
     session.add(request)
     await session.commit()
     await session.refresh(request)
 
-    session.add(GeneratedTest(test_request_id=request.id, content="*** Test Cases ***", file_path="/tmp/test.robot"))
+    session.add(
+        GeneratedTest(
+            test_request_id=request.id,
+            content="*** Test Cases ***",
+            file_path="/tmp/test.robot",
+        )
+    )
     await session.commit()
 
     projects = await repo.list_with_test_count(session)

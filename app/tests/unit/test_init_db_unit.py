@@ -115,7 +115,7 @@ async def test_init_db_runs_all_sync_steps() -> None:
         def begin(self):
             return FakeBeginCtx()
 
-    await init_db(FakeEngine()) # type: ignore[arg-type]
+    await init_db(FakeEngine())  # type: ignore[arg-type]
 
     assert calls == [
         "create_all",
@@ -129,7 +129,9 @@ async def test_init_db_runs_all_sync_steps() -> None:
 def test_ensure_project_scan_cache_columns_adds_missing_columns() -> None:
     engine = create_engine("sqlite:///:memory:")
     with engine.begin() as conn:
-        conn.execute(text("CREATE TABLE projects (id INTEGER PRIMARY KEY, name VARCHAR(150))"))
+        conn.execute(
+            text("CREATE TABLE projects (id INTEGER PRIMARY KEY, name VARCHAR(150))")
+        )
         _ensure_project_scan_cache_columns(conn)
         columns = {col["name"] for col in inspect(conn).get_columns("projects")}
         assert "scan_cache" in columns

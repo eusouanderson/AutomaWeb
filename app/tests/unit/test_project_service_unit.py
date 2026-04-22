@@ -19,28 +19,30 @@ class DummyRepository:
 
 
 def _fake_project(name: str = "Projeto", test_directory: str | None = "/tmp"):
-    return type("FakeProject", (), {"id": 1, "name": name, "test_directory": test_directory})()
+    return type(
+        "FakeProject", (), {"id": 1, "name": name, "test_directory": test_directory}
+    )()
 
 
 @pytest.mark.asyncio
 async def test_delete_project_service_returns_true() -> None:
-    service = ProjectService(repository=DummyRepository(_fake_project(), True)) # type: ignore[arg-type]
-    result = await service.delete_project(session=None, project_id=1) # type: ignore[arg-type]
+    service = ProjectService(repository=DummyRepository(_fake_project(), True))  # type: ignore[arg-type]
+    result = await service.delete_project(session=None, project_id=1)  # type: ignore[arg-type]
     assert result is True
 
 
 @pytest.mark.asyncio
 async def test_delete_project_service_returns_false() -> None:
-    service = ProjectService(repository=DummyRepository(None, False)) # type: ignore[arg-type]
-    result = await service.delete_project(session=None, project_id=999) # type: ignore[arg-type]
+    service = ProjectService(repository=DummyRepository(None, False))  # type: ignore[arg-type]
+    result = await service.delete_project(session=None, project_id=999)  # type: ignore[arg-type]
     assert result is False
 
 
 @pytest.mark.asyncio
 async def test_delete_project_service_returns_false_when_delete_fails() -> None:
-    service = ProjectService(repository=DummyRepository(_fake_project(), False)) # type: ignore[arg-type]
+    service = ProjectService(repository=DummyRepository(_fake_project(), False))  # type: ignore[arg-type]
 
-    result = await service.delete_project(session=None, project_id=1) # type: ignore[arg-type]
+    result = await service.delete_project(session=None, project_id=1)  # type: ignore[arg-type]
 
     assert result is False
 
@@ -72,18 +74,20 @@ def test_cleanup_project_directories_uses_default_projects_dir(tmp_path) -> None
     settings.STATIC_DIR = str(tmp_path)
     service = ProjectService()
     project = _fake_project(name="Projeto Base", test_directory=None)
-    project_dir = tmp_path / "projects" / service._safe_dir_name(project.name) # type: ignore[arg-type]
+    project_dir = tmp_path / "projects" / service._safe_dir_name(project.name)  # type: ignore[arg-type]
     project_dir.mkdir(parents=True, exist_ok=True)
 
-    service._cleanup_project_directories(project) # type: ignore[arg-type]
+    service._cleanup_project_directories(project)  # type: ignore[arg-type]
 
     assert not project_dir.exists()
 
 
-def test_cleanup_project_directories_handles_remove_error(tmp_path, monkeypatch) -> None:
+def test_cleanup_project_directories_handles_remove_error(
+    tmp_path, monkeypatch
+) -> None:
     service = ProjectService()
     project = _fake_project(name="Projeto Erro", test_directory=str(tmp_path))
-    project_dir = tmp_path / service._safe_dir_name(project.name) # type: ignore[arg-type]
+    project_dir = tmp_path / service._safe_dir_name(project.name)  # type: ignore[arg-type]
     project_dir.mkdir(parents=True, exist_ok=True)
 
     warning_calls = []
@@ -97,7 +101,7 @@ def test_cleanup_project_directories_handles_remove_error(tmp_path, monkeypatch)
     monkeypatch.setattr("app.services.project_service.shutil.rmtree", fake_rmtree)
     monkeypatch.setattr("app.services.project_service.logger.warning", fake_warning)
 
-    service._cleanup_project_directories(project) # type: ignore[arg-type]
+    service._cleanup_project_directories(project)  # type: ignore[arg-type]
 
     assert len(warning_calls) == 1
 

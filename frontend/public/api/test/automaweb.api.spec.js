@@ -10,7 +10,9 @@ import {
   deleteGeneratedTest,
   deleteProject,
   generateRobotTest,
+  generateVisualBuilderCode,
   getTestById,
+  getVisualBuilderSteps,
   improveRobotTest,
   listGeneratedTests,
   listProjectExecutions,
@@ -18,6 +20,7 @@ import {
   runTests,
   saveRobotTestContent,
   scanProject,
+  startVisualBuilder,
 } from '../automaweb.api.js';
 import { request, streamPost } from '../client.js';
 
@@ -124,5 +127,40 @@ describe('automaweb.api', () => {
     request.mockResolvedValueOnce({ id: 42, content: '*** Test Cases ***' });
     await getTestById(42);
     expect(request).toHaveBeenCalledWith({ method: 'GET', url: '/tests/42' });
+  });
+
+  it('delegates startVisualBuilder to request()', async () => {
+    request.mockResolvedValueOnce({ session_id: 'abc' });
+    await startVisualBuilder('https://example.com/login');
+    expect(request).toHaveBeenCalledWith({
+      method: 'POST',
+      url: '/builder/start',
+      data: { url: 'https://example.com/login' },
+    });
+  });
+
+  it('delegates getVisualBuilderSteps to request() without query', async () => {
+    request.mockResolvedValueOnce({ steps: [] });
+    await getVisualBuilderSteps();
+    expect(request).toHaveBeenCalledWith({ method: 'GET', url: '/builder/steps' });
+  });
+
+  it('delegates getVisualBuilderSteps to request() with query', async () => {
+    request.mockResolvedValueOnce({ steps: [] });
+    await getVisualBuilderSteps('session-123');
+    expect(request).toHaveBeenCalledWith({
+      method: 'GET',
+      url: '/builder/steps?session_id=session-123',
+    });
+  });
+
+  it('delegates generateVisualBuilderCode to request()', async () => {
+    request.mockResolvedValueOnce({ code: 'await page.click()' });
+    await generateVisualBuilderCode('session-123');
+    expect(request).toHaveBeenCalledWith({
+      method: 'POST',
+      url: '/builder/generate',
+      data: { session_id: 'session-123' },
+    });
   });
 });

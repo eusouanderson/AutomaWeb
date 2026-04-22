@@ -11,13 +11,13 @@ class TestAggregatorBasic:
     def test_aggregate_results_returns_tuple(self):
         """Test that aggregate_results returns tuple with test and metadata."""
         aggregator = TestAggregator()
-        
+
         result = ChunkProcessingResult(
             chunk_id="chunk_1",
             section_type=DOMSectionType.FORMS,
             section_name="forms",
             generated_test="Test Form\n    Input Text    id:email",
-            token_usage=100, # type
+            token_usage=100,  # type
         )
 
         output, metadata = aggregator.aggregate_results([result])
@@ -28,7 +28,7 @@ class TestAggregatorBasic:
     def test_aggregate_multiple_results(self):
         """Test aggregation of multiple chunk results."""
         aggregator = TestAggregator()
-        
+
         results = [
             ChunkProcessingResult(
                 chunk_id=f"chunk_{i}",
@@ -57,7 +57,7 @@ class TestAggregatorBasic:
     def test_aggregate_preserves_sections(self):
         """Test that aggregation preserves section types."""
         aggregator = TestAggregator()
-        
+
         results = [
             ChunkProcessingResult(
                 chunk_id="chunk_header",
@@ -107,7 +107,9 @@ class TestAggregatorBasic:
             section_name="forms",
             generated_test="*** Test Cases ***\nA\n    No Operation",
         )
-        assert aggregator._merge_section_tests("forms", [single]) == single.generated_test
+        assert (
+            aggregator._merge_section_tests("forms", [single]) == single.generated_test
+        )
 
     def test_extract_test_cases_and_keywords_no_match(self):
         aggregator = TestAggregator()

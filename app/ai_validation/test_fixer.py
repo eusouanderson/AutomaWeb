@@ -38,16 +38,23 @@ class TestFixer:
             updated = self._replace_locator(current, issue.suggested_locator)
             if updated != current:
                 lines[issue.line_number - 1] = updated
-                applied_fixes.append(f"L{issue.line_number}: locator refinado ({issue.issue_type})")
+                applied_fixes.append(
+                    f"L{issue.line_number}: locator refinado ({issue.issue_type})"
+                )
 
         # Insert waits after replacements.
         inserted = 0
-        for issue in sorted((i for i in issues if i.issue_type == "missing_wait"), key=lambda item: item.line_number):
+        for issue in sorted(
+            (i for i in issues if i.issue_type == "missing_wait"),
+            key=lambda item: item.line_number,
+        ):
             target_index = issue.line_number - 1 + inserted
             if target_index < 0 or target_index >= len(lines):
                 continue
             wait_line = self._build_wait_line(lines[target_index])
-            if wait_line and not self._line_is_wait(lines[target_index - 1] if target_index > 0 else ""):
+            if wait_line and not self._line_is_wait(
+                lines[target_index - 1] if target_index > 0 else ""
+            ):
                 lines.insert(target_index, wait_line)
                 inserted += 1
                 applied_fixes.append(f"L{issue.line_number}: wait automático inserido")
@@ -73,7 +80,9 @@ class TestFixer:
                 lines[line_idx] = regenerated
                 applied_fixes.append(f"L{issue.line_number}: step regenerado por IA")
 
-        return FixResult(content="\n".join(lines).rstrip() + "\n", applied_fixes=applied_fixes)
+        return FixResult(
+            content="\n".join(lines).rstrip() + "\n", applied_fixes=applied_fixes
+        )
 
     def _replace_locator(self, line: str, new_locator: str) -> str:
         stripped = line.strip()
@@ -95,4 +104,6 @@ class TestFixer:
 
     def _line_is_wait(self, line: str) -> bool:
         stripped = line.strip()
-        return stripped.startswith("Wait For Elements State") or stripped.startswith("Wait For Selector")
+        return stripped.startswith("Wait For Elements State") or stripped.startswith(
+            "Wait For Selector"
+        )

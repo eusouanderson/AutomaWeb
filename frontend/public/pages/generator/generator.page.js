@@ -5,6 +5,8 @@ import {
   getProjectGeneratedTests,
   getProjects,
   getTestContent,
+  getVisualBuilderCapturedSteps,
+  startVisualBuilderSession,
 } from '../../services/test.service.js';
 import { loadTemplate, renderHTML } from '../../utils/dom.js';
 
@@ -52,8 +54,43 @@ export function initGeneratorPage({ store }) {
   const genScanCacheDate = document.getElementById('gen-scan-cache-date');
   const genRescanBtn = document.getElementById('gen-rescan-btn');
 
+  const builderForm = document.getElementById('visual-builder-form');
+  const builderUrlInput = document.getElementById('builder-url');
+  const builderPromptInput = document.getElementById('builder-prompt');
+  const builderStartBtn = document.getElementById('builder-start-btn');
+  const builderRefreshStepsBtn = document.getElementById('builder-refresh-steps-btn');
+  const builderGenerateBtn = document.getElementById('builder-generate-btn');
+  const builderSessionBanner = document.getElementById('builder-session-banner');
+  const builderSessionIdEl = document.getElementById('builder-session-id');
+  const builderStepsPanel = document.getElementById('builder-steps-panel');
+  const builderStepsSummary = document.getElementById('builder-steps-summary');
+  const builderStepsList = document.getElementById('builder-steps-list');
+  const builderCodePanel = document.getElementById('builder-code-panel');
+  const builderCodeEl = document.getElementById('builder-code');
+  const builderCopyCodeBtn = document.getElementById('builder-copy-code-btn');
+
   let isScanning = false;
   let forceRescan = false;
+  let builderSessionId = null;
+  let builderPollTimer = null;
+
+  const startBuilderPoll = () => {
+    stopBuilderPoll();
+    builderPollTimer = setInterval(async () => {
+      if (!builderSessionId) return stopBuilderPoll();
+      try {
+        const data = await getVisualBuilderCapturedSteps(builderSessionId);
+        renderBuilderSteps(data?.steps ?? []);
+      } catch (_) {
+        /* ignore */
+      }
+    }, 2500);
+  };
+
+  const stopBuilderPoll = () => {
+    clearInterval(builderPollTimer);
+    builderPollTimer = null;
+  };
 
   if (!form || !projectSelect) {
     return {
@@ -84,6 +121,16 @@ export function initGeneratorPage({ store }) {
     } else {
       genScanCacheNotice?.classList.add('hidden');
     }
+  }
+
+  function syncBuilderUrlWithSelectedProject() {
+    if (!builderUrlInput) {
+      return;
+    }
+
+    const selected = projectSelect.selectedOptions[0];
+    const projectUrl = selected?.dataset?.url || '';
+    builderUrlInput.value = projectUrl;
   }
 
   genRescanBtn?.addEventListener('click', () => {
@@ -206,6 +253,95 @@ export function initGeneratorPage({ store }) {
     generationParts?.classList.remove('hidden');
   }
 
+  function renderBuilderSteps(steps = []) {
+    if (!builderStepsPanel || !builderStepsList || !builderStepsSummary) {
+      return;
+    }
+
+    if (!Array.isArray(steps) || steps.length === 0) {
+      builderStepsSummary.textContent = 'Nenhum step capturado ainda.';
+      builderStepsList.innerHTML = '';
+      builderStepsPanel.classList.remove('hidden');
+      return;
+    }
+
+    builderStepsSummary.textContent = `${steps.length} step(s) capturado(s).`;
+    builderStepsList.innerHTML = steps
+      .map((step) => {
+        const label =
+          step.type === 'navigation'
+            ? `${step.type} -> ${step.url || '-'}`
+            : `${step.type} -> ${step.selector || '-'}${step.value ? ` = ${step.value}` : ''}`;
+        return `<li>[${step.step}] ${label}</li>`;
+      })
+      .join('');
+
+    builderStepsPanel.classList.remove('hidden');
+  }
+
+  function setBuilderSession(sessionId) {
+    builderSessionId = sessionId || null;
+    if (builderSessionId) {
+      builderSessionIdEl.textContent = builderSessionId;
+      builderSessionBanner?.classList.remove('hidden');
+      startBuilderPoll();
+    } else {
+      builderSessionIdEl.textContent = '-';
+      builderSessionBanner?.classList.add('hidden');
+      stopBuilderPoll();
+    }
+  }
+
+  async function refreshBuilderSteps() {
+    if (!builderSessionId) {
+      toast('Inicie uma sessão visual antes de buscar steps.', 'error');
+      return;
+    }
+
+    const response = await getVisualBuilderCapturedSteps(builderSessionId);
+    renderBuilderSteps(response?.steps || []);
+  }
+
+  function buildVisualBuilderContext(steps = [], sessionId = null, pageUrl = '') {
+    const normalizedSteps = Array.isArray(steps)
+      ? steps.map((step, index) => ({
+          index: Number(step?.step || index + 1),
+          action: String(step?.action || step?.type || '')
+            .trim()
+            .toLowerCase(),
+          selector: String(step?.selector || '').trim(),
+          value: step?.value == null ? '' : String(step.value),
+          description: String(step?.description || step?.text || '').trim(),
+        }))
+      : [];
+
+    const lines = normalizedSteps.map((step) => {
+      const parts = [
+        `- step=${step.index}`,
+        `action=${step.action || 'unknown'}`,
+        `selector=${step.selector || 'N/A'}`,
+      ];
+      if (step.value) parts.push(`value=${step.value}`);
+      if (step.description) parts.push(`description=${step.description}`);
+      return parts.join(' | ');
+    });
+
+    return [
+      'Origem: Visual Test Builder',
+      `Session ID: ${sessionId || 'N/A'}`,
+      `Page URL: ${pageUrl || 'N/A'}`,
+      `Total de steps: ${normalizedSteps.length}`,
+      '',
+      'Elementos testaveis capturados (use preferencialmente estes seletores):',
+      ...lines,
+      '',
+      'Instrucoes:',
+      '- Gere Robot Framework valido para a Library Browser.',
+      '- Utilize os seletores capturados e mantenha robustez com esperas necessarias.',
+      '- Retorne apenas codigo Robot Framework.',
+    ].join('\n');
+  }
+
   async function loadProjectsDropdown() {
     try {
       const projects = await getProjects();
@@ -226,6 +362,7 @@ export function initGeneratorPage({ store }) {
       }
 
       updateCacheState();
+      syncBuilderUrlWithSelectedProject();
     } catch (error) {
       toast(error.message, 'error');
     }
@@ -291,7 +428,7 @@ export function initGeneratorPage({ store }) {
     }
 
     if (!projectUrl) {
-      toast('Projeto sem URL. Edite/crie um projeto com URL válida.', 'error');
+      toast('Projeto sem URL. Selecione um projeto com URL válida.', 'error');
       return;
     }
 
@@ -366,6 +503,7 @@ export function initGeneratorPage({ store }) {
       genRescanBtn.classList.remove('btn-warning');
     }
     updateCacheState();
+    syncBuilderUrlWithSelectedProject();
   });
 
   form.addEventListener('submit', async (event) => {
@@ -415,6 +553,103 @@ export function initGeneratorPage({ store }) {
       return;
     }
     globalThis.open(`/tests/${testId}/download`, '_blank');
+  });
+
+  builderForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    const selectedProjectOption = projectSelect.selectedOptions[0];
+    const selectedProjectUrl = selectedProjectOption?.dataset?.url || '';
+    const url = (builderUrlInput?.value?.trim() || selectedProjectUrl).trim();
+
+    if (!url) {
+      toast('Projeto sem URL. Selecione um projeto com URL válida.', 'error');
+      return;
+    }
+
+    builderStartBtn.disabled = true;
+    try {
+      const started = await startVisualBuilderSession(url);
+      setBuilderSession(started.session_id);
+      renderBuilderSteps([]);
+      builderCodePanel?.classList.add('hidden');
+      if (builderCodeEl) builderCodeEl.textContent = '';
+      toast('Builder visual iniciado. Interaja na janela do navegador aberta pelo Playwright.');
+    } catch (error) {
+      toast(error.message, 'error');
+    } finally {
+      builderStartBtn.disabled = false;
+    }
+  });
+
+  builderRefreshStepsBtn?.addEventListener('click', async () => {
+    try {
+      await refreshBuilderSteps();
+      toast('Steps atualizados com sucesso.');
+    } catch (error) {
+      toast(error.message, 'error');
+    }
+  });
+
+  builderGenerateBtn?.addEventListener('click', async () => {
+    if (!builderSessionId) {
+      toast('Inicie uma sessão visual antes de gerar código.', 'error');
+      return;
+    }
+
+    const projectId = Number.parseInt(projectSelect.value, 10);
+    if (!projectId) {
+      toast('Selecione um projeto antes de gerar o teste visual.', 'error');
+      return;
+    }
+
+    try {
+      const captured = await getVisualBuilderCapturedSteps(builderSessionId);
+      const steps = captured?.steps || [];
+      renderBuilderSteps(steps);
+
+      if (!Array.isArray(steps) || steps.length === 0) {
+        toast('Nenhum step capturado. Interaja na tela antes de gerar o teste.', 'error');
+        return;
+      }
+
+      const selectedProjectOption = projectSelect.selectedOptions[0];
+      const selectedProjectUrl =
+        selectedProjectOption?.dataset?.url || builderUrlInput?.value || '';
+      const rawPrompt = builderPromptInput?.value?.trim() || '';
+      const prompt =
+        rawPrompt.length >= 5
+          ? rawPrompt
+          : 'Gerar teste Robot Framework com base nos steps capturados no Visual Builder.';
+      const context = buildVisualBuilderContext(steps, builderSessionId, selectedProjectUrl);
+
+      const generated = await generateTestFromPrompt({
+        projectId,
+        prompt,
+        context,
+        forceRescan: false,
+      });
+
+      if (builderCodeEl) {
+        builderCodeEl.textContent = generated?.content || '';
+      }
+
+      codeElement.textContent = generated?.content || '';
+      renderGenerationParts(generated);
+      resultSection.classList.remove('hidden');
+      downloadButton.dataset.testId = String(generated?.id || '');
+
+      builderCodePanel?.classList.remove('hidden');
+      await refreshBuilderSteps();
+      toast('Teste Robot Framework criado e salvo no mesmo fluxo de Gerar Teste.');
+    } catch (error) {
+      toast(error.message, 'error');
+    }
+  });
+
+  builderCopyCodeBtn?.addEventListener('click', async () => {
+    await navigator.clipboard.writeText(builderCodeEl?.textContent || '');
+    toast('Código Robot copiado!');
   });
 
   return {

@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../../services/test.service.js', () => ({
   getProjects: vi.fn(),
   generateTestFromPrompt: vi.fn(),
+  startVisualBuilderSession: vi.fn(),
+  getVisualBuilderCapturedSteps: vi.fn(),
   getProjectGeneratedTests: vi.fn().mockResolvedValue([]),
   getTestContent: vi.fn().mockResolvedValue(null),
 }));
@@ -21,6 +23,8 @@ import {
   getProjectGeneratedTests,
   getProjects,
   getTestContent,
+  getVisualBuilderCapturedSteps,
+  startVisualBuilderSession,
 } from '../../../services/test.service.js';
 import { initGeneratorPage, mount } from '../generator.page.js';
 
@@ -62,6 +66,22 @@ function buildDOM() {
       <ul id="generation-parts-list"></ul>
     </div>
     <code id="test-code"></code>
+    <form id="visual-builder-form">
+      <input id="builder-url" type="url" />
+      <textarea id="builder-prompt"></textarea>
+      <button id="builder-start-btn" type="submit">Start Builder</button>
+      <button id="builder-refresh-steps-btn" type="button">Refresh Steps</button>
+      <button id="builder-generate-btn" type="button">Generate Code</button>
+    </form>
+    <div id="builder-session-banner" class="hidden"><strong id="builder-session-id">-</strong></div>
+    <div id="builder-steps-panel" class="hidden">
+      <p id="builder-steps-summary"></p>
+      <ul id="builder-steps-list"></ul>
+    </div>
+    <div id="builder-code-panel" class="hidden">
+      <button id="builder-copy-code-btn">Copy Builder Code</button>
+      <code id="builder-code"></code>
+    </div>
   `;
 }
 
@@ -130,6 +150,17 @@ describe('generator page (legacy) – initGeneratorPage', () => {
     await page.loadProjectsDropdown();
     const opts = document.querySelectorAll('#test-project option');
     expect([...opts].map((o) => o.textContent)).toContain('Proj B');
+  });
+
+  it('fills visual builder URL from active selected project after loading projects', async () => {
+    getProjects.mockResolvedValue([
+      { id: 1, name: 'Proj A', url: 'https://a.com' },
+      { id: 2, name: 'Proj B', url: 'https://b.com' },
+    ]);
+    const page = initGeneratorPage({ store: makeStore({ activeProjectId: 2 }) });
+    await page.loadProjectsDropdown();
+
+    expect(document.getElementById('builder-url').value).toBe('https://b.com');
   });
 
   it('toasts error when loadProjectsDropdown fails', async () => {
@@ -266,6 +297,115 @@ describe('generator page (legacy) – initGeneratorPage', () => {
     await vi.waitFor(() => expect(toast).toHaveBeenCalledWith('AI error', 'error'));
   });
 
+  it('starts visual builder and shows active session', async () => {
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'session-1' });
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+
+    await vi.waitFor(() =>
+      expect(startVisualBuilderSession).toHaveBeenCalledWith('https://demo.com')
+    );
+    expect(document.getElementById('builder-session-banner').classList.contains('hidden')).toBe(
+      false
+    );
+  });
+
+  it('refreshes visual builder steps list', async () => {
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'session-1' });
+    getVisualBuilderCapturedSteps.mockResolvedValue({
+      steps: [{ step: 1, type: 'click', selector: '#login' }],
+    });
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+    document.getElementById('builder-refresh-steps-btn').click();
+    await vi.waitFor(() => expect(getVisualBuilderCapturedSteps).toHaveBeenCalledWith('session-1'));
+    expect(document.getElementById('builder-steps-list').textContent).toContain('#login');
+  });
+
+  it('generates visual builder code and renders output', async () => {
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'session-1' });
+    getVisualBuilderCapturedSteps.mockResolvedValue({
+      steps: [{ step: 1, action: 'click', selector: '#login', description: 'Clicar login' }],
+    });
+    generateTestFromPrompt.mockResolvedValue({ id: 88, content: '*** Test Cases ***\nVisual' });
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+    document.getElementById('builder-generate-btn').click();
+
+    await vi.waitFor(() =>
+      expect(generateTestFromPrompt).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: 1,
+          prompt: expect.stringContaining('Gerar teste Robot Framework'),
+          context: expect.stringContaining('Elementos testaveis capturados'),
+        })
+      )
+    );
+    expect(document.getElementById('builder-code-panel').classList.contains('hidden')).toBe(false);
+    expect(document.getElementById('builder-code').textContent).toContain('*** Test Cases ***');
+    expect(document.getElementById('download-test-btn').dataset.testId).toBe('88');
+  });
+
+  it('forwards optional builder prompt when generating visual builder code', async () => {
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'session-1' });
+    getVisualBuilderCapturedSteps.mockResolvedValue({
+      steps: [{ step: 1, action: 'click', selector: '#login' }],
+    });
+    generateTestFromPrompt.mockResolvedValue({ id: 89, content: 'ok' });
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+    document.getElementById('builder-prompt').value = 'validar login';
+    document.getElementById('builder-generate-btn').click();
+
+    await vi.waitFor(() =>
+      expect(generateTestFromPrompt).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: 1, prompt: 'validar login' })
+      )
+    );
+  });
+
+  it('shows error when trying to generate visual test with no captured steps', async () => {
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'session-1' });
+    getVisualBuilderCapturedSteps.mockResolvedValue({ steps: [] });
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+    document.getElementById('builder-generate-btn').click();
+
+    await vi.waitFor(() =>
+      expect(toast).toHaveBeenCalledWith(
+        'Nenhum step capturado. Interaja na tela antes de gerar o teste.',
+        'error'
+      )
+    );
+  });
+
   // ── scan button ───────────────────────────────────────────────────────────
 
   it('toasts error when scan button clicked without selecting a project', () => {
@@ -281,7 +421,7 @@ describe('generator page (legacy) – initGeneratorPage', () => {
     document.getElementById('test-project').value = '1';
     document.getElementById('scan-page-btn').click();
     expect(toast).toHaveBeenCalledWith(
-      'Projeto sem URL. Edite/crie um projeto com URL válida.',
+      'Projeto sem URL. Selecione um projeto com URL válida.',
       'error'
     );
   });
@@ -320,6 +460,15 @@ describe('generator page (legacy) – initGeneratorPage', () => {
     document.getElementById('scan-panel').classList.remove('hidden');
     document.getElementById('test-project').dispatchEvent(new Event('change', { bubbles: true }));
     expect(document.getElementById('scan-panel').classList.contains('hidden')).toBe(true);
+  });
+
+  it('updates visual builder URL when project selection changes', () => {
+    initGeneratorPage({ store: makeStore() });
+    const projectSelect = document.getElementById('test-project');
+    projectSelect.value = '1';
+    projectSelect.dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect(document.getElementById('builder-url').value).toBe('https://demo.com');
   });
 
   // ── appendScanProgress: early return when scanProgress absent (lines 71-72) ─

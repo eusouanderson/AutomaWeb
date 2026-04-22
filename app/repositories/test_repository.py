@@ -8,37 +8,55 @@ from app.models.test_request import TestRequest
 class TestRepository:
     """Test request and generated test data access layer."""
 
-    async def create_test_request(self, session: AsyncSession, test_request: TestRequest) -> TestRequest:
+    async def create_test_request(
+        self, session: AsyncSession, test_request: TestRequest
+    ) -> TestRequest:
         session.add(test_request)
         await session.commit()
         await session.refresh(test_request)
         return test_request
 
-    async def update_test_request(self, session: AsyncSession, test_request: TestRequest) -> TestRequest:
+    async def update_test_request(
+        self, session: AsyncSession, test_request: TestRequest
+    ) -> TestRequest:
         session.add(test_request)
         await session.commit()
         await session.refresh(test_request)
         return test_request
 
-    async def create_generated_test(self, session: AsyncSession, generated_test: GeneratedTest) -> GeneratedTest:
+    async def create_generated_test(
+        self, session: AsyncSession, generated_test: GeneratedTest
+    ) -> GeneratedTest:
         session.add(generated_test)
         await session.commit()
         await session.refresh(generated_test)
         return generated_test
 
-    async def get_generated_test(self, session: AsyncSession, test_id: int) -> GeneratedTest | None:
-        result = await session.execute(select(GeneratedTest).where(GeneratedTest.id == test_id))
+    async def get_generated_test(
+        self, session: AsyncSession, test_id: int
+    ) -> GeneratedTest | None:
+        result = await session.execute(
+            select(GeneratedTest).where(GeneratedTest.id == test_id)
+        )
         return result.scalar_one_or_none()
 
-    async def get_test_request(self, session: AsyncSession, test_request_id: int) -> TestRequest | None:
-        result = await session.execute(select(TestRequest).where(TestRequest.id == test_request_id))
+    async def get_test_request(
+        self, session: AsyncSession, test_request_id: int
+    ) -> TestRequest | None:
+        result = await session.execute(
+            select(TestRequest).where(TestRequest.id == test_request_id)
+        )
         return result.scalar_one_or_none()
 
-    async def delete_generated_test(self, session: AsyncSession, generated_test: GeneratedTest) -> None:
+    async def delete_generated_test(
+        self, session: AsyncSession, generated_test: GeneratedTest
+    ) -> None:
         await session.delete(generated_test)
         await session.commit()
 
-    async def list_generated_tests_by_project(self, session: AsyncSession, project_id: int) -> list[GeneratedTest]:
+    async def list_generated_tests_by_project(
+        self, session: AsyncSession, project_id: int
+    ) -> list[GeneratedTest]:
         result = await session.execute(
             select(GeneratedTest)
             .join(TestRequest, GeneratedTest.test_request_id == TestRequest.id)

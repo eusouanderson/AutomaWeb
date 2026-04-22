@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Development server runner."""
+
 import uvicorn
 
 if __name__ == "__main__":

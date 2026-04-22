@@ -19,7 +19,7 @@ async def test_get_db_dependency() -> None:
     gen = get_db()
     session = await gen.__anext__()
     assert isinstance(session, AsyncSession)
-    
+
     try:
         await gen.__anext__()
     except StopAsyncIteration:

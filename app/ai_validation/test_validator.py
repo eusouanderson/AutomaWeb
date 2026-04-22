@@ -51,12 +51,16 @@ class TestValidator:
     def __init__(self, locator_analyzer: LocatorAnalyzer | None = None) -> None:
         self._locator_analyzer = locator_analyzer or LocatorAnalyzer()
 
-    async def validate(self, content: str, page_url: str | None = None) -> ValidationReport:
+    async def validate(
+        self, content: str, page_url: str | None = None
+    ) -> ValidationReport:
         lines = content.splitlines()
         issues: list[ValidationIssue] = []
 
         # --- Pass 1: static analysis (no network, instant) ---
-        action_lines: list[tuple[int, str, str, str]] = []  # (idx, keyword, locator, indent)
+        action_lines: list[tuple[int, str, str, str]] = (
+            []
+        )  # (idx, keyword, locator, indent)
         for idx, line in enumerate(lines, start=1):
             stripped = line.strip()
             if not stripped or stripped.startswith("***") or stripped.startswith("#"):
@@ -84,7 +88,9 @@ class TestValidator:
                     )
                 )
 
-            if keyword not in self.WAIT_KEYWORDS and not self._has_wait_before(lines, idx - 1):
+            if keyword not in self.WAIT_KEYWORDS and not self._has_wait_before(
+                lines, idx - 1
+            ):
                 issues.append(
                     ValidationIssue(
                         line_number=idx,
@@ -104,13 +110,15 @@ class TestValidator:
                     self._locator_analyzer.count_matches_bulk(
                         page_url=page_url,
                         locators=unique_locators,
-                        navigation_timeout_ms=settings.AI_LIVE_CHECK_TIMEOUT_SECONDS * 1000,
+                        navigation_timeout_ms=settings.AI_LIVE_CHECK_TIMEOUT_SECONDS
+                        * 1000,
                     ),
                     timeout=settings.AI_LIVE_CHECK_TIMEOUT_SECONDS + 5,
                 )
             except asyncio.TimeoutError:
                 logger.warning(
-                    "AI live-check timed out for %s; skipping element verification.", page_url
+                    "AI live-check timed out for %s; skipping element verification.",
+                    page_url,
                 )
                 counts = {}
 

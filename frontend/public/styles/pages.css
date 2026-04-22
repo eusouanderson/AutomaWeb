@@ -287,6 +287,18 @@ code {
   gap: 0.25rem;
 }
 
+.visual-builder-section {
+  margin-top: var(--space-4);
+}
+
+.visual-builder-form {
+  margin-bottom: var(--space-3);
+}
+
+#builder-code-panel {
+  margin-top: var(--space-3);
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);

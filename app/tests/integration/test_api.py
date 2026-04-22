@@ -54,8 +54,12 @@ def override_dependencies(session: AsyncSession):
 async def test_generate_endpoint(session: AsyncSession) -> None:
     from httpx import ASGITransport
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        project_resp = await client.post("/projects", json={"name": "P1", "description": "Desc"})
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        project_resp = await client.post(
+            "/projects", json={"name": "P1", "description": "Desc"}
+        )
         assert project_resp.status_code == 200
         project_id = project_resp.json()["id"]
 

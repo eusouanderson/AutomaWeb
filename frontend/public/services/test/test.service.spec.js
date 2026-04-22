@@ -4,6 +4,9 @@ vi.mock('../../api/automaweb.api.js', () => ({
   listProjects: vi.fn(),
   createProject: vi.fn(),
   deleteProject: vi.fn(),
+  startVisualBuilder: vi.fn(),
+  getVisualBuilderSteps: vi.fn(),
+  generateVisualBuilderCode: vi.fn(),
   generateRobotTest: vi.fn(),
   runTests: vi.fn(),
   listGeneratedTests: vi.fn(),
@@ -17,11 +20,14 @@ import {
   deleteGeneratedTest,
   deleteProject,
   generateRobotTest,
+  generateVisualBuilderCode,
   getTestById,
+  getVisualBuilderSteps,
   listGeneratedTests,
   listProjectExecutions,
   listProjects,
   runTests,
+  startVisualBuilder,
 } from '../../api/automaweb.api.js';
 
 import {
@@ -30,10 +36,13 @@ import {
   deleteProjectService,
   executeProjectTests,
   generateTestFromPrompt,
+  generateVisualBuilderPlaywrightCode,
   getProjectExecutions,
   getProjectGeneratedTests,
   getProjects,
   getTestContent,
+  getVisualBuilderCapturedSteps,
+  startVisualBuilderSession,
 } from '../test.service.js';
 
 beforeEach(() => vi.clearAllMocks());
@@ -250,5 +259,37 @@ describe('getTestContent', () => {
   it('returns null when getTestById resolves with no content', async () => {
     getTestById.mockResolvedValue({ id: 6, content: null });
     expect(await getTestContent(6)).toBeNull();
+  });
+});
+
+describe('visual builder service helpers', () => {
+  it('startVisualBuilderSession validates URL and delegates', async () => {
+    startVisualBuilder.mockResolvedValue({ session_id: 'x' });
+    await startVisualBuilderSession('https://example.com');
+    expect(startVisualBuilder).toHaveBeenCalledWith('https://example.com');
+  });
+
+  it('startVisualBuilderSession throws on invalid URL', async () => {
+    await expect(startVisualBuilderSession('invalid-url')).rejects.toThrow(
+      'Builder URL must be valid'
+    );
+  });
+
+  it('getVisualBuilderCapturedSteps delegates with null fallback', async () => {
+    getVisualBuilderSteps.mockResolvedValue({ steps: [] });
+    await getVisualBuilderCapturedSteps();
+    expect(getVisualBuilderSteps).toHaveBeenCalledWith(null);
+  });
+
+  it('generateVisualBuilderPlaywrightCode delegates with session id', async () => {
+    generateVisualBuilderCode.mockResolvedValue({ code: 'ok' });
+    await generateVisualBuilderPlaywrightCode('session-1');
+    expect(generateVisualBuilderCode).toHaveBeenCalledWith('session-1', null);
+  });
+
+  it('generateVisualBuilderPlaywrightCode forwards optional prompt', async () => {
+    generateVisualBuilderCode.mockResolvedValue({ code: 'ok' });
+    await generateVisualBuilderPlaywrightCode('session-1', 'validar login');
+    expect(generateVisualBuilderCode).toHaveBeenCalledWith('session-1', 'validar login');
   });
 });
