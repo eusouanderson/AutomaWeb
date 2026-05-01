@@ -6,7 +6,7 @@ from tenacity import RetryError
 
 from app.core.config import settings
 from app.db.base import Base
-from app.llm.groq_client import PayloadTooLargeError
+from app.llm.copilot_adapter import PayloadTooLargeError
 from app.models.project import Project
 from app.models.test_execution import TestExecution  # noqa: F401 — registers mapper
 from app.services.element_scanner import ElementScannerError
@@ -18,10 +18,10 @@ from app.services.test_service import (
 
 
 class DummyGroqClient:
-    def generate_robot_test(
+    async def generate_robot_test(
         self,
-        prompt: str,
-        context: str | None = None,
+        prompt_text: str,
+        context_text: str | None = None,
         page_structure: dict | None = None,
     ) -> str:
         return "*** Settings ***\nLibrary    Browser\n\n*** Test Cases ***\nExample\n    Log    Hello"
@@ -93,7 +93,7 @@ class DummyRetryError(RetryError):
 
 
 class RetryFailingGroqClient:
-    def generate_robot_test(self, prompt, context=None, page_structure=None):
+    async def generate_robot_test(self, prompt_text, context_text=None, page_structure=None):
         raise DummyRetryError()
 
 
@@ -102,12 +102,12 @@ class APIConnectionError(Exception):
 
 
 class APIConnectionFailingGroqClient:
-    def generate_robot_test(self, prompt, context=None, page_structure=None):
+    async def generate_robot_test(self, prompt_text, context_text=None, page_structure=None):
         raise APIConnectionError("network")
 
 
 class PayloadTooLargeFailingGroqClient:
-    def generate_robot_test(self, prompt, context=None, page_structure=None):
+    async def generate_robot_test(self, prompt_text, context_text=None, page_structure=None):
         raise PayloadTooLargeError("too large")
 
 
@@ -116,9 +116,9 @@ class ChunkingGroqClient:
         self.calls = []
         self._first = True
 
-    def generate_robot_test(self, prompt, context=None, page_structure=None):
+    async def generate_robot_test(self, prompt_text, context_text=None, page_structure=None):
         self.calls.append(
-            {"prompt": prompt, "context": context, "page_structure": page_structure}
+            {"prompt": prompt_text, "context": context_text, "page_structure": page_structure}
         )
         if self._first:
             self._first = False
@@ -137,7 +137,7 @@ class UnexpectedLLMError(Exception):
 
 
 class UnexpectedFailingGroqClient:
-    def generate_robot_test(self, prompt, context=None, page_structure=None):
+    async def generate_robot_test(self, prompt_text, context_text=None, page_structure=None):
         raise UnexpectedLLMError("unexpected")
 
 
@@ -145,7 +145,7 @@ class CapturingGroqClient:
     def __init__(self):
         self.captured_page_structure = None
 
-    def generate_robot_test(self, prompt, context=None, page_structure=None):
+    async def generate_robot_test(self, prompt_text, context_text=None, page_structure=None):
         self.captured_page_structure = page_structure
         return "*** Test Cases ***\nExample\n    Log    OK"
 
@@ -173,7 +173,7 @@ async def test_generate_test(session: AsyncSession) -> None:
     await session.commit()
     await session.refresh(project)
 
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     generated = await service.generate_test(
         session=session,
         project_id=project.id,
@@ -190,7 +190,7 @@ async def test_generate_test_raises_when_project_not_found() -> None:
     service = TestService(
         test_repository=DummyTestRepository(),  # type: ignore[arg-type]
         project_repository=DummyProjectRepository(None),  # type: ignore[arg-type]
-        groq_client=DummyGroqClient(),  # type: ignore[arg-type]
+        copilot_client=DummyGroqClient(),  # type: ignore[arg-type]
     )
 
     with pytest.raises(ValueError, match="Project not found"):
@@ -211,7 +211,7 @@ async def test_generate_test_raises_scan_unavailable_when_scan_fails(tmp_path) -
     service = TestService(
         test_repository=test_repo,  # type: ignore[arg-type]
         project_repository=DummyProjectRepository(project),  # type: ignore[arg-type]
-        groq_client=DummyGroqClient(),  # type: ignore[arg-type]
+        copilot_client=DummyGroqClient(),  # type: ignore[arg-type]
         element_scanner=FailingScanService(),  # type: ignore[arg-type]
     )
 
@@ -231,7 +231,7 @@ async def test_generate_test_raises_llm_unavailable_on_retry_error(tmp_path) -> 
     service = TestService(
         test_repository=test_repo,  # type: ignore[arg-type]
         project_repository=DummyProjectRepository(project),  # type: ignore[arg-type]
-        groq_client=RetryFailingGroqClient(),  # type: ignore[arg-type]
+        copilot_client=RetryFailingGroqClient(),  # type: ignore[arg-type]
         element_scanner=SuccessfulScanService(),  # type: ignore[arg-type]
     )
 
@@ -255,7 +255,7 @@ async def test_generate_test_raises_llm_unavailable_on_api_connection_error(
     service = TestService(
         test_repository=test_repo,  # type: ignore[arg-type]
         project_repository=DummyProjectRepository(project),  # type: ignore[arg-type]
-        groq_client=APIConnectionFailingGroqClient(),  # type: ignore[arg-type]
+        copilot_client=APIConnectionFailingGroqClient(),  # type: ignore[arg-type]
         element_scanner=SuccessfulScanService(),  # type: ignore[arg-type]
     )
 
@@ -279,7 +279,7 @@ async def test_generate_test_raises_llm_unavailable_on_payload_too_large(
     service = TestService(
         test_repository=test_repo,  # type: ignore[arg-type]
         project_repository=DummyProjectRepository(project),  # type: ignore[arg-type]
-        groq_client=PayloadTooLargeFailingGroqClient(),  # type: ignore[arg-type]
+        copilot_client=PayloadTooLargeFailingGroqClient(),  # type: ignore[arg-type]
         element_scanner=SuccessfulScanService(),  # type: ignore[arg-type]
     )
 
@@ -302,11 +302,11 @@ async def test_generate_test_uses_scanned_page_structure(tmp_path) -> None:
         url="https://example.com",
     )
     test_repo = DummyTestRepository()
-    groq_client = CapturingGroqClient()
+    copilot_client = CapturingGroqClient()
     service = TestService(
         test_repository=test_repo,  # type: ignore[arg-type]
         project_repository=DummyProjectRepository(project),  # type: ignore[arg-type]
-        groq_client=groq_client,  # type: ignore[arg-type]
+        copilot_client=copilot_client,  # type: ignore[arg-type]
         element_scanner=SuccessfulScanService(),  # type: ignore[arg-type]
     )
 
@@ -317,7 +317,7 @@ async def test_generate_test_uses_scanned_page_structure(tmp_path) -> None:
     generated = await service.generate_test(session=_Session(), project_id=1, prompt="Gerar teste")  # type: ignore[arg-type]
 
     assert generated.id == 99
-    assert groq_client.captured_page_structure == {"title": "Page"}
+    assert copilot_client.captured_page_structure == {"title": "Page"}
 
 
 @pytest.mark.asyncio
@@ -339,11 +339,11 @@ async def test_generate_test_uses_chunked_generation_after_payload_too_large(
         scan_cache=json.dumps({"title": "Page", "items": big_items}),
     )
     test_repo = DummyTestRepository()
-    groq_client = ChunkingGroqClient()
+    copilot_client = ChunkingGroqClient()
     service = TestService(
         test_repository=test_repo,  # type: ignore[arg-type]
         project_repository=DummyProjectRepository(project),  # type: ignore[arg-type]
-        groq_client=groq_client,  # type: ignore[arg-type]
+        copilot_client=copilot_client,  # type: ignore[arg-type]
         element_scanner=SuccessfulScanService(),  # type: ignore[arg-type]
     )
 
@@ -351,10 +351,10 @@ async def test_generate_test_uses_chunked_generation_after_payload_too_large(
 
     assert generated.id == 99
     assert "*** Test Cases ***" in generated.content
-    assert len(groq_client.calls) > 1
+    assert len(copilot_client.calls) > 1
     assert any(
         "Where (onde):" in call["prompt"] and "CHUNK" in call["prompt"]
-        for call in groq_client.calls[1:]
+        for call in copilot_client.calls[1:]
     )
 
 
@@ -378,7 +378,7 @@ async def test_generate_test_raises_when_chunked_generation_also_fails(
     service = TestService(
         test_repository=test_repo,  # type: ignore[arg-type]
         project_repository=DummyProjectRepository(project),  # type: ignore[arg-type]
-        groq_client=PayloadTooLargeFailingGroqClient(),  # type: ignore[arg-type]
+        copilot_client=PayloadTooLargeFailingGroqClient(),  # type: ignore[arg-type]
         element_scanner=SuccessfulScanService(),  # type: ignore[arg-type]
     )
 
@@ -405,7 +405,7 @@ async def test_generate_test_reraises_unexpected_llm_exception(tmp_path) -> None
     service = TestService(
         test_repository=test_repo,  # type: ignore[arg-type]
         project_repository=DummyProjectRepository(project),  # type: ignore[arg-type]
-        groq_client=UnexpectedFailingGroqClient(),  # type: ignore[arg-type]
+        copilot_client=UnexpectedFailingGroqClient(),  # type: ignore[arg-type]
         element_scanner=SuccessfulScanService(),  # type: ignore[arg-type]
     )
 
@@ -420,7 +420,7 @@ async def test_list_generated_tests_by_project_success() -> None:
     service = TestService(
         test_repository=test_repo,  # type: ignore[arg-type]
         project_repository=DummyProjectRepository(project),  # type: ignore[arg-type]
-        groq_client=DummyGroqClient(),  # type: ignore[arg-type]
+        copilot_client=DummyGroqClient(),  # type: ignore[arg-type]
     )
 
     items = await service.list_generated_tests_by_project(session=None, project_id=1)  # type: ignore[arg-type]
@@ -436,7 +436,7 @@ async def test_get_generated_test_passthrough() -> None:
     service = TestService(
         test_repository=test_repo,  # type: ignore[arg-type]
         project_repository=DummyProjectRepository(None),  # type: ignore[arg-type]
-        groq_client=DummyGroqClient(),  # type: ignore[arg-type]
+        copilot_client=DummyGroqClient(),  # type: ignore[arg-type]
     )
 
     found = await service.get_generated_test(session=None, test_id=7)  # type: ignore[arg-type]
@@ -449,7 +449,7 @@ async def test_list_generated_tests_by_project_raises_when_project_not_found() -
     service = TestService(
         test_repository=DummyTestRepository(),  # type: ignore[arg-type]
         project_repository=DummyProjectRepository(None),  # type: ignore[arg-type]
-        groq_client=DummyGroqClient(),  # type: ignore[arg-type]
+        copilot_client=DummyGroqClient(),  # type: ignore[arg-type]
     )
 
     with pytest.raises(ValueError, match="Project not found"):
@@ -459,7 +459,7 @@ async def test_list_generated_tests_by_project_raises_when_project_not_found() -
 @pytest.mark.asyncio
 async def test_delete_generated_test_returns_false_when_not_found() -> None:
     test_repo = DummyTestRepository()
-    service = TestService(test_repository=test_repo, project_repository=DummyProjectRepository(None), groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(test_repository=test_repo, project_repository=DummyProjectRepository(None), copilot_client=DummyGroqClient())  # type: ignore[arg-type]
 
     deleted = await service.delete_generated_test(session=None, test_id=1)  # type: ignore[arg-type]
 
@@ -476,7 +476,7 @@ async def test_delete_generated_test_handles_unlink_error(
 
     test_repo = DummyTestRepository()
     test_repo.generated_to_return = generated  # type: ignore[arg-type]
-    service = TestService(test_repository=test_repo, project_repository=DummyProjectRepository(None), groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(test_repository=test_repo, project_repository=DummyProjectRepository(None), copilot_client=DummyGroqClient())  # type: ignore[arg-type]
 
     def failing_unlink(self):
         raise OSError("cannot unlink")
@@ -490,7 +490,7 @@ async def test_delete_generated_test_handles_unlink_error(
 
 
 def test_sanitize_robot_output_filters_noise_and_normalizes_library() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     content = (
         "texto fora\n"
         "*** Settings ***\n"
@@ -511,7 +511,7 @@ def test_sanitize_robot_output_filters_noise_and_normalizes_library() -> None:
 
 
 def test_split_page_structure_chunks_large_payload() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     settings.LLM_DOM_CHUNK_TARGET_CHARS = 200
     page_structure = {
         "title": "Page",
@@ -525,7 +525,7 @@ def test_split_page_structure_chunks_large_payload() -> None:
 
 
 def test_check_llm_health_passthrough() -> None:
-    service = TestService(groq_client=HealthGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=HealthGroqClient())  # type: ignore[arg-type]
 
     health = service.check_llm_health()
 
@@ -533,19 +533,21 @@ def test_check_llm_health_passthrough() -> None:
     assert health["latency_ms"] == 10
 
 
-def test_generate_robot_test_chunked_raises_when_not_splittable() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+@pytest.mark.asyncio
+async def test_generate_robot_test_chunked_raises_when_not_splittable() -> None:
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
 
     with pytest.raises(PayloadTooLargeError, match="cannot be split"):
-        service._generate_robot_test_chunked(
+        await service._generate_robot_test_chunked(
             prompt="p",
             context=None,
             page_structure={"title": "small"},
         )
 
 
-def test_generate_robot_test_chunked_raises_when_no_partial_output(monkeypatch) -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+@pytest.mark.asyncio
+async def test_generate_robot_test_chunked_raises_when_no_partial_output(monkeypatch) -> None:
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
 
     class _NoIterationChunks:
         def __len__(self):
@@ -563,13 +565,13 @@ def test_generate_robot_test_chunked_raises_when_no_partial_output(monkeypatch) 
     )
 
     with pytest.raises(PayloadTooLargeError, match="produced no output"):
-        service._generate_robot_test_chunked(
+        await service._generate_robot_test_chunked(
             prompt="p", context=None, page_structure={"k": "v"}
         )
 
 
 def test_split_page_structure_returns_original_when_within_target() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     settings.LLM_DOM_CHUNK_TARGET_CHARS = 1000
     page_structure = {"title": "tiny", "elements": []}
 
@@ -579,7 +581,7 @@ def test_split_page_structure_returns_original_when_within_target() -> None:
 
 
 def test_split_page_structure_collects_nested_dict_entries() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     settings.LLM_DOM_CHUNK_TARGET_CHARS = 60
     page_structure = {
         "title": "Page",
@@ -596,7 +598,7 @@ def test_split_page_structure_collects_nested_dict_entries() -> None:
 
 
 def test_split_page_structure_fallback_for_scalar_only_payload() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     settings.LLM_DOM_CHUNK_TARGET_CHARS = 200
     page_structure = {
         "title": "Page",
@@ -610,7 +612,7 @@ def test_split_page_structure_fallback_for_scalar_only_payload() -> None:
 
 
 def test_split_page_structure_handles_non_dict_root_for_dotted_key() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     settings.LLM_DOM_CHUNK_TARGET_CHARS = 180
     page_structure = {
         "meta": [{"kind": "base"}],
@@ -624,7 +626,7 @@ def test_split_page_structure_handles_non_dict_root_for_dotted_key() -> None:
 
 
 def test_split_page_structure_keeps_oversized_single_entry_chunk() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     settings.LLM_DOM_CHUNK_TARGET_CHARS = 200
     page_structure = {
         "title": "Page",
@@ -637,12 +639,13 @@ def test_split_page_structure_keeps_oversized_single_entry_chunk() -> None:
     assert any("items" in c for c in chunks)
 
 
-def test_generate_robot_test_chunked_retries_with_smaller_targets(monkeypatch) -> None:
+@pytest.mark.asyncio
+async def test_generate_robot_test_chunked_retries_with_smaller_targets(monkeypatch) -> None:
     class SizeSensitiveGroqClient:
         def __init__(self):
             self.chunk_sizes = []
 
-        def generate_robot_test(self, prompt, context=None, page_structure=None):
+        async def generate_robot_test(self, prompt_text, context_text=None, page_structure=None):
             size = len(
                 json.dumps(
                     page_structure or {}, ensure_ascii=False, separators=(",", ":")
@@ -654,8 +657,8 @@ def test_generate_robot_test_chunked_retries_with_smaller_targets(monkeypatch) -
             return "*** Test Cases ***\nChunk\n    Log    OK"
 
     settings.LLM_DOM_CHUNK_TARGET_CHARS = 1200
-    groq_client = SizeSensitiveGroqClient()
-    service = TestService(groq_client=groq_client)  # type: ignore[arg-type]
+    copilot_client = SizeSensitiveGroqClient()
+    service = TestService(copilot_client=copilot_client)  # type: ignore[arg-type]
 
     def fake_split(_page_structure, target_chars=None):
         if (target_chars or 0) >= 1000:
@@ -664,20 +667,20 @@ def test_generate_robot_test_chunked_retries_with_smaller_targets(monkeypatch) -
 
     monkeypatch.setattr(service, "_split_page_structure", fake_split)
 
-    merged = service._generate_robot_test_chunked(
+    merged = await service._generate_robot_test_chunked(
         prompt="p", context=None, page_structure={"big": True}
     )
 
     assert "*** Test Cases ***" in merged
-    assert any(size > 700 for size in groq_client.chunk_sizes)
-    assert any(size <= 700 for size in groq_client.chunk_sizes)
+    assert any(size > 700 for size in copilot_client.chunk_sizes)
+    assert any(size <= 700 for size in copilot_client.chunk_sizes)
     assert service.last_generation_metadata is not None
     assert service.last_generation_metadata["strategy"] == "chunked"
     assert service.last_generation_metadata["chunk_target_chars"] < 1200
 
 
 def test_compact_page_structure_limits_heavy_fields() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     page_structure = {
         "title": "T" * 500,
         "elements": [
@@ -694,7 +697,7 @@ def test_compact_page_structure_limits_heavy_fields() -> None:
 
 
 def test_compact_page_structure_handles_top_level_string() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
 
     compacted = service._compact_page_structure("x" * 500)  # type: ignore[arg-type]
 
@@ -703,7 +706,7 @@ def test_compact_page_structure_handles_top_level_string() -> None:
 
 
 def test_compact_page_structure_handles_top_level_list() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
 
     compacted = service._compact_page_structure(list(range(50)))  # type: ignore[arg-type]
 
@@ -713,7 +716,7 @@ def test_compact_page_structure_handles_top_level_list() -> None:
 
 
 def test_compact_page_structure_handles_top_level_scalar() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
 
     compacted = service._compact_page_structure(123)  # type: ignore[arg-type]
 
@@ -721,7 +724,7 @@ def test_compact_page_structure_handles_top_level_scalar() -> None:
 
 
 def test_merge_robot_parts_keeps_sections() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     parts = [
         "*** Settings ***\nLibrary    Browser\n\n*** Test Cases ***\nCaso A\n    Log    A\n",
         "*** Test Cases ***\nCaso B\n    Log    B\n\n*** Keywords ***\nKW\n    Log    K\n",
@@ -737,7 +740,7 @@ def test_merge_robot_parts_keeps_sections() -> None:
 
 
 def test_sanitize_robot_output_hardens_strict_mode_selector_from_context() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     content = (
         "*** Settings ***\n"
         "Library    Browser\n"
@@ -756,7 +759,7 @@ def test_sanitize_robot_output_hardens_strict_mode_selector_from_context() -> No
 def test_sanitize_robot_output_converts_open_browser_and_invalid_selector_prefixes() -> (
     None
 ):
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     content = (
         "*** Settings ***\n"
         "Library    Browser\n"
@@ -777,7 +780,7 @@ def test_sanitize_robot_output_converts_open_browser_and_invalid_selector_prefix
 
 
 def test_sanitize_robot_output_applies_strict_mode_on_non_class_selector() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     content = (
         "*** Settings ***\n"
         "Library    Browser\n"
@@ -793,7 +796,7 @@ def test_sanitize_robot_output_applies_strict_mode_on_non_class_selector() -> No
 
 
 def test_sanitize_robot_output_applies_strict_mode_on_raw_id_selector() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     content = (
         "*** Settings ***\n"
         "Library    Browser\n"
@@ -809,7 +812,7 @@ def test_sanitize_robot_output_applies_strict_mode_on_raw_id_selector() -> None:
 
 
 def test_sanitize_robot_output_applies_strict_mode_on_raw_attribute_selector() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     content = (
         "*** Settings ***\n"
         "Library    Browser\n"
@@ -827,14 +830,14 @@ def test_sanitize_robot_output_applies_strict_mode_on_raw_attribute_selector() -
 
 
 def test_normalize_selector_covers_css_and_dot_prefixes() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
 
     assert service._normalize_selector("css:.btn-primary") == "css=.btn-primary"
     assert service._normalize_selector(".card-title") == "css=.card-title"
 
 
 def test_make_selector_unique_covers_already_unique_and_non_css() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
 
     assert (
         service._make_selector_unique("css=.card-title >> nth=0")
@@ -844,7 +847,7 @@ def test_make_selector_unique_covers_already_unique_and_non_css() -> None:
 
 
 def test_sanitize_injects_set_browser_timeout_after_new_context() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     content = (
         "*** Settings ***\n"
         "Library    Browser\n"
@@ -861,7 +864,7 @@ def test_sanitize_injects_set_browser_timeout_after_new_context() -> None:
 
 
 def test_sanitize_removes_useless_wait_before_get_title() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     content = (
         "*** Settings ***\n"
         "Library    Browser\n"
@@ -881,7 +884,7 @@ def test_sanitize_removes_useless_wait_before_get_title() -> None:
 
 
 def test_sanitize_converts_open_browser_and_injects_timeout() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     content = (
         "*** Settings ***\n"
         "Library    Browser\n"
@@ -904,7 +907,7 @@ def test_sanitize_converts_open_browser_and_injects_timeout() -> None:
 
 def test_sanitize_removes_wait_before_get_title_with_blank_line_between() -> None:
     """Line 276: j += 1 inside the blank-line-skip while loop."""
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     content = (
         "*** Settings ***\n"
         "Library    Browser\n"
@@ -925,7 +928,7 @@ def test_sanitize_removes_wait_before_get_title_with_blank_line_between() -> Non
 
 def test_sanitize_removes_wait_before_get_url_with_blank_line_between() -> None:
     """Line 276: same blank-line-skip, but for Get Url."""
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     content = (
         "*** Settings ***\n"
         "Library    Browser\n"
@@ -951,7 +954,7 @@ def test_sanitize_removes_wait_before_get_url_with_blank_line_between() -> None:
 
 def test_normalize_selector_slash_prefix_yields_xpath() -> None:
     """Line 306: selector starting with '/' → xpath=..."""
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     assert (
         service._normalize_selector("//div[@role='main']")
         == "xpath=//div[@role='main']"
@@ -960,19 +963,19 @@ def test_normalize_selector_slash_prefix_yields_xpath() -> None:
 
 def test_normalize_selector_paren_prefix_yields_xpath() -> None:
     """Line 306: selector starting with '(' → xpath=..."""
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     assert service._normalize_selector("(//a)[1]") == "xpath=(//a)[1]"
 
 
 def test_normalize_selector_plain_tag_yields_css() -> None:
     """Line 310: plain alphanumeric selector matched by regex → css=..."""
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     assert service._normalize_selector("button") == "css=button"
 
 
 def test_normalize_selector_plain_tag_with_attribute_yields_css() -> None:
     """Line 310: tag with attribute like input[type='text'] → css=..."""
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     assert service._normalize_selector("input[type='text']") == "css=input[type='text']"
 
 
@@ -983,13 +986,13 @@ def test_normalize_selector_plain_tag_with_attribute_yields_css() -> None:
 
 def test_make_selector_unique_hash_prefix() -> None:
     """Line 327: selector starting with '#' → css=# >> nth=0."""
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     assert service._make_selector_unique("#submit-btn") == "css=#submit-btn >> nth=0"
 
 
 def test_make_selector_unique_bracket_prefix() -> None:
     """Line 327: selector starting with '[' → css=[...] >> nth=0."""
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     assert (
         service._make_selector_unique("[data-testid='ok']")
         == "css=[data-testid='ok'] >> nth=0"
@@ -998,7 +1001,7 @@ def test_make_selector_unique_bracket_prefix() -> None:
 
 def test_make_selector_unique_plain_tag() -> None:
     """Line 327: plain alphanumeric selector matched by regex → css=... >> nth=0."""
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     assert service._make_selector_unique("button") == "css=button >> nth=0"
 
 
@@ -1014,7 +1017,7 @@ class _FakeSession:
         pass
 
 
-def _make_improve_service(groq_client, project=None, generated=None):
+def _make_improve_service(copilot_client, project=None, generated=None):
     """Build a TestService with a fake generated test and project for improve tests."""
     from app.models.generated_test import GeneratedTest as GT
     from app.models.project import Project
@@ -1047,7 +1050,7 @@ def _make_improve_service(groq_client, project=None, generated=None):
     return TestService(
         test_repository=_Repo(),  # type: ignore[arg-type]
         project_repository=DummyProjectRepository(fake_project),  # type: ignore[arg-type]
-        groq_client=groq_client,  # type: ignore[arg-type]
+        copilot_client=copilot_client,  # type: ignore[arg-type]
         element_scanner=SuccessfulScanService(),  # type: ignore[arg-type]
     )
 
@@ -1057,7 +1060,7 @@ async def test_improve_robot_test_returns_sanitized_output() -> None:
     """improve_robot_test calls the LLM and returns sanitized content."""
 
     class ImprovingGroqClient:
-        def generate_robot_test(self, prompt, context=None, page_structure=None):
+        async def generate_robot_test(self, prompt_text, context_text=None, page_structure=None):
             return "*** Test Cases ***\nImproved\n    Log    better"
 
     service = _make_improve_service(ImprovingGroqClient())
@@ -1072,7 +1075,7 @@ async def test_improve_robot_test_returns_none_when_test_not_found() -> None:
     """improve_robot_test returns None when the generated test does not exist."""
 
     class AnyGroqClient:
-        def generate_robot_test(self, prompt, context=None, page_structure=None):
+        async def generate_robot_test(self, prompt_text, context_text=None, page_structure=None):
             return "*** Test Cases ***"
 
     service = _make_improve_service(AnyGroqClient(), generated=None)
@@ -1089,7 +1092,7 @@ async def test_improve_robot_test_raises_llm_unavailable_on_connection_error() -
         pass
 
     class ConnFailingGroqClient:
-        def generate_robot_test(self, prompt, context=None, page_structure=None):
+        async def generate_robot_test(self, prompt_text, context_text=None, page_structure=None):
             raise APIConnectionError("down")
 
     service = _make_improve_service(ConnFailingGroqClient())
@@ -1105,7 +1108,7 @@ async def test_improve_robot_test_raises_llm_unavailable_on_timeout_error() -> N
         pass
 
     class TimeoutGroqClient:
-        def generate_robot_test(self, prompt, context=None, page_structure=None):
+        async def generate_robot_test(self, prompt_text, context_text=None, page_structure=None):
             raise APITimeoutError("timeout")
 
     service = _make_improve_service(TimeoutGroqClient())
@@ -1121,7 +1124,7 @@ async def test_improve_robot_test_reraises_unexpected_exceptions() -> None:
         pass
 
     class BoomGroqClient:
-        def generate_robot_test(self, prompt, context=None, page_structure=None):
+        async def generate_robot_test(self, prompt_text, context_text=None, page_structure=None):
             raise BoomError("boom")
 
     service = _make_improve_service(BoomGroqClient())
@@ -1138,7 +1141,7 @@ async def test_improve_robot_test_uses_page_scan_when_project_has_url() -> None:
     received_structures = []
 
     class CapturingGroqClient:
-        def generate_robot_test(self, prompt, context=None, page_structure=None):
+        async def generate_robot_test(self, prompt_text, context_text=None, page_structure=None):
             received_structures.append(page_structure)
             return "*** Test Cases ***\nWith Scan\n    Log    ok"
 
@@ -1163,7 +1166,7 @@ async def test_improve_robot_test_uses_cached_scan_when_fresh() -> None:
     received_structures = []
 
     class CapturingGroqClient:
-        def generate_robot_test(self, prompt, context=None, page_structure=None):
+        async def generate_robot_test(self, prompt_text, context_text=None, page_structure=None):
             received_structures.append(page_structure)
             return "*** Test Cases ***\nCached\n    Log    ok"
 
@@ -1222,11 +1225,11 @@ async def test_generate_test_uses_cached_scan_without_rescan(tmp_path) -> None:
         async def scan_url(self, _url):
             raise AssertionError("Scanner should not be called when cache is available")
 
-    groq_client = CapturingGroqClient()
+    copilot_client = CapturingGroqClient()
     service = TestService(
         test_repository=DummyTestRepository(),  # type: ignore[arg-type]
         project_repository=DummyProjectRepository(project),  # type: ignore[arg-type]
-        groq_client=groq_client,  # type: ignore[arg-type]
+        copilot_client=copilot_client,  # type: ignore[arg-type]
         element_scanner=NeverScanService(),  # type: ignore[arg-type]
     )
 
@@ -1238,7 +1241,7 @@ async def test_generate_test_uses_cached_scan_without_rescan(tmp_path) -> None:
         session=_Session(), project_id=1, prompt="Gerar teste", force_rescan=False  # type: ignore[arg-type]
     )
     assert generated.id == 99
-    assert groq_client.captured_page_structure == cached_data
+    assert copilot_client.captured_page_structure == cached_data
 
 
 @pytest.mark.asyncio
@@ -1271,7 +1274,7 @@ async def test_save_robot_test_content_returns_none_when_not_found() -> None:
     service = TestService(
         test_repository=test_repo,  # type: ignore[arg-type]
         project_repository=DummyProjectRepository(None),  # type: ignore[arg-type]
-        groq_client=DummyGroqClient(),  # type: ignore[arg-type]
+        copilot_client=DummyGroqClient(),  # type: ignore[arg-type]
     )
     result = await service.save_robot_test_content(session=None, test_id=999, content="*** Test Cases ***")  # type: ignore[arg-type]
     assert result is None
@@ -1305,7 +1308,7 @@ async def test_save_robot_test_content_writes_file_and_updates_content(
     service = TestService(
         test_repository=test_repo,  # type: ignore[arg-type]
         project_repository=DummyProjectRepository(None),  # type: ignore[arg-type]
-        groq_client=DummyGroqClient(),  # type: ignore[arg-type]
+        copilot_client=DummyGroqClient(),  # type: ignore[arg-type]
     )
 
     new_content = "*** Test Cases ***\nNew Test\n    Log    new\n"
@@ -1324,7 +1327,7 @@ async def test_save_robot_test_content_writes_file_and_updates_content(
 
 
 def test_fix_robot_syntax_errors_corrects_output_variable() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     content = "*** Test Cases ***\n" "My Test\n" "    Log    ${OUTPUT}\n"
     fixed = service._fix_robot_syntax_errors(content)
     assert "${OUTPUT_DIR}" in fixed
@@ -1334,14 +1337,14 @@ def test_fix_robot_syntax_errors_corrects_output_variable() -> None:
 
 
 def test_fix_robot_syntax_errors_corrects_log_variable() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     content = "*** Test Cases ***\nT\n    Log    ${LOG}\n"
     fixed = service._fix_robot_syntax_errors(content)
     assert "${LOG_FILE}" in fixed
 
 
 def test_fix_robot_syntax_errors_drops_should_be_equal_with_one_arg() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     content = (
         "*** Test Cases ***\n"
         "Header Test\n"
@@ -1353,7 +1356,7 @@ def test_fix_robot_syntax_errors_drops_should_be_equal_with_one_arg() -> None:
 
 
 def test_fix_robot_syntax_errors_keeps_should_be_equal_with_two_args() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     content = (
         "*** Test Cases ***\n"
         "Header Test\n"
@@ -1365,14 +1368,14 @@ def test_fix_robot_syntax_errors_keeps_should_be_equal_with_two_args() -> None:
 
 
 def test_fix_robot_syntax_errors_drops_should_contain_with_one_arg() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     content = "*** Test Cases ***\n" "T\n" "    Should Contain    ${text}\n"
     fixed = service._fix_robot_syntax_errors(content)
     assert "Should Contain" not in fixed
 
 
 def test_fix_robot_syntax_errors_adds_no_operation_to_empty_keyword() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     content = (
         "*** Keywords ***\n"
         "Empty Keyword\n"
@@ -1383,7 +1386,7 @@ def test_fix_robot_syntax_errors_adds_no_operation_to_empty_keyword() -> None:
 
 
 def test_fix_robot_syntax_errors_keeps_keyword_with_steps_intact() -> None:
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     content = (
         "*** Keywords ***\n"
         "My Keyword\n"
@@ -1398,7 +1401,7 @@ def test_fix_robot_syntax_errors_keeps_keyword_with_steps_intact() -> None:
 
 def test_sanitize_robot_output_e2e_fixes_all_three_error_classes() -> None:
     """Regression: reproduce the exact three failure modes from the Mercado test report."""
-    service = TestService(groq_client=DummyGroqClient())  # type: ignore[arg-type]
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     content = (
         "*** Settings ***\n"
         "Library    Browser\n"

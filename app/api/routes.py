@@ -114,10 +114,18 @@ async def generate_test(
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        # Handle authentication errors
+        if "authentication required" in str(exc).lower():
+            raise HTTPException(
+                status_code=401,
+                detail="Copilot authentication required. Please visit /api/ai/authorize to authenticate.",
+            ) from exc
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
     except LLMServiceUnavailableError as exc:
         raise HTTPException(
             status_code=503,
-            detail="Não foi possível conectar ao provedor de IA (Groq). Verifique internet do container, DNS e GROQ_API_KEY.",
+            detail="Não foi possível conectar ao provedor de IA (Copilot). Verifique internet do container, DNS e a autenticação do Copilot.",
         ) from exc
     except ScanUnavailableError as exc:
         raise HTTPException(

@@ -6,21 +6,21 @@ vi.mock('../client.js', () => ({
 }));
 
 import {
-  createProject,
-  deleteGeneratedTest,
-  deleteProject,
-  generateRobotTest,
-  generateVisualBuilderCode,
-  getTestById,
-  getVisualBuilderSteps,
-  improveRobotTest,
-  listGeneratedTests,
-  listProjectExecutions,
-  listProjects,
-  runTests,
-  saveRobotTestContent,
-  scanProject,
-  startVisualBuilder,
+    createProject,
+    deleteGeneratedTest,
+    deleteProject,
+    generateRobotTest,
+    generateVisualBuilderCode,
+    getTestById,
+    getVisualBuilderSteps,
+    improveRobotTest,
+    listGeneratedTests,
+    listProjectExecutions,
+    listProjects,
+    runTests,
+    saveRobotTestContent,
+    scanProject,
+    startVisualBuilder,
 } from '../automaweb.api.js';
 import { request, streamPost } from '../client.js';
 
@@ -160,7 +160,7 @@ describe('automaweb.api', () => {
     expect(request).toHaveBeenCalledWith({
       method: 'POST',
       url: '/builder/generate',
-      data: { session_id: 'session-123' },
+      data: { session_id: 'session-123', prompt: null },
     });
   });
 });

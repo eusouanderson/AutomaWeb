@@ -55,7 +55,7 @@ from tenacity import RetryError
 
 from app.ai_validation.self_healing_service import AITestSelfHealingService
 from app.core.config import settings
-from app.llm.groq_client import GroqClient, PayloadTooLargeError
+from app.llm.copilot_adapter import CopilotServiceAdapter, PayloadTooLargeError
 from app.models.generated_test import GeneratedTest
 from app.models.test_request import TestRequest
 from app.repositories.project_repository import ProjectRepository
@@ -80,12 +80,12 @@ class TestService:
         self,
         test_repository: TestRepository | None = None,
         project_repository: ProjectRepository | None = None,
-        groq_client: GroqClient | None = None,
+        copilot_client: CopilotServiceAdapter | None = None,
         element_scanner: ElementScannerService | None = None,
     ) -> None:
         self._test_repository = test_repository or TestRepository()
         self._project_repository = project_repository or ProjectRepository()
-        self._groq_client = groq_client or GroqClient()
+        self._copilot_client = copilot_client or CopilotServiceAdapter()
         self._element_scanner = element_scanner or ElementScannerService()
         self._self_healing = AITestSelfHealingService()
         self._last_generation_metadata: dict | None = None
@@ -95,7 +95,7 @@ class TestService:
         return self._last_generation_metadata
 
     def check_llm_health(self) -> dict[str, str | bool | int | None]:
-        return self._groq_client.check_api_health()
+        return self._copilot_client.check_api_health()
 
     async def generate_test(
         self,
@@ -147,10 +147,9 @@ class TestService:
                 await session.flush()
 
         try:
-            content = await asyncio.to_thread(
-                self._groq_client.generate_robot_test,
-                prompt=prompt,
-                context=context,
+            content = await self._copilot_client.generate_robot_test(
+                prompt_text=prompt,
+                context_text=context,
                 page_structure=page_structure,
             )
             self._last_generation_metadata = {
@@ -171,8 +170,7 @@ class TestService:
                     project_id,
                 )
                 try:
-                    content = await asyncio.to_thread(
-                        self._generate_robot_test_chunked,
+                    content = await self._generate_robot_test_chunked(
                         prompt,
                         context,
                         page_structure,
@@ -219,7 +217,7 @@ class TestService:
                 page_url=str(project.url) if project.url else None,
                 prompt=prompt,
                 context=context,
-                groq_client=self._groq_client,
+                copilot_client=self._copilot_client,
                 ai_debug=ai_debug,
             )
             content = healed.final_content
@@ -300,10 +298,9 @@ class TestService:
             f"{content}"
         )
         try:
-            improved = await asyncio.to_thread(
-                self._groq_client.generate_robot_test,
-                prompt=improvement_prompt,
-                context=None,
+            improved = await self._copilot_client.generate_robot_test(
+                prompt_text=improvement_prompt,
+                context_text=None,
                 page_structure=page_structure,
             )
         except Exception as exc:
@@ -388,7 +385,7 @@ class TestService:
         )
         return f"🧪_{safe}"
 
-    def _generate_robot_test_chunked(
+    async def _generate_robot_test_chunked(
         self, prompt: str, context: str | None, page_structure: dict
     ) -> str:
         base_target = max(200, settings.LLM_DOM_CHUNK_TARGET_CHARS)
@@ -422,7 +419,7 @@ class TestService:
                 chunks = chunks[:max_parts]
 
                 try:
-                    merged, chunk_parts_meta = self._generate_from_chunks(
+                    merged, chunk_parts_meta = await self._generate_from_chunks(
                         prompt=prompt,
                         context=context,
                         chunks=chunks,
@@ -447,7 +444,7 @@ class TestService:
             raise last_payload_error
         raise PayloadTooLargeError("Page structure cannot be split into smaller chunks")
 
-    def _generate_from_chunks(
+    async def _generate_from_chunks(
         self, prompt: str, context: str | None, chunks: list[dict]
     ) -> tuple[str, list[dict]]:
         partial_outputs: list[str] = []
@@ -460,9 +457,9 @@ class TestService:
                 f"Where (onde):\nSubconjunto do DOM referente ao CHUNK {idx}/{len(chunks)}.\n\n"
                 "How (como):\nGerar casos APENAS com base neste chunk, sem duplicar casos de chunks anteriores e com nomes descritivos."
             )
-            part = self._groq_client.generate_robot_test(
-                prompt=chunk_prompt,
-                context=context,
+            part = await self._copilot_client.generate_robot_test(
+                prompt_text=chunk_prompt,
+                context_text=context,
                 page_structure=chunk,
             )
             partial_outputs.append(self._sanitize_robot_output(part, context=context))

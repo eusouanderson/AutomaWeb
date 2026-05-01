@@ -8,7 +8,7 @@ from typing import Optional
 from tenacity import RetryError
 
 from app.domain.dom.models import DOMChunk, ChunkProcessingResult
-from app.llm.groq_client import GroqClient, PayloadTooLargeError
+from app.llm.copilot_adapter import CopilotServiceAdapter, PayloadTooLargeError
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -17,13 +17,13 @@ logger = logging.getLogger(__name__)
 class ChunkProcessor:
     """Processes individual DOM chunks through LLM for test generation."""
 
-    def __init__(self, groq_client: GroqClient | None = None):
+    def __init__(self, copilot_client: CopilotServiceAdapter | None = None):
         """Initialize processor.
 
         Args:
-            groq_client: Optional GroqClient instance
+            copilot_client: Optional CopilotServiceAdapter instance
         """
-        self._groq_client = groq_client or GroqClient()
+        self._copilot_client = copilot_client or CopilotServiceAdapter()
 
     async def process_chunk(
         self,
@@ -57,10 +57,9 @@ class ChunkProcessor:
 
         try:
             # Generate test for this chunk
-            content = await asyncio.to_thread(
-                self._groq_client.generate_robot_test,
-                prompt=section_context,
-                context=None,  # Context already included in section_context
+            content = await self._copilot_client.generate_robot_test(
+                prompt_text=section_context,
+                context_text=None,  # Context already included in section_context
                 page_structure={"chunk": chunk_dict},
             )
 
@@ -92,10 +91,9 @@ class ChunkProcessor:
             compact_dict = compact_chunk.to_dict()
 
             try:
-                content = await asyncio.to_thread(
-                    self._groq_client.generate_robot_test,
-                    prompt=section_context,
-                    context=None,
+                content = await self._copilot_client.generate_robot_test(
+                    prompt_text=section_context,
+                    context_text=None,
                     page_structure={"chunk": compact_dict},
                 )
 

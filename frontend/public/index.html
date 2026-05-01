@@ -1,44 +1,51 @@
 <!doctype html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AutomaWeb - Gerador de Testes Robot Framework</title>
-    <link rel="stylesheet" href="/static/frontend/styles.css" />
-    <link rel="stylesheet" href="/static/frontend/node_modules/toastify-js/src/toastify.css" />
-  </head>
 
-  <body>
-    <div class="container">
-      <header>
-        <h1>🤖 AutomaWeb</h1>
-        <p>Gerador de Testes Robot Framework com IA</p>
-      </header>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AutomaWeb - Gerador de Testes Robot Framework</title>
+  <link rel="stylesheet" href="/static/frontend/styles.css" />
+  <link rel="stylesheet" href="/static/frontend/static/auth.css" />
+  <link rel="stylesheet" href="/static/frontend/node_modules/toastify-js/src/toastify.css" />
+</head>
 
-      <div class="tabs">
-        <button class="tab-btn active" data-tab="projects">Projetos</button>
-        <button class="tab-btn" data-tab="generate">Gerar Teste</button>
-        <button class="tab-btn" data-tab="tests">Testes Gerados</button>
-        <button class="tab-btn" data-tab="execute">Executar Testes</button>
-        <button class="tab-btn" data-tab="editor">Editor Robot</button>
-        <button class="tab-btn" data-tab="reports">Relatórios</button>
-      </div>
+<body>
+  <div class="container">
+    <header>
+      <h1>🤖 AutomaWeb</h1>
+      <p>Gerador de Testes Robot Framework com IA</p>
+    </header>
 
-      <div id="projects-tab" class="tab-content active"></div>
-
-      <div id="generate-tab" class="tab-content"></div>
-
-      <div id="tests-tab" class="tab-content"></div>
-
-      <div id="execute-tab" class="tab-content"></div>
-
-      <div id="editor-tab" class="tab-content"></div>
-
-      <div id="reports-tab" class="tab-content"></div>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="projects">Projetos</button>
+      <button class="tab-btn" data-tab="generate">Gerar Teste</button>
+      <button class="tab-btn" data-tab="tests">Testes Gerados</button>
+      <button class="tab-btn" data-tab="execute">Executar Testes</button>
+      <button class="tab-btn" data-tab="editor">Editor Robot</button>
+      <button class="tab-btn" data-tab="reports">Relatórios</button>
     </div>
 
-    <script src="/static/frontend/node_modules/axios/dist/axios.min.js"></script>
-    <script src="/static/frontend/node_modules/toastify-js/src/toastify.js"></script>
-    <script type="module" src="/static/frontend/app.js"></script>
-  </body>
+    <div id="projects-tab" class="tab-content active"></div>
+
+    <div id="generate-tab" class="tab-content"></div>
+
+    <div id="tests-tab" class="tab-content"></div>
+
+    <div id="execute-tab" class="tab-content"></div>
+
+    <div id="editor-tab" class="tab-content"></div>
+
+    <div id="reports-tab" class="tab-content"></div>
+  </div>
+
+  <!-- Authentication Modal Container -->
+  <div id="auth-container"></div>
+
+  <script src="/static/frontend/node_modules/axios/dist/axios.min.js"></script>
+  <script src="/static/frontend/node_modules/toastify-js/src/toastify.js"></script>
+  <script type="module" src="/static/frontend/static/auth.js?v=2"></script>
+  <script type="module" src="/static/frontend/app.js?v=2"></script>
+</body>
+
 </html>

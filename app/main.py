@@ -5,6 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from app.api.routes import router as api_router
+from app.api.copilot_routes import router as copilot_router
 from app.builder.router import router as builder_router
 from app.builder.service import get_builder_service
 from app.core.config import settings
@@ -25,6 +26,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)
 
 app.include_router(api_router)
+app.include_router(copilot_router)
 app.include_router(builder_router)
 
 app.mount(

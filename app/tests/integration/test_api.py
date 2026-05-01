@@ -10,11 +10,11 @@ from app.main import app
 from app.services.test_service import TestService
 
 
-class DummyGroqClient:
-    def generate_robot_test(
+class DummyCopilotClient:
+    async def generate_robot_test(
         self,
-        prompt: str,
-        context: str | None = None,
+        prompt_text: str,
+        context_text: str | None = None,
         page_structure: dict | None = None,
     ) -> str:
         return "*** Settings ***\nLibrary    Browser\n\n*** Test Cases ***\nExample\n    Log    Hello"
@@ -41,7 +41,7 @@ def override_dependencies(session: AsyncSession):
     original_init = TestService.__init__
 
     def patched_init(self, *args, **kwargs):
-        kwargs["groq_client"] = DummyGroqClient()
+        kwargs["copilot_client"] = DummyCopilotClient()
         original_init(self, *args, **kwargs)
 
     TestService.__init__ = patched_init

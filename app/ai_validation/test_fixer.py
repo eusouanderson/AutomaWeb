@@ -18,7 +18,7 @@ class TestFixer:
         self,
         content: str,
         issues: list[ValidationIssue],
-        groq_client=None,
+        copilot_client=None,
         prompt: str | None = None,
         context: str | None = None,
     ) -> FixResult:
@@ -63,14 +63,13 @@ class TestFixer:
         for issue in issues:
             if issue.issue_type != "element_not_found":
                 continue
-            if groq_client is None or not prompt:
+            if copilot_client is None or not prompt:
                 continue
             line_idx = issue.line_number - 1
             if line_idx < 0 or line_idx >= len(lines):
                 continue
 
-            regenerated = await asyncio.to_thread(
-                groq_client.regenerate_robot_step,
+            regenerated = await copilot_client.regenerate_robot_step(
                 prompt,
                 lines[line_idx],
                 issue.message,

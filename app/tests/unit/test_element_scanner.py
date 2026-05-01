@@ -840,6 +840,20 @@ async def test_close_shared_browser_closes_and_stops(monkeypatch):
     assert ElementScannerService._shared_playwright is None
 
 
+def test_is_login_url_returns_false_for_non_login_url():
+    """Covers the final `return False` in _is_login_url."""
+    scanner = ElementScannerService()
+    result = scanner._is_login_url("https://example.com/about")
+    assert result is False
+
+
+def test_is_login_url_returns_true_for_login_path():
+    """Covers the path-indicator `return True` branch in _is_login_url (line 629)."""
+    scanner = ElementScannerService()
+    result = scanner._is_login_url("https://example.com/login")
+    assert result is True
+
+
 def test_import_fallback_without_playwright(monkeypatch):
     original_import = __import__
 
@@ -1638,3 +1652,5 @@ async def test_playwright_scan_detects_internal_login_redirect(monkeypatch):
     # Verify that login flow was triggered by detecting /login path
     assert len(login_calls) == 1
     assert "/login" in login_calls[0]
+
+

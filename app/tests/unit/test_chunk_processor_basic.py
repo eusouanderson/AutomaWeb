@@ -1,7 +1,7 @@
 """Tests for chunk processor."""
 
 import pytest
-from unittest.mock import Mock
+from unittest.mock import Mock, AsyncMock
 from app.domain.dom.models import (
     DOMChunk,
     DOMSectionType,
@@ -9,23 +9,23 @@ from app.domain.dom.models import (
     ChunkProcessingResult,
 )
 from app.infrastructure.llm_chunking.chunk_processor import ChunkProcessor
-from app.llm.groq_client import PayloadTooLargeError
+from app.llm.copilot_adapter import PayloadTooLargeError
 
 
 class TestChunkProcessorBasic:
     """Basic tests for ChunkProcessor."""
 
     @pytest.fixture
-    def mock_groq_client(self):
-        """Mock Groq client."""
+    def mock_copilot_client(self):
+        """Mock Copilot client."""
         client = Mock()
-        client.generate_robot_test = Mock(return_value="Test Chunk\n    Click Button")
+        client.generate_robot_test = AsyncMock(return_value="Test Chunk\n    Click Button")
         return client
 
     @pytest.mark.asyncio
-    async def test_process_chunk_basic(self, mock_groq_client):
+    async def test_process_chunk_basic(self, mock_copilot_client):
         """Test basic chunk processing."""
-        processor = ChunkProcessor(groq_client=mock_groq_client)
+        processor = ChunkProcessor(copilot_client=mock_copilot_client)
 
         chunk = DOMChunk(
             chunk_id="chunk_1",
@@ -44,9 +44,9 @@ class TestChunkProcessorBasic:
         assert result.chunk_id == "chunk_1"
 
     @pytest.mark.asyncio
-    async def test_process_chunk_preserves_metadata(self, mock_groq_client):
+    async def test_process_chunk_preserves_metadata(self, mock_copilot_client):
         """Test that chunk metadata is preserved."""
-        processor = ChunkProcessor(groq_client=mock_groq_client)
+        processor = ChunkProcessor(copilot_client=mock_copilot_client)
 
         chunk = DOMChunk(
             chunk_id="chunk_test",
@@ -66,9 +66,9 @@ class TestChunkProcessorBasic:
         assert result.section_type == DOMSectionType.HEADER
 
     @pytest.mark.asyncio
-    async def test_process_chunks_batch_basic(self, mock_groq_client):
+    async def test_process_chunks_batch_basic(self, mock_copilot_client):
         """Test batch processing of chunks."""
-        processor = ChunkProcessor(groq_client=mock_groq_client)
+        processor = ChunkProcessor(copilot_client=mock_copilot_client)
 
         chunks = [
             DOMChunk(
@@ -90,9 +90,9 @@ class TestChunkProcessorBasic:
         assert all(isinstance(r, ChunkProcessingResult) for r in results)
 
     @pytest.mark.asyncio
-    async def test_process_chunk_with_context(self, mock_groq_client):
+    async def test_process_chunk_with_context(self, mock_copilot_client):
         """Test chunk processing with context."""
-        processor = ChunkProcessor(groq_client=mock_groq_client)
+        processor = ChunkProcessor(copilot_client=mock_copilot_client)
 
         chunk = DOMChunk(
             chunk_id="chunk_1",
@@ -110,15 +110,15 @@ class TestChunkProcessorBasic:
 
         assert isinstance(result, ChunkProcessingResult)
 
-    def test_processor_initialization(self, mock_groq_client):
+    def test_processor_initialization(self, mock_copilot_client):
         """Test processor initialization."""
-        processor = ChunkProcessor(groq_client=mock_groq_client)
+        processor = ChunkProcessor(copilot_client=mock_copilot_client)
 
-        assert processor._groq_client is not None
+        assert processor._copilot_client is not None
 
-    def test_create_section_context_includes_all_parts(self, mock_groq_client):
+    def test_create_section_context_includes_all_parts(self, mock_copilot_client):
         """Test internal section context construction."""
-        processor = ChunkProcessor(groq_client=mock_groq_client)
+        processor = ChunkProcessor(copilot_client=mock_copilot_client)
         chunk = DOMChunk(
             chunk_id="c1",
             section_type=DOMSectionType.MAIN_CONTENT,
@@ -138,9 +138,9 @@ class TestChunkProcessorBasic:
         assert "Additional context" in context
         assert "Generate robust tests" in context
 
-    def test_compact_chunk_truncates_long_text(self, mock_groq_client):
+    def test_compact_chunk_truncates_long_text(self, mock_copilot_client):
         """Test _compact_chunk strips long text from elements."""
-        processor = ChunkProcessor(groq_client=mock_groq_client)
+        processor = ChunkProcessor(copilot_client=mock_copilot_client)
         chunk = DOMChunk(
             chunk_id="c2",
             section_type=DOMSectionType.FORMS,
@@ -162,10 +162,10 @@ class TestChunkProcessorBasic:
     async def test_process_chunk_retries_after_payload_too_large(self):
         """Test retry path when first call exceeds payload and second succeeds."""
         groq = Mock()
-        groq.generate_robot_test = Mock(
+        groq.generate_robot_test = AsyncMock(
             side_effect=[PayloadTooLargeError("too large"), "Recovered test"]
         )
-        processor = ChunkProcessor(groq_client=groq)
+        processor = ChunkProcessor(copilot_client=groq)
 
         chunk = DOMChunk(
             chunk_id="retry_chunk",
@@ -184,8 +184,8 @@ class TestChunkProcessorBasic:
     async def test_process_chunk_raises_when_retry_disabled(self):
         """Test PayloadTooLargeError is propagated when retry is disabled."""
         groq = Mock()
-        groq.generate_robot_test = Mock(side_effect=PayloadTooLargeError("too large"))
-        processor = ChunkProcessor(groq_client=groq)
+        groq.generate_robot_test = AsyncMock(side_effect=PayloadTooLargeError("too large"))
+        processor = ChunkProcessor(copilot_client=groq)
 
         chunk = DOMChunk(
             chunk_id="no_retry",
@@ -206,8 +206,8 @@ class TestChunkProcessorBasic:
     async def test_process_chunks_batch_returns_failed_result_on_exception(self):
         """Test batch processing returns empty generated_test for failed chunks."""
         groq = Mock()
-        groq.generate_robot_test = Mock(side_effect=Exception("boom"))
-        processor = ChunkProcessor(groq_client=groq)
+        groq.generate_robot_test = AsyncMock(side_effect=Exception("boom"))
+        processor = ChunkProcessor(copilot_client=groq)
 
         chunks = [
             DOMChunk(
@@ -228,13 +228,13 @@ class TestChunkProcessorBasic:
     @pytest.mark.asyncio
     async def test_process_chunk_raises_when_compacted_retry_also_too_large(self):
         groq = Mock()
-        groq.generate_robot_test = Mock(
+        groq.generate_robot_test = AsyncMock(
             side_effect=[
                 PayloadTooLargeError("too large"),
                 PayloadTooLargeError("still too large"),
             ]
         )
-        processor = ChunkProcessor(groq_client=groq)
+        processor = ChunkProcessor(copilot_client=groq)
 
         chunk = DOMChunk(
             chunk_id="retry_fail",

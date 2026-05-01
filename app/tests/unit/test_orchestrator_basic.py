@@ -21,7 +21,7 @@ class TestChunkedTestGenerationOrchestratorBasic:
 
     def _build_orchestrator(self):
         orch = ChunkedTestGenerationOrchestrator(
-            groq_client=Mock(), test_repository=Mock()
+            copilot_client=Mock(), test_repository=Mock()
         )
         return orch
 

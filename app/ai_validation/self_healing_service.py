@@ -40,7 +40,7 @@ class AITestSelfHealingService:
         page_url: str | None = None,
         prompt: str | None = None,
         context: str | None = None,
-        groq_client=None,
+        copilot_client=None,
         ai_debug: bool = False,
     ) -> HealedTestResult:
         self._metrics.inc_generated()
@@ -55,7 +55,7 @@ class AITestSelfHealingService:
             fix_result = await self._fixer.apply_fixes(
                 content=content,
                 issues=first_report.issues,
-                groq_client=groq_client,
+                copilot_client=copilot_client,
                 prompt=prompt,
                 context=context,
             )

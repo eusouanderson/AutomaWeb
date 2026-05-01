@@ -184,6 +184,29 @@ docker compose up -d --build
 - `POST /executions/run` - Executar testes
 - `GET /docs` - Documentação Swagger
 
+## Troubleshooting
+
+### Erro: "Executable doesn't exist at /home/bob/.cache/ms-playwright/..."
+
+**Causa**: Playwright não foi instalado corretamente.
+
+**Solução**:
+```bash
+# Instale os browsers do Playwright
+poetry run playwright install chromium
+
+# Ou use o Makefile
+make setup
+```
+
+### Erro: "No module named 'playwright'"
+
+**Solução**:
+```bash
+poetry install
+poetry run playwright install chromium
+```
+
 ## Licença
 
 MIT

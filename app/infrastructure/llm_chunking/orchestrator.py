@@ -19,7 +19,7 @@ from app.infrastructure.dom_cache.segmentation_cache import (
     DOMSegmentationCache,
     DOMHasher,
 )
-from app.llm.groq_client import GroqClient
+from app.llm.copilot_adapter import CopilotServiceAdapter
 from app.models.generated_test import GeneratedTest
 from app.models.test_request import TestRequest
 from app.repositories.test_repository import TestRepository
@@ -32,23 +32,23 @@ class ChunkedTestGenerationOrchestrator:
 
     def __init__(
         self,
-        groq_client: GroqClient | None = None,
+        copilot_client: CopilotServiceAdapter | None = None,
         test_repository: TestRepository | None = None,
     ):
         """Initialize orchestrator.
 
         Args:
-            groq_client: Optional GroqClient instance
+            copilot_client: Optional CopilotServiceAdapter instance
             test_repository: Optional TestRepository instance
         """
-        self._groq_client = groq_client or GroqClient()
+        self._copilot_client = copilot_client or CopilotServiceAdapter()
         self._test_repository = test_repository or TestRepository()
 
         self._preprocessor = DOMPreprocessor(
             max_text_per_element=settings.DOM_MAX_TEXT_PER_ELEMENT
         )
         self._segmenter = DOMSegmenter()
-        self._chunk_processor = ChunkProcessor(groq_client=self._groq_client)
+        self._chunk_processor = ChunkProcessor(copilot_client=self._copilot_client)
         self._test_aggregator = TestAggregator()
 
         # Shared cache
@@ -108,7 +108,7 @@ class ChunkedTestGenerationOrchestrator:
         )
 
         chunker = AdaptiveChunker(
-            total_token_budget=settings.GROQ_CHUNK_TOKEN_BUDGET,
+            total_token_budget=settings.LLM_CHUNK_TOKEN_BUDGET,
             strategy=chunking_strategy,
         )
 

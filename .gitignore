@@ -152,3 +152,4 @@ mkdocs/site/
 *~
 frontend/coverage/index.html
 frontend/coverage/index.html
+.copilot/

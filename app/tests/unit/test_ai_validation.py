@@ -600,7 +600,7 @@ class TestTestFixer:
         assert result.applied_fixes == []
 
     @pytest.mark.asyncio
-    async def test_regenerates_step_via_groq_for_element_not_found(self):
+    async def test_regenerates_step_via_copilot_for_element_not_found(self):
         content = "*** Test Cases ***\nFoo\n    Click    css=#ghost\n"
         issue = ValidationIssue(
             line_number=3,
@@ -610,19 +610,19 @@ class TestTestFixer:
             message="not found",
         )
 
-        mock_groq = MagicMock()
-        mock_groq.regenerate_robot_step = MagicMock(
+        mock_copilot = MagicMock()
+        mock_copilot.regenerate_robot_step = AsyncMock(
             return_value="    Click    css=#real-btn"
         )
 
         result = await self.fixer.apply_fixes(
-            content, [issue], groq_client=mock_groq, prompt="Test prompt"
+            content, [issue], copilot_client=mock_copilot, prompt="Test prompt"
         )
         assert "css=#real-btn" in result.content
         assert any("regenerado" in fix for fix in result.applied_fixes)
 
     @pytest.mark.asyncio
-    async def test_skips_groq_regen_when_no_client(self):
+    async def test_skips_copilot_regen_when_no_client(self):
         content = "*** Test Cases ***\nFoo\n    Click    css=#ghost\n"
         issue = ValidationIssue(
             line_number=3,
@@ -632,12 +632,12 @@ class TestTestFixer:
             message="not found",
         )
         result = await self.fixer.apply_fixes(
-            content, [issue], groq_client=None, prompt="test"
+            content, [issue], copilot_client=None, prompt="test"
         )
         assert result.applied_fixes == []
 
     @pytest.mark.asyncio
-    async def test_skips_groq_regen_when_no_prompt(self):
+    async def test_skips_copilot_regen_when_no_prompt(self):
         content = "*** Test Cases ***\nFoo\n    Click    css=#ghost\n"
         issue = ValidationIssue(
             line_number=3,
@@ -646,9 +646,9 @@ class TestTestFixer:
             issue_type="element_not_found",
             message="not found",
         )
-        mock_groq = MagicMock()
+        mock_copilot = MagicMock()
         result = await self.fixer.apply_fixes(
-            content, [issue], groq_client=mock_groq, prompt=None
+            content, [issue], copilot_client=mock_copilot, prompt=None
         )
         assert result.applied_fixes == []
 
@@ -710,9 +710,9 @@ class TestTestFixer:
         assert result.applied_fixes == []
 
     @pytest.mark.asyncio
-    async def test_skips_groq_regen_when_element_not_found_line_out_of_bounds(self):
+    async def test_skips_copilot_regen_when_element_not_found_line_out_of_bounds(self):
         """Line 63: continue when line_idx >= len(lines) for element_not_found
-        even when groq_client and prompt are provided."""
+        even when copilot_client and prompt are provided."""
         content = "*** Test Cases ***\nFoo\n"
         issue = ValidationIssue(
             line_number=99,  # way out of bounds
@@ -721,11 +721,11 @@ class TestTestFixer:
             issue_type="element_not_found",
             message="not found",
         )
-        mock_groq = MagicMock()
+        mock_copilot = MagicMock()
         result = await self.fixer.apply_fixes(
-            content, [issue], groq_client=mock_groq, prompt="test"
+            content, [issue], copilot_client=mock_copilot, prompt="test"
         )
-        mock_groq.regenerate_robot_step.assert_not_called()
+        mock_copilot.regenerate_robot_step.assert_not_called()
         assert result.applied_fixes == []
 
     def test_replace_locator_returns_unchanged_for_single_part_line(self):

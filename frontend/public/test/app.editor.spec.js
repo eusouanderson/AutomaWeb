@@ -46,6 +46,22 @@ describe('app.js – editor page mount when editor-tab is present', () => {
       mount: mountEditorPage
     }));
 
+    vi.doMock('../static/auth.js', () => ({
+      AuthorizationUI: class {
+        constructor() {}
+        showAuthDialog = vi.fn().mockResolvedValue(true);
+      }
+    }));
+
+    // Provide axios as a global (app.js uses it without importing)
+    global.axios = {
+      get: vi.fn().mockResolvedValue({ data: { authenticated: true } }),
+      post: vi.fn().mockResolvedValue({ data: {} }),
+      interceptors: {
+        response: { use: vi.fn() }
+      }
+    };
+
     // Import app.js fresh so the editor-tab DOM element is found
     await import('../app.js');
   });

@@ -38,6 +38,22 @@ vi.mock('../pages/robot-editor/editor.page.js', () => ({
   mount: vi.fn().mockResolvedValue(undefined)
 }));
 
+vi.mock('../static/auth.js', () => ({
+  AuthorizationUI: class {
+    constructor() {}
+    showAuthDialog = vi.fn().mockResolvedValue(true);
+  }
+}));
+
+// Provide axios as a global (app.js uses it without importing)
+global.axios = {
+  get: vi.fn().mockResolvedValue({ data: { authenticated: true } }),
+  post: vi.fn().mockResolvedValue({ data: {} }),
+  interceptors: {
+    response: { use: vi.fn() }
+  }
+};
+
 import { toast } from '../components/toast.js';
 import { mount as mountDashboardPage } from '../pages/dashboard/dashboard.page.js';
 import { mount as mountGeneratorPage } from '../pages/generator/generator.page.js';
