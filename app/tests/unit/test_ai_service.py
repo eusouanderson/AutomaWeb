@@ -198,6 +198,19 @@ async def test_generate_robot_test_without_page_structure():
 
 
 @pytest.mark.asyncio
+async def test_generate_robot_test_keeps_execution_contract_with_custom_system_prompt():
+    service = _make_service()
+    await service.generate_robot_test(
+        prompt="Test",
+        system_prompt="Use linguagem objetiva e foco em fluxo feliz.",
+    )
+    messages = service.provider.run_model.call_args[0][1]
+    sys_msg = next(m for m in messages if m["role"] == "system")
+    assert "New Browser -> New Context -> Set Browser Timeout 30s -> New Page" in sys_msg["content"]
+    assert "Use linguagem objetiva e foco em fluxo feliz." in sys_msg["content"]
+
+
+@pytest.mark.asyncio
 async def test_generate_robot_test_uses_zero_temperature():
     service = _make_service()
     await service.generate_robot_test(prompt="Test")

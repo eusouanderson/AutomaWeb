@@ -182,7 +182,7 @@ class CopilotService:
         Returns:
             Generated Robot Framework code
         """
-        default_system_prompt = (
+        execution_contract = (
             "Você é um especialista em gerar testes automatizados com Robot "
             "Framework e Browser Library (Playwright). "
             "Gere APENAS código Robot Framework válido, sem explicações, sem markdown, sem blocos ```robot. "
@@ -205,8 +205,28 @@ class CopilotService:
             "13. NUNCA use ${OUTPUT}, ${LOG} ou ${REPORT}\n"
             "14. Toda keyword customizada deve ter pelo menos 1 step executável\n"
             "15. Set Browser Timeout aceita apenas 1 argumento (ex: 30s)\n\n"
+            "PADRAO OBRIGATORIO DE EXECUCAO (SEM VARIAR):\n"
+            "- Fluxo base: New Browser -> New Context -> Set Browser Timeout 30s -> New Page\n"
+            "- Exemplo mínimo:\n"
+            "  *** Settings ***\n"
+            "  Library    Browser\n"
+            "  *** Test Cases ***\n"
+            "  Caso\n"
+            "      New Browser    chromium    headless=${HEADLESS}\n"
+            "      New Context\n"
+            "      Set Browser Timeout    30s\n"
+            "      New Page    https://exemplo.com\n"
+            "      [Teardown]    Close Browser\n\n"
         )
-        resolved_system_prompt = system_prompt or default_system_prompt
+
+        if system_prompt and system_prompt.strip():
+            resolved_system_prompt = (
+                f"{execution_contract}"
+                "INSTRUCOES ADICIONAIS DO USUARIO (sem violar o padrao obrigatorio acima):\n"
+                f"{system_prompt.strip()}"
+            )
+        else:
+            resolved_system_prompt = execution_contract
 
         if page_structure:
             import json

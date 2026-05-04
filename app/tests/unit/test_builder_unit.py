@@ -57,6 +57,17 @@ class DummyPlaywrightManagerWithHandler:
         return None
 
 
+class DummyPlaywrightManagerTypeError:
+    def __init__(self, message: str) -> None:
+        self._message = message
+
+    async def start_session(self, **kwargs):
+        raise TypeError(self._message)
+
+    async def shutdown(self) -> None:
+        return None
+
+
 async def _make_service(manager) -> BuilderService:
     engine = create_async_engine(
         "sqlite+aiosqlite:///:memory:", poolclass=StaticPool
@@ -201,6 +212,41 @@ async def test_builder_service_records_event_from_browser_handler() -> None:
 
 
 @pytest.mark.asyncio
+async def test_builder_service_records_event_from_browser_handler_for_project() -> None:
+    manager = DummyPlaywrightManagerWithHandler()
+    service = await _make_service(manager)  # type: ignore[arg-type]
+
+    session_id = await service.start_builder_for_project(
+        "https://example.com", "http://localhost:8000", project_id=42
+    )
+
+    steps = await service.list_steps(session_id)
+    assert len(steps) == 1
+    assert steps[0]["selector"] == "#from-browser"
+    assert steps[0]["action"] == "click"
+
+
+@pytest.mark.asyncio
+async def test_builder_service_start_builder_reraises_non_handler_type_error() -> None:
+    manager = DummyPlaywrightManagerTypeError("boom")
+    service = await _make_service(manager)  # type: ignore[arg-type]
+
+    with pytest.raises(TypeError, match="boom"):
+        await service.start_builder("https://example.com", "http://localhost:8000")
+
+
+@pytest.mark.asyncio
+async def test_builder_service_start_builder_for_project_reraises_non_handler_type_error() -> None:
+    manager = DummyPlaywrightManagerTypeError("other failure")
+    service = await _make_service(manager)  # type: ignore[arg-type]
+
+    with pytest.raises(TypeError, match="other failure"):
+        await service.start_builder_for_project(
+            "https://example.com", "http://localhost:8000", project_id=7
+        )
+
+
+@pytest.mark.asyncio
 async def test_builder_service_shutdown_calls_manager() -> None:
     manager = DummyPlaywrightManager()
     service = await _make_service(manager)  # type: ignore[arg-type]
@@ -230,6 +276,56 @@ async def test_builder_service_updates_saved_step_name() -> None:
 
     assert updated["step_name"] == "Salvar formulário"
     assert updated["page_url"] == "https://example.com/form"
+
+
+@pytest.mark.asyncio
+async def test_builder_service_updates_saved_step_description_only() -> None:
+    manager = DummyPlaywrightManager()
+    service = await _make_service(manager)  # type: ignore[arg-type]
+
+    session_id = await service.start_builder(
+        "https://example.com", "http://localhost:8000"
+    )
+    saved = await service.ingest_event(
+        {
+            "session_id": session_id,
+            "action": "click",
+            "selector": "#submit",
+            "description": "Descricao original",
+        }
+    )
+
+    updated = await service.update_step(saved["id"], description="Descricao alterada")
+    assert updated["description"] == "Descricao alterada"
+
+
+@pytest.mark.asyncio
+async def test_builder_service_update_step_requires_at_least_one_field() -> None:
+    manager = DummyPlaywrightManager()
+    service = await _make_service(manager)  # type: ignore[arg-type]
+
+    with pytest.raises(ValueError, match="No builder step updates provided"):
+        await service.update_step(1)
+
+
+@pytest.mark.asyncio
+async def test_builder_service_input_without_labels_uses_default_step_name() -> None:
+    manager = DummyPlaywrightManager()
+    service = await _make_service(manager)  # type: ignore[arg-type]
+    session_id = await service.start_builder(
+        "https://example.com", "http://localhost:8000"
+    )
+
+    saved = await service.ingest_event(
+        {
+            "session_id": session_id,
+            "action": "input",
+            "selector": "#email",
+            "value": "user@example.com",
+        }
+    )
+
+    assert saved["step_name"] == "Preencher campo"
 
 
 def test_get_builder_service_returns_singleton_instance() -> None:

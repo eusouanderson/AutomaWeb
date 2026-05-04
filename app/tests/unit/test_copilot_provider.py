@@ -258,6 +258,65 @@ async def test_responses_retries_with_legacy_payload_on_400():
 
 
 @pytest.mark.asyncio
+async def test_responses_reraises_non_400_http_error_without_legacy_retry():
+    import httpx
+
+    req = httpx.Request("POST", "https://api.githubcopilot.com/responses")
+
+    server_error_response = _mock_response({"error": "server error"}, status_code=500)
+    server_error_response.raise_for_status = MagicMock(
+        side_effect=httpx.HTTPStatusError(
+            "500 server error",
+            request=req,
+            response=httpx.Response(500, request=req, text="server error"),
+        )
+    )
+
+    provider = _make_provider(server_error_response)
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await provider.responses("gpt-5", [{"role": "user", "content": "go"}])
+
+    # Non-400 errors should not trigger the legacy-format retry.
+    assert provider.http_client.post.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_responses_legacy_retry_logs_and_raises_when_second_call_is_not_success():
+    import httpx
+
+    req = httpx.Request("POST", "https://api.githubcopilot.com/responses")
+
+    bad_request_response = _mock_response({"error": "bad payload"}, status_code=400)
+    bad_request_response.raise_for_status = MagicMock(
+        side_effect=httpx.HTTPStatusError(
+            "400 bad request",
+            request=req,
+            response=httpx.Response(400, request=req, text="bad payload"),
+        )
+    )
+
+    legacy_retry_failure = _mock_response({"error": "still bad"}, status_code=500)
+    legacy_retry_failure.raise_for_status = MagicMock(
+        side_effect=httpx.HTTPStatusError(
+            "500 retry failed",
+            request=req,
+            response=httpx.Response(500, request=req, text="still bad"),
+        )
+    )
+
+    provider = _make_provider()
+    provider.http_client.post = AsyncMock(
+        side_effect=[bad_request_response, legacy_retry_failure]
+    )
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await provider.responses("gpt-5.4", [{"role": "user", "content": "go"}])
+
+    assert provider.http_client.post.await_count == 2
+
+
+@pytest.mark.asyncio
 async def test_responses_raises_and_logs_on_invalid_format():
     provider = _make_provider(_mock_response({"output_text": "   "}))
     with pytest.raises(ValueError, match="Invalid response from responses API"):

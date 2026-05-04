@@ -32,6 +32,7 @@ class InMemoryEventStore:
     ) -> None:
         self._session_factory = session_factory or AsyncSessionLocal
         self._latest_session_id: str | None = None
+        self._known_session_ids: set[str] = set()
         self._lock = asyncio.Lock()
 
     async def create_session(
@@ -47,6 +48,7 @@ class InMemoryEventStore:
                 db_session.add(session)
                 await db_session.commit()
             self._latest_session_id = session.session_id
+            self._known_session_ids.add(session.session_id)
             return self._serialize_session(session)
 
     async def add_event(self, session_id: str, event: dict[str, Any]) -> dict[str, Any]:
@@ -129,10 +131,18 @@ class InMemoryEventStore:
                 session = await db_session.get(BuilderSessionModel, resolved_session)
                 if session:
                     self._latest_session_id = session.session_id
+                    self._known_session_ids.add(session.session_id)
                     return self._serialize_session(session)
+                if session_id is not None:
+                    return None
+
+            if not self._known_session_ids:
+                return None
 
             result = await db_session.execute(
-                select(BuilderSessionModel).order_by(BuilderSessionModel.created_at.desc())
+                select(BuilderSessionModel)
+                .where(BuilderSessionModel.session_id.in_(self._known_session_ids))
+                .order_by(BuilderSessionModel.created_at.desc())
             )
             session = result.scalars().first()
             if not session:
@@ -140,6 +150,7 @@ class InMemoryEventStore:
 
             self._latest_session_id = session.session_id
             return self._serialize_session(session)
+
 
     async def clear_session(self, session_id: str) -> None:
         async with self._lock:
@@ -153,6 +164,7 @@ class InMemoryEventStore:
                     )
                 )
                 await db_session.commit()
+            self._known_session_ids.discard(session_id)
             if self._latest_session_id == session_id:
                 self._latest_session_id = None
 

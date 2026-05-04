@@ -342,6 +342,7 @@ class TestService:
             "Preserve a estrutura das seções (*** Settings ***, *** Variables ***, *** Test Cases ***, *** Keywords ***). "
             "Corrija problemas de sintaxe, melhore a legibilidade, otimize keywords, "
             "adicione waits onde necessário e sugira uma estrutura de teste melhor. "
+            "Siga obrigatoriamente o padrão de execução Browser: New Browser -> New Context -> Set Browser Timeout 30s -> New Page. "
             "Se houver feedback da execução, trate-o como prioridade. "
             "Use os testes existentes do diretório como referência de estilo e mantenha os testes que já passam alinhados com esse padrão. "
             "Retorne APENAS código Robot Framework válido, sem explicações ou markdown.\n\n"
@@ -563,8 +564,6 @@ class TestService:
             rel = path.relative_to(base_dir)
             header = f"\n### Arquivo: {rel.as_posix()}\n"
             budget_for_content = max(120, remaining - len(header) - 1)
-            if budget_for_content <= 0:
-                break
             body = raw[:budget_for_content]
             if len(raw) > budget_for_content:
                 body += "\n... [conteúdo truncado]"
@@ -984,6 +983,7 @@ class TestService:
         }
 
         hardened: list[str] = []
+        has_context_timeout = False
         for line in lines:
             stripped = line.strip()
             if not stripped or stripped.startswith("***"):
@@ -1061,6 +1061,17 @@ class TestService:
                 # Inject a global 30s timeout right after New Context so every
                 # Wait / interaction uses 30s by default instead of the 10s default.
                 hardened.append(f"{indent}Set Browser Timeout    30s")
+                has_context_timeout = True
+                continue
+
+            if keyword == "New Page" and not has_context_timeout:
+                # Some generated tests use Suite Setup with only New Browser and then
+                # call New Page in test cases. In this shape Browser library falls back
+                # to its 10s default and page.goto can fail on slower sites.
+                hardened.append(f"{indent}New Context")
+                hardened.append(f"{indent}Set Browser Timeout    30s")
+                hardened.append(line)
+                has_context_timeout = True
                 continue
 
             if keyword in selector_keywords and len(parts) >= 2:

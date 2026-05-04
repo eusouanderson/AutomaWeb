@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
-from typing import Any, Awaitable, Callable
+from dataclasses import dataclass, field
+from typing import Any, Awaitable, Callable, Coroutine, cast
 
 from playwright.async_api import (
     Browser,
@@ -19,6 +19,7 @@ class BuilderRuntimeSession:
     browser: Browser
     context: BrowserContext
     page: Page
+    pending_event_tasks: set[asyncio.Task[Any]] = field(default_factory=set)
 
 
 def _capture_script(session_id: str, backend_event_url: str) -> str:
@@ -241,14 +242,19 @@ def _capture_script(session_id: str, backend_event_url: str) -> str:
     }};
 
     try {{
-      await fetch('/builder/event', options);
-      return;
+      const sameOriginResponse = await fetch('/builder/event', options);
+      if (sameOriginResponse.ok) {{
+        return;
+      }}
     }} catch (_error) {{
       // Fallback for cross-origin pages.
     }}
 
     try {{
-      await fetch(BACKEND_EVENT_URL, options);
+      const backendResponse = await fetch(BACKEND_EVENT_URL, options);
+      if (backendResponse.ok) {{
+        return;
+      }}
     }} catch (_error) {{
       // Ignore backend failures while recording interactions.
     }}
@@ -453,15 +459,41 @@ class PlaywrightManager:
             context = await browser.new_context()
             page = await context.new_page()
 
+            # Builder startup must not fail due to client-side timeout budgets.
+            context.set_default_timeout(0)
+            context.set_default_navigation_timeout(0)
+            page.set_default_timeout(0)
+            page.set_default_navigation_timeout(0)
+            pending_event_tasks: set[asyncio.Task[Any]] = set()
+
             if event_handler is not None:
                 async def _aw_record_event(_source: Any, payload: Any) -> None:
                     if isinstance(payload, dict):
-                        await event_handler(payload)
+                        # Avoid blocking page-side bridge calls and browser interactions
+                        # on transient DB/network slowness while still persisting events.
+                        coroutine = cast(
+                          Coroutine[Any, Any, None],
+                          event_handler(payload),
+                        )
+                        task = asyncio.create_task(coroutine)
+                        pending_event_tasks.add(task)
 
-                await page.expose_binding("__awRecordBuilderEvent", _aw_record_event)
+                        def _cleanup(done_task: asyncio.Task[Any]) -> None:
+                            pending_event_tasks.discard(done_task)
+                            try:
+                                done_task.result()
+                            except Exception:
+                                # Capture errors should never break browser-side flow.
+                                return
 
-            await page.add_init_script(_capture_script(session_id, backend_event_url))
-            await page.goto(url)
+                        task.add_done_callback(_cleanup)
+
+                await context.expose_binding("__awRecordBuilderEvent", _aw_record_event)
+
+            # Install capture bootstrap at context level so it applies to every
+            # navigation/frame created inside this builder session.
+            await context.add_init_script(_capture_script(session_id, backend_event_url))
+            await page.goto(url, wait_until="domcontentloaded", timeout=0)
 
             self._sessions[session_id] = BuilderRuntimeSession(
                 session_id=session_id,
@@ -469,6 +501,7 @@ class PlaywrightManager:
                 browser=browser,
                 context=context,
                 page=page,
+                pending_event_tasks=pending_event_tasks,
             )
 
     async def stop_session(self, session_id: str) -> None:
@@ -477,6 +510,9 @@ class PlaywrightManager:
 
         if not session:
             return
+
+        if session.pending_event_tasks:
+          await asyncio.gather(*session.pending_event_tasks, return_exceptions=True)
 
         await session.context.close()
         await session.browser.close()

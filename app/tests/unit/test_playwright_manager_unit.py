@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -11,11 +12,15 @@ from app.builder.playwright_manager import (
 
 def _fake_playwright_runtime():
     page = MagicMock()
-    page.expose_binding = AsyncMock()
-    page.add_init_script = AsyncMock()
+    page.set_default_timeout = MagicMock()
+    page.set_default_navigation_timeout = MagicMock()
     page.goto = AsyncMock()
 
     context = MagicMock()
+    context.expose_binding = AsyncMock()
+    context.add_init_script = AsyncMock()
+    context.set_default_timeout = MagicMock()
+    context.set_default_navigation_timeout = MagicMock()
     context.new_page = AsyncMock(return_value=page)
     context.close = AsyncMock()
 
@@ -76,18 +81,26 @@ async def test_start_session_registers_runtime_and_binding_callback() -> None:
     assert session.context is context
     assert session.page is page
 
-    page.expose_binding.assert_awaited_once()
-    bind_name, bind_callback = page.expose_binding.await_args.args
+    context.expose_binding.assert_awaited_once()
+    bind_name, bind_callback = context.expose_binding.await_args.args
     assert bind_name == "__awRecordBuilderEvent"
 
     await bind_callback(None, {"action": "click"})
+    await asyncio.sleep(0)
     event_handler.assert_awaited_once_with({"action": "click"})
 
     await bind_callback(None, "not-a-dict")
+    await asyncio.sleep(0)
     event_handler.assert_awaited_once()
 
-    page.add_init_script.assert_awaited_once()
-    page.goto.assert_awaited_once_with("https://example.com")
+    context.add_init_script.assert_awaited_once()
+    context.set_default_timeout.assert_called_once_with(0)
+    context.set_default_navigation_timeout.assert_called_once_with(0)
+    page.set_default_timeout.assert_called_once_with(0)
+    page.set_default_navigation_timeout.assert_called_once_with(0)
+    page.goto.assert_awaited_once_with(
+        "https://example.com", wait_until="domcontentloaded", timeout=0
+    )
 
 
 @pytest.mark.asyncio
@@ -124,20 +137,24 @@ async def test_stop_session_closes_runtime_resources() -> None:
     manager = PlaywrightManager()
     manager._sessions = {}
 
+    playwright_stop = AsyncMock()
+    browser_close = AsyncMock()
+    context_close = AsyncMock()
+
     fake_session = BuilderRuntimeSession(
         session_id="s1",
-        playwright=MagicMock(stop=AsyncMock()),
-        browser=MagicMock(close=AsyncMock()),
-        context=MagicMock(close=AsyncMock()),
+        playwright=MagicMock(stop=playwright_stop),
+        browser=MagicMock(close=browser_close),
+        context=MagicMock(close=context_close),
         page=MagicMock(),
     )
     manager._sessions["s1"] = fake_session
 
     await manager.stop_session("s1")
 
-    fake_session.context.close.assert_awaited_once()
-    fake_session.browser.close.assert_awaited_once()
-    fake_session.playwright.stop.assert_awaited_once()
+    context_close.assert_awaited_once()
+    browser_close.assert_awaited_once()
+    playwright_stop.assert_awaited_once()
     assert "s1" not in manager._sessions
 
 

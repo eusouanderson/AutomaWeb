@@ -67,7 +67,12 @@ export function saveRobotTestContent(testId, content) {
 }
 
 export function startVisualBuilder(url, projectId = null) {
-  return request({ method: 'POST', url: '/builder/start', data: { url, project_id: projectId } });
+  return request({
+    method: 'POST',
+    url: '/builder/start',
+    data: { url, project_id: projectId },
+    timeout: 0,
+  });
 }
 
 export function getVisualBuilderSteps(sessionId = null) {

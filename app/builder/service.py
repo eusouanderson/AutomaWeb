@@ -35,7 +35,9 @@ class BuilderService:
                 backend_event_url=backend_event_url,
                 event_handler=_record_from_browser,
             )
-        except TypeError:
+        except TypeError as exc:
+            if "event_handler" not in str(exc):
+                raise
             # Backward-compatible fallback for older test doubles.
             await self._playwright_manager.start_session(
                 session_id=session.session_id,
@@ -60,7 +62,9 @@ class BuilderService:
                 backend_event_url=backend_event_url,
                 event_handler=_record_from_browser,
             )
-        except TypeError:
+        except TypeError as exc:
+            if "event_handler" not in str(exc):
+                raise
             await self._playwright_manager.start_session(
                 session_id=session.session_id,
                 url=url,

@@ -1,14 +1,14 @@
 import { toast } from '../../components/toast.js';
 import {
-    generateTestFromPrompt,
-    getAvailableAiModels,
-    getProjectGeneratedTests,
-    getProjects,
-    getTestContent,
-    getVisualBuilderCapturedSteps,
-    improveExistingGeneratedTest,
-    startVisualBuilderSession,
-    updateVisualBuilderCapturedStep,
+  generateTestFromPrompt,
+  getAvailableAiModels,
+  getProjectGeneratedTests,
+  getProjects,
+  getTestContent,
+  getVisualBuilderCapturedSteps,
+  improveExistingGeneratedTest,
+  startVisualBuilderSession,
+  updateVisualBuilderCapturedStep,
 } from '../../services/test.service.js';
 import { loadTemplate, renderHTML } from '../../utils/dom.js';
 
@@ -326,7 +326,9 @@ export function initGeneratorPage({ store }) {
   }
 
   async function saveBuilderStepName(stepId) {
-    const input = builderStepsList?.querySelector(`.builder-step-name-input[data-step-id="${stepId}"]`);
+    const input = builderStepsList?.querySelector(
+      `.builder-step-name-input[data-step-id="${stepId}"]`
+    );
     if (!input) {
       return;
     }
@@ -460,7 +462,11 @@ export function initGeneratorPage({ store }) {
     resultSection.classList.remove('hidden');
     downloadButton.dataset.testId = String(targetTestId || result.id || '');
     projectSelect.value = String(projectId);
-    toast(targetTestId ? 'Teste existente corrigido com base nos erros da execucao!' : 'Teste corrigido com base nos erros da execucao!');
+    toast(
+      targetTestId
+        ? 'Teste existente corrigido com base nos erros da execucao!'
+        : 'Teste corrigido com base nos erros da execucao!'
+    );
   }
 
   projectSelect.addEventListener('change', () => {
@@ -623,11 +629,8 @@ export function initGeneratorPage({ store }) {
         builderCodeEl.textContent = generated?.content || '';
       }
 
-      codeElement.textContent = generated?.content || '';
-      resultSection.classList.remove('hidden');
-      downloadButton.dataset.testId = String(generated?.id || '');
-
       builderCodePanel?.classList.remove('hidden');
+      downloadButton.dataset.testId = String(generated?.id || '');
       toast('Teste Robot Framework criado a partir do Test Builder.');
     } catch (error) {
       hideGenerationStatus();

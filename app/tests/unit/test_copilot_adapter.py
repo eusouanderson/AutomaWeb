@@ -146,6 +146,34 @@ async def test_generate_robot_test_uses_default_prompt_when_empty():
 
 
 @pytest.mark.asyncio
+async def test_generate_robot_test_forwards_optional_generation_params():
+    svc = MagicMock()
+    svc.generate_robot_test = AsyncMock(return_value="*** Test Cases ***\nSmoke\n")
+    adapter = _make_adapter(svc)
+
+    result = await adapter.generate_robot_test(
+        "Prompt base",
+        context_text="ctx",
+        page_structure={"dom": "snapshot"},
+        model="gpt-5",
+        system_prompt="system instructions",
+        temperature=0.4,
+        max_tokens=2048,
+    )
+
+    assert result == "*** Test Cases ***\nSmoke\n"
+    svc.generate_robot_test.assert_awaited_once_with(
+        prompt="Prompt base",
+        context="ctx",
+        page_structure={"dom": "snapshot"},
+        model="gpt-5",
+        system_prompt="system instructions",
+        temperature=0.4,
+        max_tokens=2048,
+    )
+
+
+@pytest.mark.asyncio
 async def test_generate_robot_test_raises_on_empty_response():
     svc = MagicMock()
     svc.generate_robot_test = AsyncMock(return_value="")
