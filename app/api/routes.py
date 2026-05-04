@@ -25,12 +25,37 @@ from app.services.project_service import ProjectService
 from app.services.test_execution_service import TestExecutionService
 from app.services.element_scanner import ElementScannerError, ElementScannerService
 from app.services.test_service import (
+    LLMInvalidRequestError,
     LLMServiceUnavailableError,
     ScanUnavailableError,
     TestService,
 )
 
 router = APIRouter()
+
+
+def _build_llm_unavailable_detail(exc: LLMServiceUnavailableError) -> str:
+    message = str(exc).lower()
+    if "weekly rate limit" in message:
+        return (
+            "A IA excedeu o limite semanal de uso deste provedor. "
+            "Será necessário aguardar a renovação da cota ou usar outro modelo/provedor."
+        )
+    if "rate limit" in message or "429" in message:
+        return (
+            "A IA atingiu o limite temporário de requisições. "
+            "Aguarde alguns instantes e tente novamente."
+        )
+    if "timed out" in message or "timeout" in message:
+        return (
+            "A IA demorou mais do que o esperado para responder. "
+            "Tente novamente em instantes."
+        )
+    return (
+        "Não foi possível usar o provedor de IA (Copilot) no momento. "
+        "Isso pode acontecer por indisponibilidade temporária, falha de rede "
+        "ou limite de requisições. Tente novamente em alguns instantes."
+    )
 
 
 @router.post("/projects", response_model=ProjectOut)
@@ -104,13 +129,25 @@ async def generate_test(
 ) -> GeneratedTestOut:
     service = TestService()
     try:
+        generation_kwargs = {
+            "session": session,
+            "project_id": payload.project_id,
+            "prompt": payload.prompt,
+            "context": payload.context,
+            "ai_debug": payload.ai_debug,
+            "force_rescan": payload.force_rescan,
+        }
+        if payload.model is not None:
+            generation_kwargs["model"] = payload.model
+        if payload.system_prompt is not None:
+            generation_kwargs["system_prompt"] = payload.system_prompt
+        if payload.temperature is not None:
+            generation_kwargs["temperature"] = payload.temperature
+        if payload.max_tokens is not None:
+            generation_kwargs["max_tokens"] = payload.max_tokens
+
         generated = await service.generate_test(
-            session=session,
-            project_id=payload.project_id,
-            prompt=payload.prompt,
-            context=payload.context,
-            ai_debug=payload.ai_debug,
-            force_rescan=payload.force_rescan,
+            **generation_kwargs,
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -125,7 +162,12 @@ async def generate_test(
     except LLMServiceUnavailableError as exc:
         raise HTTPException(
             status_code=503,
-            detail="Não foi possível conectar ao provedor de IA (Copilot). Verifique internet do container, DNS e a autenticação do Copilot.",
+            detail=_build_llm_unavailable_detail(exc),
+        ) from exc
+    except LLMInvalidRequestError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
         ) from exc
     except ScanUnavailableError as exc:
         raise HTTPException(
@@ -293,6 +335,7 @@ async def get_llm_health(response: Response) -> dict[str, str | bool | int | Non
 
 class RobotImproveRequest(BaseModel):
     content: str
+    feedback: str | None = None
 
 
 class RobotImproveResponse(BaseModel):
@@ -307,9 +350,18 @@ async def improve_robot_test(
 ) -> RobotImproveResponse:
     """Send current .robot content to the AI (with page scan context) and return an improved version."""
     service = TestService()
-    improved = await service.improve_robot_test(
-        session=session, test_id=test_id, content=payload.content
-    )
+    try:
+        improved = await service.improve_robot_test(
+            session=session,
+            test_id=test_id,
+            content=payload.content,
+            feedback=payload.feedback,
+        )
+    except LLMServiceUnavailableError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=_build_llm_unavailable_detail(exc),
+        ) from exc
     if improved is None:
         raise HTTPException(status_code=404, detail="Test not found")
     return RobotImproveResponse(content=improved)

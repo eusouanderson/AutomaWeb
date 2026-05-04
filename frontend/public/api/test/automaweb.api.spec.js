@@ -14,6 +14,7 @@ import {
     getTestById,
     getVisualBuilderSteps,
     improveRobotTest,
+    listAiModels,
     listGeneratedTests,
     listProjectExecutions,
     listProjects,
@@ -21,6 +22,7 @@ import {
     saveRobotTestContent,
     scanProject,
     startVisualBuilder,
+    updateVisualBuilderStep,
 } from '../automaweb.api.js';
 import { request, streamPost } from '../client.js';
 
@@ -62,7 +64,12 @@ describe('automaweb.api', () => {
     const payload = { project_id: 1, prompt: 'create login test' };
     request.mockResolvedValueOnce({ id: 11 });
     await generateRobotTest(payload);
-    expect(request).toHaveBeenCalledWith({ method: 'POST', url: '/tests/generate', data: payload });
+    expect(request).toHaveBeenCalledWith({
+      method: 'POST',
+      url: '/tests/generate',
+      data: payload,
+      timeout: 0,
+    });
   });
 
   it('delegates runTests to request() with long timeout', async () => {
@@ -105,11 +112,11 @@ describe('automaweb.api', () => {
 
   it('delegates improveRobotTest to request()', async () => {
     request.mockResolvedValueOnce({ content: '*** Test Cases ***' });
-    await improveRobotTest(7, '*** Test Cases ***\nOld');
+    await improveRobotTest(7, '*** Test Cases ***\nOld', 'execution feedback');
     expect(request).toHaveBeenCalledWith({
       method: 'POST',
       url: '/tests/7/improve',
-      data: { content: '*** Test Cases ***\nOld' },
+      data: { content: '*** Test Cases ***\nOld', feedback: 'execution feedback' },
     });
   });
 
@@ -129,13 +136,19 @@ describe('automaweb.api', () => {
     expect(request).toHaveBeenCalledWith({ method: 'GET', url: '/tests/42' });
   });
 
+  it('delegates listAiModels to request()', async () => {
+    request.mockResolvedValueOnce({ models: [] });
+    await listAiModels();
+    expect(request).toHaveBeenCalledWith({ method: 'GET', url: '/api/ai/models' });
+  });
+
   it('delegates startVisualBuilder to request()', async () => {
     request.mockResolvedValueOnce({ session_id: 'abc' });
-    await startVisualBuilder('https://example.com/login');
+    await startVisualBuilder('https://example.com/login', 3);
     expect(request).toHaveBeenCalledWith({
       method: 'POST',
       url: '/builder/start',
-      data: { url: 'https://example.com/login' },
+      data: { url: 'https://example.com/login', project_id: 3 },
     });
   });
 
@@ -161,6 +174,16 @@ describe('automaweb.api', () => {
       method: 'POST',
       url: '/builder/generate',
       data: { session_id: 'session-123', prompt: null },
+    });
+  });
+
+  it('delegates updateVisualBuilderStep to request()', async () => {
+    request.mockResolvedValueOnce({ id: 12, step_name: 'Novo nome' });
+    await updateVisualBuilderStep(12, { step_name: 'Novo nome' });
+    expect(request).toHaveBeenCalledWith({
+      method: 'PUT',
+      url: '/builder/steps/12',
+      data: { step_name: 'Novo nome' },
     });
   });
 });

@@ -7,42 +7,49 @@ vi.mock('../../api/automaweb.api.js', () => ({
   startVisualBuilder: vi.fn(),
   getVisualBuilderSteps: vi.fn(),
   generateVisualBuilderCode: vi.fn(),
+  updateVisualBuilderStep: vi.fn(),
   generateRobotTest: vi.fn(),
+  listAiModels: vi.fn(),
   runTests: vi.fn(),
   listGeneratedTests: vi.fn(),
   deleteGeneratedTest: vi.fn(),
   getTestById: vi.fn(),
   listProjectExecutions: vi.fn(),
+  improveRobotTest: vi.fn(),
 }));
 
 import {
-  createProject,
-  deleteGeneratedTest,
-  deleteProject,
-  generateRobotTest,
-  generateVisualBuilderCode,
-  getTestById,
-  getVisualBuilderSteps,
-  listGeneratedTests,
-  listProjectExecutions,
-  listProjects,
-  runTests,
-  startVisualBuilder,
+    createProject,
+    deleteGeneratedTest,
+    deleteProject,
+    generateRobotTest,
+    generateVisualBuilderCode,
+    getTestById,
+    getVisualBuilderSteps,
+    listAiModels,
+    listGeneratedTests,
+    listProjectExecutions,
+    listProjects,
+    runTests,
+    startVisualBuilder,
+    updateVisualBuilderStep
 } from '../../api/automaweb.api.js';
 
 import {
-  createProjectService,
-  deleteGeneratedTestService,
-  deleteProjectService,
-  executeProjectTests,
-  generateTestFromPrompt,
-  generateVisualBuilderPlaywrightCode,
-  getProjectExecutions,
-  getProjectGeneratedTests,
-  getProjects,
-  getTestContent,
-  getVisualBuilderCapturedSteps,
-  startVisualBuilderSession,
+    createProjectService,
+    deleteGeneratedTestService,
+    deleteProjectService,
+    executeProjectTests,
+    generateTestFromPrompt,
+    generateVisualBuilderPlaywrightCode,
+    getAvailableAiModels,
+    getProjectExecutions,
+    getProjectGeneratedTests,
+    getProjects,
+    getTestContent,
+    getVisualBuilderCapturedSteps,
+    startVisualBuilderSession,
+    updateVisualBuilderCapturedStep,
 } from '../test.service.js';
 
 beforeEach(() => vi.clearAllMocks());
@@ -138,6 +145,35 @@ describe('generateTestFromPrompt', () => {
     await expect(generateTestFromPrompt({ projectId: 1, prompt: 'abc' })).rejects.toThrow(
       'at least 5 chars'
     );
+  });
+
+  it('forwards optional llm configuration fields', async () => {
+    generateRobotTest.mockResolvedValue({ id: 8 });
+    await generateTestFromPrompt({
+      projectId: 1,
+      prompt: 'Login test with model',
+      context: 'ctx',
+      model: 'gpt-5-mini',
+      systemPrompt: 'focus on robust selectors',
+      temperature: 0.3,
+      maxTokens: 2048,
+    });
+    expect(generateRobotTest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'gpt-5-mini',
+        system_prompt: 'focus on robust selectors',
+        temperature: 0.3,
+        max_tokens: 2048,
+      })
+    );
+  });
+});
+
+describe('getAvailableAiModels', () => {
+  it('delegates to listAiModels()', async () => {
+    listAiModels.mockResolvedValue({ models: [], count: 0 });
+    await getAvailableAiModels();
+    expect(listAiModels).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -265,8 +301,8 @@ describe('getTestContent', () => {
 describe('visual builder service helpers', () => {
   it('startVisualBuilderSession validates URL and delegates', async () => {
     startVisualBuilder.mockResolvedValue({ session_id: 'x' });
-    await startVisualBuilderSession('https://example.com');
-    expect(startVisualBuilder).toHaveBeenCalledWith('https://example.com');
+    await startVisualBuilderSession('https://example.com', 4);
+    expect(startVisualBuilder).toHaveBeenCalledWith('https://example.com', 4);
   });
 
   it('startVisualBuilderSession throws on invalid URL', async () => {
@@ -291,5 +327,17 @@ describe('visual builder service helpers', () => {
     generateVisualBuilderCode.mockResolvedValue({ code: 'ok' });
     await generateVisualBuilderPlaywrightCode('session-1', 'validar login');
     expect(generateVisualBuilderCode).toHaveBeenCalledWith('session-1', 'validar login');
+  });
+
+  it('updateVisualBuilderCapturedStep normalizes and delegates', async () => {
+    updateVisualBuilderStep.mockResolvedValue({ id: 7, step_name: 'Salvar login' });
+    await updateVisualBuilderCapturedStep(7, { step_name: '  Salvar login  ' });
+    expect(updateVisualBuilderStep).toHaveBeenCalledWith(7, { step_name: 'Salvar login' });
+  });
+
+  it('updateVisualBuilderCapturedStep rejects empty payload', async () => {
+    await expect(updateVisualBuilderCapturedStep(7, {})).rejects.toThrow(
+      'At least one builder step field must be provided'
+    );
   });
 });

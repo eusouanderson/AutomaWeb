@@ -6,6 +6,8 @@ import logging
 import time
 from typing import Any
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -40,7 +42,7 @@ class CopilotServiceAdapter:
                 return {
                     "ok": True,
                     "source": "live",
-                    "model": "gpt-5-mini",
+                    "model": settings.COPILOT_MODEL,
                     "checked_at_epoch": int(time.time()),
                     "last_success_epoch": int(time.time()),
                     "error": None,
@@ -51,7 +53,7 @@ class CopilotServiceAdapter:
                 return {
                     "ok": False,
                     "source": "live",
-                    "model": "gpt-5-mini",
+                    "model": settings.COPILOT_MODEL,
                     "checked_at_epoch": int(time.time()),
                     "last_success_epoch": (
                         int(self._last_health_ok_at)
@@ -66,7 +68,7 @@ class CopilotServiceAdapter:
             return {
                 "ok": False,
                 "source": "live",
-                "model": "gpt-5-mini",
+                "model": settings.COPILOT_MODEL,
                 "checked_at_epoch": int(time.time()),
                 "last_success_epoch": (
                     int(self._last_health_ok_at) if self._last_health_ok_at else None
@@ -80,6 +82,10 @@ class CopilotServiceAdapter:
         prompt_text: str,
         context_text: str | None = None,
         page_structure: dict | None = None,
+        model: str | None = None,
+        system_prompt: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
     ) -> str:
         """Generate Robot Framework test code using Copilot.
 
@@ -95,10 +101,22 @@ class CopilotServiceAdapter:
             PayloadTooLargeError: If payload exceeds limits even after retry
         """
         try:
+            generation_kwargs: dict[str, Any] = {
+                "prompt": prompt_text or "Gerar teste Robot Framework conforme solicitação recebida.",
+                "context": context_text,
+                "page_structure": page_structure,
+            }
+            if model is not None:
+                generation_kwargs["model"] = model
+            if system_prompt is not None:
+                generation_kwargs["system_prompt"] = system_prompt
+            if temperature is not None:
+                generation_kwargs["temperature"] = temperature
+            if max_tokens is not None:
+                generation_kwargs["max_tokens"] = max_tokens
+
             content = await self._service.generate_robot_test(
-                prompt=prompt_text or "Gerar teste Robot Framework conforme solicitação recebida.",
-                context=context_text,
-                page_structure=page_structure,
+                **generation_kwargs,
             )
 
             if not content:

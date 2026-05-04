@@ -12,6 +12,7 @@ import httpx
 from app.llm.copilot_auth import (
     CopilotAuthManager,
     CopilotAuthRecord,
+    CopilotAPIToken,
     OAuthDeviceCodeResponse,
     OAuthTokenResponse,
     get_static_copilot_token,
@@ -598,6 +599,74 @@ async def test_get_valid_access_token_extends_expiry_for_classic_token(tmp_path,
     saved: CopilotAuthRecord = mgr._save_auth_record.call_args[0][0]
     days_remaining = (saved.expires_at / 1000 - time.time()) / 86400
     assert days_remaining > 27
+
+
+# ---------------------------------------------------------------------------
+# _exchange_for_copilot_token — cache + parsing branches
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_exchange_for_copilot_token_uses_cached_token_when_valid(tmp_path):
+    mgr = _make_manager(tmp_path)
+    mgr._copilot_api_token = CopilotAPIToken(
+        token="cached-api-token",
+        expires_at=9999999999,
+        expires_at_ms=int((time.time() + 600) * 1000),
+    )
+
+    client = AsyncMock()
+    token = await mgr._exchange_for_copilot_token("oauth-token", client)
+
+    assert token == "cached-api-token"
+    client.get.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_exchange_for_copilot_token_requests_and_caches(tmp_path):
+    mgr = _make_manager(tmp_path)
+    mgr._copilot_api_token = None
+
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.json.return_value = {
+        "token": "api-token-1",
+        "expires_at": 2000000000,
+    }
+    client = AsyncMock()
+    client.get = AsyncMock(return_value=mock_resp)
+
+    token = await mgr._exchange_for_copilot_token("oauth-token", client)
+
+    assert token == "api-token-1"
+    assert mgr._copilot_api_token is not None
+    assert mgr._copilot_api_token.token == "api-token-1"
+    assert mgr._copilot_api_token.expires_at_ms == 2000000000 * 1000
+
+
+@pytest.mark.asyncio
+async def test_exchange_for_copilot_token_fallback_when_expires_at_invalid(tmp_path):
+    mgr = _make_manager(tmp_path)
+    mgr._copilot_api_token = None
+
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.json.return_value = {
+        "token": "api-token-2",
+        "expires_at": None,
+    }
+    client = AsyncMock()
+    client.get = AsyncMock(return_value=mock_resp)
+
+    before = int(time.time() * 1000)
+    token = await mgr._exchange_for_copilot_token("oauth-token", client)
+    after = int(time.time() * 1000)
+
+    assert token == "api-token-2"
+    assert mgr._copilot_api_token is not None
+    # fallback is now + 1500s (with tolerance for test runtime)
+    assert mgr._copilot_api_token.expires_at_ms >= before + 1490 * 1000
+    assert mgr._copilot_api_token.expires_at_ms <= after + 1510 * 1000
 
 
 @pytest.mark.asyncio

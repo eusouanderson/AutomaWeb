@@ -8,6 +8,7 @@ from typing import Optional
 
 import httpx
 
+from app.core.config import settings
 from app.llm.copilot_auth import CopilotAuthManager
 from app.llm.copilot_http import CopilotHTTPClient
 from app.llm.copilot_models import CopilotModelsClient, CopilotModelInfo
@@ -122,7 +123,7 @@ class CopilotService:
 
         Args:
             prompt: User prompt/request
-            model: Model ID (defaults to env COPILOT_MODEL or gpt-5-mini)
+            model: Model ID (defaults to settings.COPILOT_MODEL)
             system_prompt: System message for context
             temperature: Sampling temperature
             max_tokens: Maximum output tokens
@@ -131,7 +132,7 @@ class CopilotService:
             Generated text
         """
         # Determine model
-        selected_model = model or os.environ.get("COPILOT_MODEL", "gpt-5-mini")
+        selected_model = model or os.environ.get("COPILOT_MODEL") or settings.COPILOT_MODEL
 
         self._logger.info(
             f"🚀 Generating content using model: {selected_model}"
@@ -163,6 +164,9 @@ class CopilotService:
         context: Optional[str] = None,
         page_structure: Optional[dict] = None,
         model: Optional[str] = None,
+        system_prompt: Optional[str] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
     ) -> str:
         """Generate Robot Framework test code.
 
@@ -171,36 +175,43 @@ class CopilotService:
             context: Additional context about the page/application
             page_structure: Page DOM structure as dict
             model: Model ID override
+            system_prompt: Optional custom system prompt
+            temperature: Optional temperature override
+            max_tokens: Optional max tokens override
 
         Returns:
             Generated Robot Framework code
         """
-        system_prompt = (
+        default_system_prompt = (
             "Você é um especialista em gerar testes automatizados com Robot "
-            "Framework e Playwright. "
-            "Gere apenas código Robot Framework válido, sem explicações ou markdown. "
-            "Siga as melhores práticas de automação:\n\n"
-            "REGRAS:\n"
-            "1. Use Browser Library do Playwright\n"
-            "2. Sempre use New Browser antes de New Context\n"
-            "3. Sempre use Set Browser Timeout\n"
-            "4. NUNCA use Input Text - use Fill Text\n"
-            "5. NUNCA use Click - use click da página com wait\n"
-            "6. Sempre aguarde elemento antes de ação (Wait For Elements State)\n"
-            "7. Use data-testid ou role + name para seletores\n"
-            "8. NUNCA use //div, //a ou seletores genéricos\n"
-            "9. Use css= ou xpath= para localizadores\n"
-            "10. Cada teste deve ser independente\n"
-            "11. Sempre feche browser no teardown\n"
+            "Framework e Browser Library (Playwright). "
+            "Gere APENAS código Robot Framework válido, sem explicações, sem markdown, sem blocos ```robot. "
+            "Siga rigorosamente as regras abaixo:\n\n"
+            "REGRAS DE BIBLIOTECA:\n"
+            "1. Use SOMENTE Browser Library — NUNCA SeleniumLibrary\n"
+            "2. Sempre use New Browser → New Context → Set Browser Timeout 30s → New Page\n"
+            "3. Sempre adicione [Teardown]    Close Browser no test case\n\n"
+            "REGRAS DE SELETORES:\n"
+            "4. NUNCA use xpath absoluto (xpath=/html/body/...) — use SEMPRE xpath relativo (xpath=//...)\n"
+            "5. Prefira css= com id estável, data-testid, role ou classe específica\n"
+            "6. NUNCA use seletores genéricos como css=h3, css=button, css=a sem contexto\n"
+            "7. Se a estrutura da página estiver disponível, use os seletores exatos fornecidos\n\n"
+            "REGRAS DE KEYWORDS:\n"
+            "8. NUNCA use Input Text — use Fill Text\n"
+            "9. Sempre aguarde visibilidade antes de agir: Wait For Elements State    <sel>    visible\n"
+            "10. Para URL, use Get Url (não Get Location nem Location Should Contain)\n"
+            "11. Cada teste deve ser completamente independente\n"
             "12. Should Be Equal precisa EXATAMENTE 2 argumentos\n"
             "13. NUNCA use ${OUTPUT}, ${LOG} ou ${REPORT}\n"
-            "14. Toda keyword deve ter pelo menos 1 step executável\n\n"
+            "14. Toda keyword customizada deve ter pelo menos 1 step executável\n"
+            "15. Set Browser Timeout aceita apenas 1 argumento (ex: 30s)\n\n"
         )
+        resolved_system_prompt = system_prompt or default_system_prompt
 
         if page_structure:
             import json
             structure_str = json.dumps(page_structure, ensure_ascii=False, indent=2)
-            system_prompt += f"Estrutura da página:\n{structure_str}\n"
+            resolved_system_prompt += f"Estrutura da página:\n{structure_str}\n"
 
         full_prompt = prompt
         if context:
@@ -209,9 +220,9 @@ class CopilotService:
         return await self.generate(
             prompt=full_prompt,
             model=model,
-            system_prompt=system_prompt,
-            temperature=0.0,  # Deterministic for test generation
-            max_tokens=4096,
+            system_prompt=resolved_system_prompt,
+            temperature=0.0 if temperature is None else temperature,
+            max_tokens=4096 if max_tokens is None else max_tokens,
         )
 
     async def check_connection(self) -> dict:

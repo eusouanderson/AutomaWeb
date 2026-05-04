@@ -1,6 +1,8 @@
 import pytest
 import pytest_asyncio
 import json
+import httpx
+from pathlib import Path
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from tenacity import RetryError
 
@@ -11,6 +13,7 @@ from app.models.project import Project
 from app.models.test_execution import TestExecution  # noqa: F401 — registers mapper
 from app.services.element_scanner import ElementScannerError
 from app.services.test_service import (
+    LLMInvalidRequestError,
     LLMServiceUnavailableError,
     ScanUnavailableError,
     TestService,
@@ -106,9 +109,51 @@ class APIConnectionFailingGroqClient:
         raise APIConnectionError("network")
 
 
+class ReadTimeoutFailingGroqClient:
+    async def generate_robot_test(self, prompt_text, context_text=None, page_structure=None):
+        raise httpx.ReadTimeout("read timed out")
+
+
 class PayloadTooLargeFailingGroqClient:
     async def generate_robot_test(self, prompt_text, context_text=None, page_structure=None):
         raise PayloadTooLargeError("too large")
+
+
+class BadRequestFailingGroqClient:
+    async def generate_robot_test(self, prompt_text, context_text=None, page_structure=None):
+        request = httpx.Request("POST", "https://api.githubcopilot.com/responses")
+        response = httpx.Response(400, request=request, text="invalid model")
+        raise httpx.HTTPStatusError(
+            "Client error '400 Bad Request'",
+            request=request,
+            response=response,
+        )
+
+
+class RateLimitedFailingGroqClient:
+    async def generate_robot_test(self, prompt_text, context_text=None, page_structure=None):
+        request = httpx.Request("POST", "https://api.githubcopilot.com/chat/completions")
+        response = httpx.Response(429, request=request, text="rate limit")
+        raise httpx.HTTPStatusError(
+            "Client error '429 Too Many Requests'",
+            request=request,
+            response=response,
+        )
+
+
+class WeeklyRateLimitedFailingGroqClient:
+    async def generate_robot_test(self, prompt_text, context_text=None, page_structure=None):
+        request = httpx.Request("POST", "https://api.githubcopilot.com/chat/completions")
+        response = httpx.Response(
+            429,
+            request=request,
+            text="Sorry, you've exceeded your weekly rate limit.",
+        )
+        raise httpx.HTTPStatusError(
+            "Client error '429 Too Many Requests'",
+            request=request,
+            response=response,
+        )
 
 
 class ChunkingGroqClient:
@@ -150,6 +195,15 @@ class CapturingGroqClient:
         return "*** Test Cases ***\nExample\n    Log    OK"
 
 
+class ContextCapturingGroqClient:
+    def __init__(self):
+        self.captured_context = None
+
+    async def generate_robot_test(self, prompt_text, context_text=None, page_structure=None):
+        self.captured_context = context_text
+        return "*** Settings ***\nLibrary    Browser\n\n*** Test Cases ***\nCaso\n    Log    OK"
+
+
 class HealthGroqClient:
     def check_api_health(self):
         return {"ok": True, "latency_ms": 10}
@@ -183,6 +237,68 @@ async def test_generate_test(session: AsyncSession) -> None:
 
     assert generated.id is not None
     assert "*** Test Cases ***" in generated.content
+
+
+@pytest.mark.asyncio
+async def test_generate_test_uses_existing_robot_files_as_context(tmp_path) -> None:
+    tests_dir = tmp_path / "TheInternet"
+    tests_dir.mkdir(parents=True, exist_ok=True)
+    (tests_dir / "login.robot").write_text(
+        "*** Test Cases ***\nLogin\n    Log    Login OK\n",
+        encoding="utf-8",
+    )
+
+    project = Project(
+        id=1,
+        name="Projeto",
+        description="Desc",
+        test_directory=str(tests_dir),
+        url=None,
+    )
+    test_repo = DummyTestRepository()
+    copilot = ContextCapturingGroqClient()
+    service = TestService(
+        test_repository=test_repo,  # type: ignore[arg-type]
+        project_repository=DummyProjectRepository(project),  # type: ignore[arg-type]
+        copilot_client=copilot,  # type: ignore[arg-type]
+        element_scanner=SuccessfulScanService(),  # type: ignore[arg-type]
+    )
+
+    await service.generate_test(
+        session=None,  # type: ignore[arg-type]
+        project_id=1,
+        prompt="Gerar teste",
+        context="Contexto do usuário",
+    )
+
+    assert copilot.captured_context is not None
+    assert "Contexto do usuário" in copilot.captured_context
+    assert "testes existentes no diretório do projeto" in copilot.captured_context
+    assert "login.robot" in copilot.captured_context
+    assert "Login OK" in copilot.captured_context
+
+
+def test_build_generation_context_uses_robot_tests_when_user_context_is_empty(tmp_path) -> None:
+    tests_dir = tmp_path / "project-tests"
+    tests_dir.mkdir(parents=True, exist_ok=True)
+    (tests_dir / "checkout.robot").write_text(
+        "*** Test Cases ***\nCheckout\n    Log    Checkout OK\n",
+        encoding="utf-8",
+    )
+
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
+    merged = service._build_generation_context(user_context=None, test_directory=str(tests_dir))
+
+    assert merged is not None
+    assert "checkout.robot" in merged
+    assert "Checkout OK" in merged
+
+
+def test_collect_robot_tests_context_returns_none_for_missing_directory() -> None:
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
+    missing = str(Path("/tmp") / "this-directory-should-not-exist-123456")
+
+    assert service._collect_robot_tests_context(missing) is None
 
 
 @pytest.mark.asyncio
@@ -268,6 +384,30 @@ async def test_generate_test_raises_llm_unavailable_on_api_connection_error(
 
 
 @pytest.mark.asyncio
+async def test_generate_test_raises_llm_unavailable_on_read_timeout(
+    tmp_path,
+) -> None:
+    settings.STATIC_DIR = str(tmp_path)
+    project = Project(
+        id=1, name="Projeto", description="Desc", test_directory=str(tmp_path), url=None
+    )
+    test_repo = DummyTestRepository()
+    service = TestService(
+        test_repository=test_repo,  # type: ignore[arg-type]
+        project_repository=DummyProjectRepository(project),  # type: ignore[arg-type]
+        copilot_client=ReadTimeoutFailingGroqClient(),  # type: ignore[arg-type]
+        element_scanner=SuccessfulScanService(),  # type: ignore[arg-type]
+    )
+
+    with pytest.raises(
+        LLMServiceUnavailableError, match="LLM provider connection failed"
+    ):
+        await service.generate_test(session=None, project_id=1, prompt="Gerar teste")  # type: ignore[arg-type]
+
+    assert test_repo.updated_statuses[-1] == "failed"
+
+
+@pytest.mark.asyncio
 async def test_generate_test_raises_llm_unavailable_on_payload_too_large(
     tmp_path,
 ) -> None:
@@ -285,6 +425,78 @@ async def test_generate_test_raises_llm_unavailable_on_payload_too_large(
 
     with pytest.raises(
         LLMServiceUnavailableError, match="LLM request payload too large"
+    ):
+        await service.generate_test(session=None, project_id=1, prompt="Gerar teste")  # type: ignore[arg-type]
+
+    assert test_repo.updated_statuses[-1] == "failed"
+
+
+@pytest.mark.asyncio
+async def test_generate_test_raises_llm_invalid_request_on_http_400(
+    tmp_path,
+) -> None:
+    settings.STATIC_DIR = str(tmp_path)
+    project = Project(
+        id=1, name="Projeto", description="Desc", test_directory=str(tmp_path), url=None
+    )
+    test_repo = DummyTestRepository()
+    service = TestService(
+        test_repository=test_repo,  # type: ignore[arg-type]
+        project_repository=DummyProjectRepository(project),  # type: ignore[arg-type]
+        copilot_client=BadRequestFailingGroqClient(),  # type: ignore[arg-type]
+        element_scanner=SuccessfulScanService(),  # type: ignore[arg-type]
+    )
+
+    with pytest.raises(
+        LLMInvalidRequestError, match="LLM request rejected by provider"
+    ):
+        await service.generate_test(session=None, project_id=1, prompt="Gerar teste")  # type: ignore[arg-type]
+
+    assert test_repo.updated_statuses[-1] == "failed"
+
+
+@pytest.mark.asyncio
+async def test_generate_test_raises_llm_unavailable_on_http_429(
+    tmp_path,
+) -> None:
+    settings.STATIC_DIR = str(tmp_path)
+    project = Project(
+        id=1, name="Projeto", description="Desc", test_directory=str(tmp_path), url=None
+    )
+    test_repo = DummyTestRepository()
+    service = TestService(
+        test_repository=test_repo,  # type: ignore[arg-type]
+        project_repository=DummyProjectRepository(project),  # type: ignore[arg-type]
+        copilot_client=RateLimitedFailingGroqClient(),  # type: ignore[arg-type]
+        element_scanner=SuccessfulScanService(),  # type: ignore[arg-type]
+    )
+
+    with pytest.raises(
+        LLMServiceUnavailableError, match="rate limit exceeded"
+    ):
+        await service.generate_test(session=None, project_id=1, prompt="Gerar teste")  # type: ignore[arg-type]
+
+    assert test_repo.updated_statuses[-1] == "failed"
+
+
+@pytest.mark.asyncio
+async def test_generate_test_raises_llm_unavailable_on_weekly_http_429(
+    tmp_path,
+) -> None:
+    settings.STATIC_DIR = str(tmp_path)
+    project = Project(
+        id=1, name="Projeto", description="Desc", test_directory=str(tmp_path), url=None
+    )
+    test_repo = DummyTestRepository()
+    service = TestService(
+        test_repository=test_repo,  # type: ignore[arg-type]
+        project_repository=DummyProjectRepository(project),  # type: ignore[arg-type]
+        copilot_client=WeeklyRateLimitedFailingGroqClient(),  # type: ignore[arg-type]
+        element_scanner=SuccessfulScanService(),  # type: ignore[arg-type]
+    )
+
+    with pytest.raises(
+        LLMServiceUnavailableError, match="weekly rate limit exceeded"
     ):
         await service.generate_test(session=None, project_id=1, prompt="Gerar teste")  # type: ignore[arg-type]
 
@@ -508,6 +720,25 @@ def test_sanitize_robot_output_filters_noise_and_normalizes_library() -> None:
     assert "Library    Browser" in cleaned
     assert "Observação" not in cleaned
     assert "** nota" not in cleaned
+
+
+def test_sanitize_robot_output_removes_markdown_code_fences() -> None:
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
+    content = (
+        "```robot\n"
+        "*** Settings ***\n"
+        "Library    Browser\n"
+        "*** Test Cases ***\n"
+        "Caso\n"
+        "    Log    OK\n"
+        "```\n"
+    )
+
+    cleaned = service._sanitize_robot_output(content)
+
+    assert "```" not in cleaned
+    assert "*** Test Cases ***" in cleaned
+    assert "Caso" in cleaned
 
 
 def test_split_page_structure_chunks_large_payload() -> None:
@@ -779,6 +1010,48 @@ def test_sanitize_robot_output_converts_open_browser_and_invalid_selector_prefix
     assert "Wait For Elements State    xpath=//button[@type='submit']" in cleaned
 
 
+def test_sanitize_robot_output_converts_selenium_library_keywords_to_browser() -> None:
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
+    content = (
+        "*** Settings ***\n"
+        "Library    SeleniumLibrary\n"
+        "\n"
+        "*** Test Cases ***\n"
+        "Test A/B Testing Link\n"
+        "    New Browser    chromium    headless=${HEADLESS}\n"
+        "    New Context\n"
+        "    New Page    https://the-internet.herokuapp.com/\n"
+        "    Maximize Browser Window\n"
+        "    Wait Until Page Contains Element    div:nth-of-type(2) > div > ul > li:nth-of-type(1) > a    timeout=10s\n"
+        "    Wait Until Element Is Visible    div:nth-of-type(2) > div > ul > li:nth-of-type(1) > a    timeout=10s\n"
+        "    Click Element    div:nth-of-type(2) > div > ul > li:nth-of-type(1) > a\n"
+        "    Wait Until Page Contains    A/B Test    timeout=10s\n"
+        "    Page Should Contain    A/B Test\n"
+        "    Wait Until Location Contains    /abtest    timeout=10s\n"
+        "    Location Should Contain    /abtest\n"
+        "    Close Browser\n"
+    )
+
+    cleaned = service._sanitize_robot_output(content)
+
+    assert "Library    Browser" in cleaned
+    assert "SeleniumLibrary" not in cleaned
+    assert "Maximize Browser Window" not in cleaned
+    assert (
+        cleaned.count(
+            "Wait For Elements State    css=div:nth-of-type(2) > div > ul > li:nth-of-type(1) > a    visible    10s"
+        )
+        >= 2
+    )
+    assert "Click    css=div:nth-of-type(2) > div > ul > li:nth-of-type(1) > a" in cleaned
+    assert "Wait For Elements State    text=A/B Test    visible    10s" in cleaned
+    assert "${__aw_page_text}    Get Text    css=body" in cleaned
+    assert "Should Contain    ${__aw_page_text}    A/B Test" in cleaned
+    assert "Wait For URL    **/abtest*    timeout=10s" in cleaned
+    assert "${__aw_current_url}    Get Url" in cleaned
+    assert "Should Contain    ${__aw_current_url}    /abtest" in cleaned
+
+
 def test_sanitize_robot_output_applies_strict_mode_on_non_class_selector() -> None:
     service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
     content = (
@@ -829,11 +1102,92 @@ def test_sanitize_robot_output_applies_strict_mode_on_raw_attribute_selector() -
     assert 'Click    css=[aria-label="Guia"] >> nth=0' in cleaned
 
 
+def test_sanitize_robot_output_applies_builder_context_selector_hardening() -> None:
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
+    content = (
+        "*** Settings ***\n"
+        "Library    Browser\n"
+        "*** Test Cases ***\n"
+        "Caso\n"
+        "    Click    #login\n"
+    )
+    context = (
+        "Origem: Visual Test Builder\n"
+        "Elementos testaveis capturados (use preferencialmente estes seletores):\n"
+        "- step=1 | action=click | selector=#login\n"
+    )
+
+    cleaned = service._sanitize_robot_output(content, context=context)
+
+    assert "Click    css=#login >> nth=0" in cleaned
+
+
+def test_sanitize_robot_output_hardens_potentially_ambiguous_id_selector() -> None:
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
+    content = (
+        "*** Settings ***\n"
+        "Library    Browser\n"
+        "*** Test Cases ***\n"
+        "Caso\n"
+        "    Wait For Elements State    css=#button    visible    10\n"
+    )
+
+    cleaned = service._sanitize_robot_output(content)
+
+    assert "Wait For Elements State    css=#button >> nth=0    visible    10" in cleaned
+
+
 def test_normalize_selector_covers_css_and_dot_prefixes() -> None:
     service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
 
     assert service._normalize_selector("css:.btn-primary") == "css=.btn-primary"
     assert service._normalize_selector(".card-title") == "css=.card-title"
+
+
+# ---------------------------------------------------------------------------
+# Absolute xpath → relative xpath conversion
+# ---------------------------------------------------------------------------
+
+
+def test_relativize_xpath_converts_absolute_to_relative() -> None:
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
+
+    assert service._relativize_xpath("xpath=/html/body/div[2]/div/h3") == "xpath=//div[2]/div/h3"
+    assert service._relativize_xpath("xpath=/html[1]/body[1]/a[3]") == "xpath=//a[3]"
+    assert service._relativize_xpath("xpath=/html/body/div/ul/li[1]") == "xpath=//div/ul/li[1]"
+
+
+def test_relativize_xpath_leaves_relative_xpath_unchanged() -> None:
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
+
+    assert service._relativize_xpath("xpath=//h3") == "xpath=//h3"
+    assert service._relativize_xpath("xpath=//div[@id='main']") == "xpath=//div[@id='main']"
+
+
+def test_normalize_selector_relativizes_absolute_xpath_prefix() -> None:
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
+
+    assert service._normalize_selector("xpath=/html/body/div[2]/div/h3") == "xpath=//div[2]/div/h3"
+    # bare slash prefix (no xpath= prefix) should also be relativized
+    assert service._normalize_selector("/html/body/h1") == "xpath=//h1"
+
+
+def test_sanitize_robot_output_relativizes_absolute_xpaths() -> None:
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
+    content = (
+        "*** Settings ***\n"
+        "Library    Browser\n"
+        "*** Test Cases ***\n"
+        "Caso\n"
+        "    Wait For Elements State    xpath=/html/body/div[2]/div/h3    visible\n"
+        "    Click    xpath=/html[1]/body[1]/div[1]/button[2]\n"
+    )
+
+    cleaned = service._sanitize_robot_output(content)
+
+    assert "xpath=//div[2]/div/h3" in cleaned
+    assert "xpath=//div[1]/button[2]" in cleaned
+    assert "/html" not in cleaned
 
 
 def test_make_selector_unique_covers_already_unique_and_non_css() -> None:
@@ -1071,6 +1425,56 @@ async def test_improve_robot_test_returns_sanitized_output() -> None:
 
 
 @pytest.mark.asyncio
+async def test_improve_robot_test_uses_feedback_and_sibling_tests_as_context(tmp_path) -> None:
+    from app.models.generated_test import GeneratedTest as GT
+    from app.models.project import Project
+    from datetime import datetime as dt
+
+    tests_dir = tmp_path / "suite"
+    tests_dir.mkdir(parents=True, exist_ok=True)
+    current_file = tests_dir / "current.robot"
+    sibling_file = tests_dir / "passing.robot"
+    current_file.write_text("*** Test Cases ***\nCurrent\n    Log    current\n", encoding="utf-8")
+    sibling_file.write_text("*** Test Cases ***\nPassing\n    Log    pass\n", encoding="utf-8")
+
+    captured = {}
+
+    class CapturingGroqClient:
+        async def generate_robot_test(self, prompt_text, context_text=None, page_structure=None):
+            captured["context"] = context_text
+            return "*** Test Cases ***\nImproved\n    Log    ok"
+
+    generated = GT(
+        id=1,
+        test_request_id=10,
+        content=current_file.read_text(encoding="utf-8"),
+        file_path=str(current_file),
+        created_at=dt.utcnow(),
+    )
+    project = Project(
+        id=1,
+        name="Proj",
+        url=None,
+        test_directory=str(tests_dir),
+        created_at=dt.utcnow(),
+    )
+
+    service = _make_improve_service(CapturingGroqClient(), project=project, generated=generated)
+    result = await service.improve_robot_test(
+        _FakeSession(),
+        test_id=1,
+        content=generated.content,
+        feedback="corrigir somente o que falhou",
+    )  # type: ignore[arg-type]
+
+    assert result is not None
+    assert "corrigir somente o que falhou" in captured["context"]
+    assert "passing.robot" in captured["context"]
+    assert "Log    pass" in captured["context"]
+    assert "current.robot" not in captured["context"]
+
+
+@pytest.mark.asyncio
 async def test_improve_robot_test_returns_none_when_test_not_found() -> None:
     """improve_robot_test returns None when the generated test does not exist."""
 
@@ -1113,6 +1517,23 @@ async def test_improve_robot_test_raises_llm_unavailable_on_timeout_error() -> N
 
     service = _make_improve_service(TimeoutGroqClient())
     with pytest.raises(LLMServiceUnavailableError):
+        await service.improve_robot_test(_FakeSession(), test_id=1, content="*** Test Cases ***\nX")  # type: ignore[arg-type]
+
+
+@pytest.mark.asyncio
+async def test_improve_robot_test_raises_llm_unavailable_on_http_429() -> None:
+    class RateLimitGroqClient:
+        async def generate_robot_test(self, prompt_text, context_text=None, page_structure=None):
+            request = httpx.Request("POST", "https://api.githubcopilot.com/chat/completions")
+            response = httpx.Response(429, request=request, text="rate limit")
+            raise httpx.HTTPStatusError(
+                "Client error '429 Too Many Requests'",
+                request=request,
+                response=response,
+            )
+
+    service = _make_improve_service(RateLimitGroqClient())
+    with pytest.raises(LLMServiceUnavailableError, match="rate limit exceeded"):
         await service.improve_robot_test(_FakeSession(), test_id=1, content="*** Test Cases ***\nX")  # type: ignore[arg-type]
 
 

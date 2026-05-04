@@ -24,8 +24,17 @@ export function getTestById(testId) {
   return request({ method: 'GET', url: `/tests/${testId}` });
 }
 
+export function listAiModels() {
+  return request({ method: 'GET', url: '/api/ai/models' });
+}
+
 export function generateRobotTest(payload) {
-  return request({ method: 'POST', url: '/tests/generate', data: payload });
+  return request({
+    method: 'POST',
+    url: '/tests/generate',
+    data: payload,
+    timeout: 0,
+  });
 }
 
 export function runTests(payload) {
@@ -45,16 +54,20 @@ export function listProjectExecutions(projectId) {
   return request({ method: 'GET', url: `/projects/${projectId}/executions` });
 }
 
-export function improveRobotTest(testId, content) {
-  return request({ method: 'POST', url: `/tests/${testId}/improve`, data: { content } });
+export function improveRobotTest(testId, content, feedback = null) {
+  return request({
+    method: 'POST',
+    url: `/tests/${testId}/improve`,
+    data: { content, feedback },
+  });
 }
 
 export function saveRobotTestContent(testId, content) {
   return request({ method: 'PUT', url: `/tests/${testId}/content`, data: { content } });
 }
 
-export function startVisualBuilder(url) {
-  return request({ method: 'POST', url: '/builder/start', data: { url } });
+export function startVisualBuilder(url, projectId = null) {
+  return request({ method: 'POST', url: '/builder/start', data: { url, project_id: projectId } });
 }
 
 export function getVisualBuilderSteps(sessionId = null) {
@@ -68,4 +81,8 @@ export function generateVisualBuilderCode(sessionId = null, prompt = null) {
     url: '/builder/generate',
     data: { session_id: sessionId, prompt },
   });
+}
+
+export function updateVisualBuilderStep(stepId, payload) {
+  return request({ method: 'PUT', url: `/builder/steps/${stepId}`, data: payload });
 }

@@ -1,16 +1,51 @@
 import { toast } from '../../components/toast.js';
-import { runProjectScan } from '../../services/scan.service.js';
 import {
-  generateTestFromPrompt,
-  getProjectGeneratedTests,
-  getProjects,
-  getTestContent,
-  getVisualBuilderCapturedSteps,
-  startVisualBuilderSession,
+    generateTestFromPrompt,
+    getAvailableAiModels,
+    getProjectGeneratedTests,
+    getProjects,
+    getTestContent,
+    getVisualBuilderCapturedSteps,
+    improveExistingGeneratedTest,
+    startVisualBuilderSession,
+    updateVisualBuilderCapturedStep,
 } from '../../services/test.service.js';
 import { loadTemplate, renderHTML } from '../../utils/dom.js';
 
 const TEMPLATE_PATH = '/static/frontend/pages/generator/generator.html';
+const BUILDER_PROMPT_STORAGE = 'builder_prompt';
+const BUILDER_MODEL_STORAGE = 'builder_model';
+const BUILDER_PLAN_STORAGE = 'builder_plan';
+const BUILDER_TEMP_STORAGE = 'builder_temperature';
+const BUILDER_MAX_TOKENS_STORAGE = 'builder_max_tokens';
+const BUILDER_SYSTEM_PROMPT_STORAGE = 'builder_system_prompt';
+
+const PLAN_PRESETS = {
+  balanced: {
+    label: 'Balanced',
+    prompt:
+      'Você é um especialista em automação de testes Robot Framework. Gere cenários legíveis e estáveis com bom equilíbrio entre cobertura e simplicidade.',
+  },
+  strict: {
+    label: 'Strict / Deterministic',
+    prompt:
+      'Gere testes Robot Framework determinísticos, com passos explícitos, waits necessários e validações objetivas. Evite ambiguidades.',
+  },
+  exploratory: {
+    label: 'Exploratory',
+    prompt:
+      'Gere testes Robot Framework com foco em exploração funcional, cobrindo caminhos alternativos e validações relevantes mantendo robustez.',
+  },
+};
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
 
 export async function mount(root, { store }) {
   const html = await loadTemplate(TEMPLATE_PATH);
@@ -18,45 +53,28 @@ export async function mount(root, { store }) {
   return initGeneratorPage({ store });
 }
 
-const GEN_STORAGE_PROMPT = 'gen_prompt';
-const GEN_STORAGE_CONTEXT = 'gen_context';
-
 export function initGeneratorPage({ store }) {
-  const form = document.getElementById('generate-test-form');
   const projectSelect = document.getElementById('test-project');
-  const promptInput = document.getElementById('test-prompt');
-  const contextInput = document.getElementById('test-context');
-  const scanButton = document.getElementById('scan-page-btn');
 
-  const scanPanel = document.getElementById('scan-panel');
-  const scanSummary = document.getElementById('scan-summary');
-  const scanLiveStatus = document.getElementById('scan-live-status');
-  const scanReadyMessage = document.getElementById('scan-ready-message');
-  const scanProgress = document.getElementById('scan-progress');
-  const scanTitle = document.getElementById('scan-title');
-  const scanTotal = document.getElementById('scan-total');
-  const scanTypes = document.getElementById('scan-types');
-
-  const submitBtn = document.getElementById('generate-submit-btn');
   const generationStatus = document.getElementById('generation-status');
   const generationStatusLabel = document.getElementById('generation-status-label');
   const generationStatusDetail = document.getElementById('generation-status-detail');
   const generationStatusTimer = document.getElementById('generation-status-timer');
 
   const resultSection = document.getElementById('generated-result');
-  const generationParts = document.getElementById('generation-parts');
-  const generationPartsSummary = document.getElementById('generation-parts-summary');
-  const generationPartsList = document.getElementById('generation-parts-list');
   const codeElement = document.getElementById('test-code');
   const copyButton = document.getElementById('copy-test-btn');
   const downloadButton = document.getElementById('download-test-btn');
-  const genScanCacheNotice = document.getElementById('gen-scan-cache-notice');
-  const genScanCacheDate = document.getElementById('gen-scan-cache-date');
-  const genRescanBtn = document.getElementById('gen-rescan-btn');
 
   const builderForm = document.getElementById('visual-builder-form');
   const builderUrlInput = document.getElementById('builder-url');
   const builderPromptInput = document.getElementById('builder-prompt');
+  const llmModelSelect = document.getElementById('builder-llm-model');
+  const llmPlanSelect = document.getElementById('builder-llm-plan');
+  const llmTemperatureInput = document.getElementById('builder-llm-temperature');
+  const llmMaxTokensInput = document.getElementById('builder-llm-max-tokens');
+  const llmSystemPromptInput = document.getElementById('builder-llm-system-prompt');
+  const llmRefreshModelsBtn = document.getElementById('builder-llm-refresh-models-btn');
   const builderStartBtn = document.getElementById('builder-start-btn');
   const builderRefreshStepsBtn = document.getElementById('builder-refresh-steps-btn');
   const builderGenerateBtn = document.getElementById('builder-generate-btn');
@@ -69,59 +87,101 @@ export function initGeneratorPage({ store }) {
   const builderCodeEl = document.getElementById('builder-code');
   const builderCopyCodeBtn = document.getElementById('builder-copy-code-btn');
 
-  let isScanning = false;
-  let forceRescan = false;
   let builderSessionId = null;
   let builderPollTimer = null;
+  let generationTimer = null;
 
-  const startBuilderPoll = () => {
-    stopBuilderPoll();
-    builderPollTimer = setInterval(async () => {
-      if (!builderSessionId) return stopBuilderPoll();
-      try {
-        const data = await getVisualBuilderCapturedSteps(builderSessionId);
-        renderBuilderSteps(data?.steps ?? []);
-      } catch (_) {
-        /* ignore */
-      }
-    }, 2500);
-  };
-
-  const stopBuilderPoll = () => {
-    clearInterval(builderPollTimer);
-    builderPollTimer = null;
-  };
-
-  if (!form || !projectSelect) {
+  if (!projectSelect) {
     return {
       loadProjectsDropdown: async () => {},
       generateFromExecutionFeedback: async () => {},
     };
   }
 
-  // Restore saved values from localStorage
-  if (promptInput) promptInput.value = localStorage.getItem(GEN_STORAGE_PROMPT) || '';
-  if (contextInput) contextInput.value = localStorage.getItem(GEN_STORAGE_CONTEXT) || '';
-
-  // Persist values on each keystroke
-  promptInput?.addEventListener('input', () => {
-    localStorage.setItem(GEN_STORAGE_PROMPT, promptInput.value);
-  });
-  contextInput?.addEventListener('input', () => {
-    localStorage.setItem(GEN_STORAGE_CONTEXT, contextInput.value);
+  if (builderPromptInput) {
+    builderPromptInput.value = localStorage.getItem(BUILDER_PROMPT_STORAGE) || '';
+  }
+  builderPromptInput?.addEventListener('input', () => {
+    localStorage.setItem(BUILDER_PROMPT_STORAGE, builderPromptInput.value);
   });
 
-  function updateCacheState() {
-    const selected = projectSelect.selectedOptions[0];
-    const cachedAt = selected?.dataset?.cachedAt;
-    if (cachedAt) {
-      if (genScanCacheDate)
-        genScanCacheDate.textContent = new Date(cachedAt).toLocaleString('pt-BR');
-      genScanCacheNotice?.classList.remove('hidden');
-    } else {
-      genScanCacheNotice?.classList.add('hidden');
+  if (llmPlanSelect) {
+    llmPlanSelect.value = localStorage.getItem(BUILDER_PLAN_STORAGE) || 'balanced';
+  }
+
+  if (llmTemperatureInput) {
+    llmTemperatureInput.value = localStorage.getItem(BUILDER_TEMP_STORAGE) || '0.2';
+  }
+
+  if (llmMaxTokensInput) {
+    llmMaxTokensInput.value = localStorage.getItem(BUILDER_MAX_TOKENS_STORAGE) || '4096';
+  }
+
+  if (llmSystemPromptInput) {
+    llmSystemPromptInput.value =
+      localStorage.getItem(BUILDER_SYSTEM_PROMPT_STORAGE) ||
+      PLAN_PRESETS[llmPlanSelect?.value || 'balanced'].prompt;
+  }
+
+  llmPlanSelect?.addEventListener('change', () => {
+    const selectedPlan = llmPlanSelect.value || 'balanced';
+    localStorage.setItem(BUILDER_PLAN_STORAGE, selectedPlan);
+
+    const currentPrompt = (llmSystemPromptInput?.value || '').trim();
+    const knownPrompts = Object.values(PLAN_PRESETS).map((preset) => preset.prompt);
+    if (!currentPrompt || knownPrompts.includes(currentPrompt)) {
+      if (llmSystemPromptInput) {
+        llmSystemPromptInput.value = PLAN_PRESETS[selectedPlan].prompt;
+      }
+      localStorage.setItem(BUILDER_SYSTEM_PROMPT_STORAGE, PLAN_PRESETS[selectedPlan].prompt);
+    }
+  });
+
+  llmTemperatureInput?.addEventListener('input', () => {
+    localStorage.setItem(BUILDER_TEMP_STORAGE, llmTemperatureInput.value);
+  });
+
+  llmMaxTokensInput?.addEventListener('input', () => {
+    localStorage.setItem(BUILDER_MAX_TOKENS_STORAGE, llmMaxTokensInput.value);
+  });
+
+  llmSystemPromptInput?.addEventListener('input', () => {
+    localStorage.setItem(BUILDER_SYSTEM_PROMPT_STORAGE, llmSystemPromptInput.value);
+  });
+
+  async function loadAiModelsDropdown() {
+    if (!llmModelSelect) return;
+
+    const previousValue = localStorage.getItem(BUILDER_MODEL_STORAGE) || llmModelSelect.value || '';
+    llmModelSelect.innerHTML = '<option value="">Padrão do servidor</option>';
+
+    try {
+      const response = await getAvailableAiModels();
+      const models = Array.isArray(response?.models) ? response.models : [];
+
+      models.forEach((model) => {
+        const option = document.createElement('option');
+        option.value = model.id;
+        option.textContent = `${model.name || model.id} (${model.id})`;
+        llmModelSelect.appendChild(option);
+      });
+
+      if (previousValue && models.some((model) => model.id === previousValue)) {
+        llmModelSelect.value = previousValue;
+      }
+    } catch (error) {
+      toast(error.message || 'Falha ao carregar modelos de IA', 'error');
     }
   }
+
+  llmModelSelect?.addEventListener('change', () => {
+    localStorage.setItem(BUILDER_MODEL_STORAGE, llmModelSelect.value || '');
+  });
+
+  llmRefreshModelsBtn?.addEventListener('click', async () => {
+    await loadAiModelsDropdown();
+    toast('Modelos de IA atualizados.');
+  });
 
   function syncBuilderUrlWithSelectedProject() {
     if (!builderUrlInput) {
@@ -133,62 +193,17 @@ export function initGeneratorPage({ store }) {
     builderUrlInput.value = projectUrl;
   }
 
-  genRescanBtn?.addEventListener('click', () => {
-    forceRescan = true;
-    genRescanBtn.textContent = '↻ Scan será refeito';
-    genRescanBtn.classList.add('btn-warning');
-  });
-
-  function resetScanPanel() {
-    scanPanel?.classList.add('hidden');
-    scanSummary?.classList.add('hidden');
-    scanLiveStatus?.classList.add('hidden');
-    scanReadyMessage?.classList.add('hidden');
-    if (scanProgress) {
-      scanProgress.innerHTML = '';
-    }
-    if (scanTitle) {
-      scanTitle.textContent = '-';
-    }
-    if (scanTotal) {
-      scanTotal.textContent = '0';
-    }
-    if (scanTypes) {
-      scanTypes.textContent = '-';
-    }
-  }
-
-  function appendScanProgress(message) {
-    if (!scanProgress) {
-      return;
-    }
-
-    const line = document.createElement('div');
-    line.className = 'scan-progress-line';
-    line.textContent = `• ${message}`;
-    scanProgress.appendChild(line);
-    scanProgress.scrollTop = scanProgress.scrollHeight;
-  }
-
-  let _generationTimerInterval = null;
-
-  function showGenerationStatus(estimatedChunks) {
+  function showGenerationStatus(label = 'Gerando teste pelo Test Builder...') {
     generationStatus?.classList.remove('hidden');
-    if (generationStatusLabel) generationStatusLabel.textContent = 'Gerando teste...';
+    if (generationStatusLabel) generationStatusLabel.textContent = label;
     if (generationStatusDetail) {
-      generationStatusDetail.textContent =
-        estimatedChunks > 1
-          ? `Estimativa: ${estimatedChunks} parte(s) a enviar para o LLM`
-          : 'Preparando envio para o LLM...';
+      generationStatusDetail.textContent = 'Preparando envio para o LLM...';
     }
     if (generationStatusTimer) generationStatusTimer.textContent = '0s';
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Gerando...';
-    }
+
     let elapsed = 0;
-    clearInterval(_generationTimerInterval);
-    _generationTimerInterval = setInterval(() => {
+    clearInterval(generationTimer);
+    generationTimer = setInterval(() => {
       elapsed += 1;
       if (generationStatusTimer) generationStatusTimer.textContent = `${elapsed}s`;
       if (elapsed === 30 && generationStatusDetail) {
@@ -198,59 +213,9 @@ export function initGeneratorPage({ store }) {
   }
 
   function hideGenerationStatus() {
-    clearInterval(_generationTimerInterval);
-    _generationTimerInterval = null;
+    clearInterval(generationTimer);
+    generationTimer = null;
     generationStatus?.classList.add('hidden');
-    if (submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Gerar Teste';
-    }
-  }
-
-  function estimateChunks(totalElements) {
-    // ~250 chars/element, chunk target ~12 000 chars → ~48 elements/chunk
-    if (!totalElements) return 1;
-    return Math.max(1, Math.ceil(totalElements / 48));
-  }
-
-  function resetGenerationParts() {
-    generationParts?.classList.add('hidden');
-    if (generationPartsSummary) {
-      generationPartsSummary.textContent = '';
-    }
-    if (generationPartsList) {
-      generationPartsList.innerHTML = '';
-    }
-  }
-
-  function renderGenerationParts(result) {
-    const strategy = result?.generation_strategy;
-    const chunkCount = Number(result?.chunk_count || 0);
-    const chunkParts = Array.isArray(result?.chunk_parts) ? result.chunk_parts : [];
-
-    if (strategy !== 'chunked' || chunkCount <= 0) {
-      resetGenerationParts();
-      return;
-    }
-
-    if (generationPartsSummary) {
-      generationPartsSummary.textContent =
-        `Gerado em ${chunkCount} parte(s) do scan e consolidado em 1 arquivo .robot.` +
-        (result?.chunk_target_chars
-          ? ` (alvo por parte: ~${result.chunk_target_chars} caracteres)`
-          : '');
-    }
-
-    if (generationPartsList) {
-      generationPartsList.innerHTML = chunkParts
-        .map((part) => {
-          const keys = Array.isArray(part.keys) && part.keys.length ? part.keys.join(', ') : '-';
-          return `<li>Parte ${part.index}: ~${part.approx_chars || 0} chars | chaves: ${keys}</li>`;
-        })
-        .join('');
-    }
-
-    generationParts?.classList.remove('hidden');
   }
 
   function renderBuilderSteps(steps = []) {
@@ -268,11 +233,46 @@ export function initGeneratorPage({ store }) {
     builderStepsSummary.textContent = `${steps.length} step(s) capturado(s).`;
     builderStepsList.innerHTML = steps
       .map((step) => {
-        const label =
-          step.type === 'navigation'
-            ? `${step.type} -> ${step.url || '-'}`
-            : `${step.type} -> ${step.selector || '-'}${step.value ? ` = ${step.value}` : ''}`;
-        return `<li>[${step.step}] ${label}</li>`;
+        const action = String(step.action || step.type || 'unknown').toLowerCase();
+        const stepId = Number(step.id || 0);
+        const name = String(step.step_name || '').trim();
+        const description = String(step.description || step.text || '').trim();
+        const metadata = [
+          step.selector ? `Selector: ${step.selector}` : '',
+          step.value ? `Valor: ${step.value}` : '',
+          step.page_url ? `URL: ${step.page_url}` : '',
+          step.page_title ? `Página: ${step.page_title}` : '',
+          step.element_tag ? `Tag: ${step.element_tag}` : '',
+          step.input_type ? `Tipo: ${step.input_type}` : '',
+          step.href ? `Href: ${step.href}` : '',
+          step.element_text ? `Texto: ${step.element_text}` : '',
+          description ? `Descrição: ${description}` : '',
+        ].filter(Boolean);
+
+        return `
+          <li class="builder-step-item" data-step-id="${stepId || ''}">
+            <div><strong>[${escapeHtml(step.step)}]</strong> ${escapeHtml(action)}</div>
+            <div class="form-group">
+              <label>Nome do step</label>
+              <div class="result-actions">
+                <input
+                  class="builder-step-name-input"
+                  data-step-id="${stepId || ''}"
+                  type="text"
+                  value="${escapeHtml(name)}"
+                  placeholder="Ex: Clicar no botão Entrar"
+                />
+                <button
+                  type="button"
+                  class="btn btn-secondary builder-step-save-btn"
+                  data-step-id="${stepId || ''}"
+                  ${stepId ? '' : 'disabled'}
+                >Salvar nome</button>
+              </div>
+            </div>
+            <div>${metadata.map((item) => `<div>${escapeHtml(item)}</div>`).join('')}</div>
+          </li>
+        `;
       })
       .join('');
 
@@ -282,24 +282,58 @@ export function initGeneratorPage({ store }) {
   function setBuilderSession(sessionId) {
     builderSessionId = sessionId || null;
     if (builderSessionId) {
-      builderSessionIdEl.textContent = builderSessionId;
+      if (builderSessionIdEl) builderSessionIdEl.textContent = builderSessionId;
       builderSessionBanner?.classList.remove('hidden');
       startBuilderPoll();
     } else {
-      builderSessionIdEl.textContent = '-';
+      if (builderSessionIdEl) builderSessionIdEl.textContent = '-';
       builderSessionBanner?.classList.add('hidden');
       stopBuilderPoll();
     }
   }
 
+  const startBuilderPoll = () => {
+    stopBuilderPoll();
+    builderPollTimer = setInterval(async () => {
+      if (!builderSessionId) {
+        stopBuilderPoll();
+        return;
+      }
+      try {
+        const data = await getVisualBuilderCapturedSteps(builderSessionId);
+        renderBuilderSteps(data?.steps || []);
+      } catch (_) {
+        /* ignore transient poll failures */
+      }
+    }, 2500);
+  };
+
+  const stopBuilderPoll = () => {
+    clearInterval(builderPollTimer);
+    builderPollTimer = null;
+  };
+
   async function refreshBuilderSteps() {
     if (!builderSessionId) {
       toast('Inicie uma sessão visual antes de buscar steps.', 'error');
-      return;
+      return [];
     }
 
     const response = await getVisualBuilderCapturedSteps(builderSessionId);
-    renderBuilderSteps(response?.steps || []);
+    const steps = response?.steps || [];
+    renderBuilderSteps(steps);
+    return steps;
+  }
+
+  async function saveBuilderStepName(stepId) {
+    const input = builderStepsList?.querySelector(`.builder-step-name-input[data-step-id="${stepId}"]`);
+    if (!input) {
+      return;
+    }
+
+    await updateVisualBuilderCapturedStep(stepId, { step_name: input.value });
+    toast('Nome do step salvo com sucesso.');
+    await refreshBuilderSteps();
   }
 
   function buildVisualBuilderContext(steps = [], sessionId = null, pageUrl = '') {
@@ -312,6 +346,13 @@ export function initGeneratorPage({ store }) {
           selector: String(step?.selector || '').trim(),
           value: step?.value == null ? '' : String(step.value),
           description: String(step?.description || step?.text || '').trim(),
+          stepName: String(step?.step_name || '').trim(),
+          pageUrl: String(step?.page_url || '').trim(),
+          pageTitle: String(step?.page_title || '').trim(),
+          elementTag: String(step?.element_tag || '').trim(),
+          elementText: String(step?.element_text || '').trim(),
+          inputType: String(step?.input_type || '').trim(),
+          href: String(step?.href || '').trim(),
         }))
       : [];
 
@@ -322,7 +363,14 @@ export function initGeneratorPage({ store }) {
         `selector=${step.selector || 'N/A'}`,
       ];
       if (step.value) parts.push(`value=${step.value}`);
+      if (step.stepName) parts.push(`step_name=${step.stepName}`);
       if (step.description) parts.push(`description=${step.description}`);
+      if (step.pageUrl) parts.push(`page_url=${step.pageUrl}`);
+      if (step.pageTitle) parts.push(`page_title=${step.pageTitle}`);
+      if (step.elementTag) parts.push(`element_tag=${step.elementTag}`);
+      if (step.inputType) parts.push(`input_type=${step.inputType}`);
+      if (step.href) parts.push(`href=${step.href}`);
+      if (step.elementText) parts.push(`element_text=${step.elementText}`);
       return parts.join(' | ');
     });
 
@@ -352,7 +400,7 @@ export function initGeneratorPage({ store }) {
         projects
           .map(
             (project) =>
-              `<option value="${project.id}" data-url="${project.url || ''}" data-cached-at="${project.scan_cached_at || ''}">${project.name}</option>`
+              `<option value="${project.id}" data-url="${project.url || ''}">${project.name}</option>`
           )
           .join('');
 
@@ -361,185 +409,64 @@ export function initGeneratorPage({ store }) {
         projectSelect.value = String(activeId);
       }
 
-      updateCacheState();
       syncBuilderUrlWithSelectedProject();
     } catch (error) {
       toast(error.message, 'error');
     }
   }
 
+  void loadAiModelsDropdown();
+
   async function generateFromExecutionFeedback(projectId, feedbackText, testIds) {
-    // Load original test content so the AI can fix it instead of rewriting from scratch
+    // Prefer correcting the existing file so the AI can preserve passing tests
+    // and use the project directory as reference context on the backend.
     let originalContent = null;
+    let targetTestId = null;
 
     const idsToLoad = Array.isArray(testIds) && testIds.length ? testIds : [];
 
     if (idsToLoad.length > 0) {
       // Load content of the first executed test (the one with errors)
-      originalContent = await getTestContent(idsToLoad[0]).catch(() => null);
+      targetTestId = idsToLoad[0];
+      originalContent = await getTestContent(targetTestId).catch(() => null);
     }
 
     if (!originalContent) {
       // Fallback: load the most recent test of the project
       const tests = await getProjectGeneratedTests(projectId).catch(() => []);
       if (tests.length > 0) {
-        originalContent = await getTestContent(tests[0].id).catch(() => null);
+        targetTestId = tests[0].id;
+        originalContent = await getTestContent(targetTestId).catch(() => null);
       }
     }
 
-    const prompt = originalContent
-      ? 'Corrija os test cases com falha no arquivo Robot Framework abaixo. Mantenha TODOS os test cases que passaram exatamente como estao. Retorne o arquivo completo e corrigido.'
-      : 'Recriar teste com base no feedback da execucao (falhas/erros).';
-
-    const context = originalContent
-      ? `${feedbackText}\n\n--- CODIGO ROBOT FRAMEWORK ORIGINAL ---\n${originalContent}`
-      : feedbackText;
-
-    showGenerationStatus(1);
+    showGenerationStatus('Gerando correção de execução...');
     let result;
     try {
-      result = await generateTestFromPrompt({ projectId, prompt, context });
+      if (targetTestId && originalContent) {
+        result = await improveExistingGeneratedTest(targetTestId, originalContent, feedbackText);
+      } else {
+        result = await generateTestFromPrompt({
+          projectId,
+          prompt: 'Recriar teste com base no feedback da execucao (falhas/erros).',
+          context: feedbackText,
+        });
+      }
     } finally {
       hideGenerationStatus();
     }
 
     codeElement.textContent = result.content || '';
-    renderGenerationParts(result);
     resultSection.classList.remove('hidden');
-    downloadButton.dataset.testId = String(result.id || '');
+    downloadButton.dataset.testId = String(targetTestId || result.id || '');
     projectSelect.value = String(projectId);
-    promptInput.value = prompt;
-    contextInput.value = context;
-    toast('Teste corrigido com base nos erros da execucao!');
+    toast(targetTestId ? 'Teste existente corrigido com base nos erros da execucao!' : 'Teste corrigido com base nos erros da execucao!');
   }
-
-  scanButton?.addEventListener('click', async () => {
-    if (isScanning) {
-      return;
-    }
-
-    const projectId = Number.parseInt(projectSelect.value, 10);
-    const selectedOption = projectSelect.options[projectSelect.selectedIndex];
-    const projectUrl = selectedOption?.dataset?.url;
-
-    if (!projectId) {
-      toast('Selecione um projeto antes de escanear.', 'error');
-      return;
-    }
-
-    if (!projectUrl) {
-      toast('Projeto sem URL. Selecione um projeto com URL válida.', 'error');
-      return;
-    }
-
-    resetScanPanel();
-    scanPanel?.classList.remove('hidden');
-    scanLiveStatus?.classList.remove('hidden');
-    scanReadyMessage?.classList.add('hidden');
-    scanButton.disabled = true;
-    isScanning = true;
-    appendScanProgress('Iniciando escaneamento...');
-
-    try {
-      const result = await runProjectScan(projectUrl, projectId, {
-        onProgress: (message) => appendScanProgress(message),
-        onError: (message) => {
-          appendScanProgress(`Erro: ${message}`);
-          toast(message || 'Erro no scan', 'error');
-        },
-      });
-
-      if (result) {
-        store.setState({
-          lastScanResult: result,
-          activeProjectId: projectId,
-        });
-
-        scanSummary?.classList.remove('hidden');
-        if (scanTitle) {
-          scanTitle.textContent = result.title || '-';
-        }
-        if (scanTotal) {
-          scanTotal.textContent = String(result.total_elements || 0);
-        }
-        if (scanTypes) {
-          scanTypes.textContent =
-            Object.entries(result.summary || {})
-              .map(([key, count]) => `${key}: ${count}`)
-              .join(', ') || '-';
-        }
-
-        scanReadyMessage?.classList.remove('hidden');
-        appendScanProgress('Dados estruturados prontos para geração de teste.');
-        toast('Scan concluído com sucesso!');
-
-        // Update cache notice with the new scan date
-        const selectedOption = projectSelect.options[projectSelect.selectedIndex];
-        const now = new Date().toISOString();
-        if (selectedOption) selectedOption.dataset.cachedAt = now;
-        forceRescan = false;
-        if (genRescanBtn) {
-          genRescanBtn.textContent = '↻ Refazer scan';
-          genRescanBtn.classList.remove('btn-warning');
-        }
-        updateCacheState();
-      }
-    } catch (error) {
-      toast(error.message, 'error');
-    } finally {
-      isScanning = false;
-      scanLiveStatus?.classList.add('hidden');
-      scanButton.disabled = false;
-    }
-  });
 
   projectSelect.addEventListener('change', () => {
     const projectId = Number.parseInt(projectSelect.value, 10) || null;
     store.setState({ activeProjectId: projectId });
-    resetScanPanel();
-    forceRescan = false;
-    if (genRescanBtn) {
-      genRescanBtn.textContent = '↻ Refazer scan';
-      genRescanBtn.classList.remove('btn-warning');
-    }
-    updateCacheState();
     syncBuilderUrlWithSelectedProject();
-  });
-
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-
-    const projectId = Number.parseInt(projectSelect.value, 10);
-    const prompt = promptInput.value;
-    const context = contextInput.value;
-
-    resultSection.classList.add('hidden');
-    resetGenerationParts();
-
-    const state = store.getState();
-    const selectedOption = projectSelect.options[projectSelect.selectedIndex];
-    const hasCachedScan = !!selectedOption?.dataset?.cachedAt;
-    const hasFreshScan = state.lastScanResult && state.activeProjectId === projectId;
-    const totalElements = Number(state.lastScanResult?.total_elements || 0);
-
-    if (!hasFreshScan && !hasCachedScan) {
-      toast('Execute o scan da página antes de gerar o teste.', 'error');
-      return;
-    }
-
-    try {
-      showGenerationStatus(estimateChunks(totalElements));
-      const result = await generateTestFromPrompt({ projectId, prompt, context, forceRescan });
-      hideGenerationStatus();
-      codeElement.textContent = result.content || '';
-      renderGenerationParts(result);
-      resultSection.classList.remove('hidden');
-      downloadButton.dataset.testId = String(result.id || '');
-      toast('Teste gerado com sucesso!');
-    } catch (error) {
-      hideGenerationStatus();
-      toast(error.message, 'error');
-    }
   });
 
   copyButton?.addEventListener('click', async () => {
@@ -558,6 +485,11 @@ export function initGeneratorPage({ store }) {
   builderForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
 
+    if (!projectSelect.value) {
+      toast('Selecione um projeto antes de iniciar captura visual.', 'error');
+      return;
+    }
+
     const selectedProjectOption = projectSelect.selectedOptions[0];
     const selectedProjectUrl = selectedProjectOption?.dataset?.url || '';
     const url = (builderUrlInput?.value?.trim() || selectedProjectUrl).trim();
@@ -567,9 +499,10 @@ export function initGeneratorPage({ store }) {
       return;
     }
 
-    builderStartBtn.disabled = true;
+    if (builderStartBtn) builderStartBtn.disabled = true;
     try {
-      const started = await startVisualBuilderSession(url);
+      const projectId = Number.parseInt(projectSelect.value, 10) || null;
+      const started = await startVisualBuilderSession(url, projectId);
       setBuilderSession(started.session_id);
       renderBuilderSteps([]);
       builderCodePanel?.classList.add('hidden');
@@ -578,7 +511,7 @@ export function initGeneratorPage({ store }) {
     } catch (error) {
       toast(error.message, 'error');
     } finally {
-      builderStartBtn.disabled = false;
+      if (builderStartBtn) builderStartBtn.disabled = false;
     }
   });
 
@@ -586,6 +519,55 @@ export function initGeneratorPage({ store }) {
     try {
       await refreshBuilderSteps();
       toast('Steps atualizados com sucesso.');
+    } catch (error) {
+      toast(error.message, 'error');
+    }
+  });
+
+  builderStepsList?.addEventListener('click', async (event) => {
+    if (!(event.target instanceof Element)) {
+      return;
+    }
+
+    const button = event.target.closest('.builder-step-save-btn');
+    if (!button) {
+      return;
+    }
+
+    const stepId = Number.parseInt(button.dataset.stepId || '', 10);
+    if (!stepId) {
+      toast('Step inválido para atualização.', 'error');
+      return;
+    }
+
+    try {
+      button.disabled = true;
+      await saveBuilderStepName(stepId);
+    } catch (error) {
+      toast(error.message, 'error');
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  builderStepsList?.addEventListener('keydown', async (event) => {
+    if (!(event.target instanceof Element)) {
+      return;
+    }
+
+    const input = event.target.closest('.builder-step-name-input');
+    if (!input || event.key !== 'Enter') {
+      return;
+    }
+
+    event.preventDefault();
+    const stepId = Number.parseInt(input.dataset.stepId || '', 10);
+    if (!stepId) {
+      return;
+    }
+
+    try {
+      await saveBuilderStepName(stepId);
     } catch (error) {
       toast(error.message, 'error');
     }
@@ -604,9 +586,7 @@ export function initGeneratorPage({ store }) {
     }
 
     try {
-      const captured = await getVisualBuilderCapturedSteps(builderSessionId);
-      const steps = captured?.steps || [];
-      renderBuilderSteps(steps);
+      const steps = await refreshBuilderSteps();
 
       if (!Array.isArray(steps) || steps.length === 0) {
         toast('Nenhum step capturado. Interaja na tela antes de gerar o teste.', 'error');
@@ -622,27 +602,35 @@ export function initGeneratorPage({ store }) {
           ? rawPrompt
           : 'Gerar teste Robot Framework com base nos steps capturados no Visual Builder.';
       const context = buildVisualBuilderContext(steps, builderSessionId, selectedProjectUrl);
+      const model = llmModelSelect?.value?.trim() || null;
+      const systemPrompt = llmSystemPromptInput?.value?.trim() || null;
+      const temperature = Number.parseFloat(llmTemperatureInput?.value || '');
+      const maxTokens = Number.parseInt(llmMaxTokensInput?.value || '', 10);
 
+      showGenerationStatus();
       const generated = await generateTestFromPrompt({
         projectId,
         prompt,
         context,
-        forceRescan: false,
+        ...(model ? { model } : {}),
+        ...(systemPrompt ? { systemPrompt } : {}),
+        ...(Number.isFinite(temperature) ? { temperature } : {}),
+        ...(Number.isInteger(maxTokens) && maxTokens > 0 ? { maxTokens } : {}),
       });
+      hideGenerationStatus();
 
       if (builderCodeEl) {
         builderCodeEl.textContent = generated?.content || '';
       }
 
       codeElement.textContent = generated?.content || '';
-      renderGenerationParts(generated);
       resultSection.classList.remove('hidden');
       downloadButton.dataset.testId = String(generated?.id || '');
 
       builderCodePanel?.classList.remove('hidden');
-      await refreshBuilderSteps();
-      toast('Teste Robot Framework criado e salvo no mesmo fluxo de Gerar Teste.');
+      toast('Teste Robot Framework criado a partir do Test Builder.');
     } catch (error) {
+      hideGenerationStatus();
       toast(error.message, 'error');
     }
   });

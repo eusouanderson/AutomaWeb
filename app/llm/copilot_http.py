@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from typing import Callable, Optional
 
 import httpx
@@ -29,6 +30,8 @@ DEFAULT_MAX_RETRIES = 2
 DEFAULT_RETRY_DELAY_MS = 600
 DEFAULT_RETRY_STATUS_CODES = [408, 425, 429, 500, 502, 503, 504]
 DEFAULT_USER_AGENT = "mcp-frontend-copilot/1.0"
+DEFAULT_TIMEOUT_SECONDS = 90.0
+DEFAULT_CONNECT_TIMEOUT_SECONDS = 15.0
 
 
 # ============================================================================
@@ -72,6 +75,8 @@ class CopilotHTTPClient:
         retry_delay_ms: int = DEFAULT_RETRY_DELAY_MS,
         retry_status_codes: Optional[list[int]] = None,
         user_agent: str = DEFAULT_USER_AGENT,
+        timeout_seconds: Optional[float] = None,
+        connect_timeout_seconds: Optional[float] = None,
         http_client: Optional[httpx.AsyncClient] = None,
     ):
         """Initialize HTTP client.
@@ -82,6 +87,8 @@ class CopilotHTTPClient:
             retry_delay_ms: Base retry delay in milliseconds
             retry_status_codes: HTTP status codes that trigger retry
             user_agent: Custom User-Agent header
+            timeout_seconds: Request timeout in seconds (read/write/pool)
+            connect_timeout_seconds: Connection timeout in seconds
             http_client: Custom httpx.AsyncClient for testing
         """
         self.auth_manager = auth_manager
@@ -89,6 +96,15 @@ class CopilotHTTPClient:
         self.retry_delay_ms = retry_delay_ms
         self.retry_status_codes = retry_status_codes or DEFAULT_RETRY_STATUS_CODES
         self.user_agent = user_agent
+        self.timeout_seconds = timeout_seconds or float(
+            os.environ.get("COPILOT_HTTP_TIMEOUT_SECONDS", DEFAULT_TIMEOUT_SECONDS)
+        )
+        self.connect_timeout_seconds = connect_timeout_seconds or float(
+            os.environ.get(
+                "COPILOT_HTTP_CONNECT_TIMEOUT_SECONDS",
+                DEFAULT_CONNECT_TIMEOUT_SECONDS,
+            )
+        )
         self._http_client = http_client
         self._logger = logger
 
@@ -96,7 +112,11 @@ class CopilotHTTPClient:
         """Get or create HTTP client."""
         if self._http_client:
             return self._http_client
-        return httpx.AsyncClient(timeout=30.0)
+        timeout = httpx.Timeout(
+            timeout=self.timeout_seconds,
+            connect=self.connect_timeout_seconds,
+        )
+        return httpx.AsyncClient(timeout=timeout)
 
     async def _add_auth_headers(self, headers: dict[str, str]) -> dict[str, str]:
         """Add authorization headers."""
@@ -204,11 +224,14 @@ class CopilotHTTPClient:
 
                 return response
 
-            except httpx.NetworkError as e:
+            except (httpx.NetworkError, httpx.TimeoutException) as e:
                 if attempt < self.max_retries and replayable:
                     wait_ms = self.retry_delay_ms * (2 ** attempt)
+                    error_kind = (
+                        "timeout" if isinstance(e, httpx.TimeoutException) else "network error"
+                    )
                     self._logger.warning(
-                        f"🔄 Network error. Retry {attempt + 1}/{self.max_retries} "
+                        f"🔄 {error_kind.capitalize()}. Retry {attempt + 1}/{self.max_retries} "
                         f"in {wait_ms}ms: {e}"
                     )
                     attempt += 1

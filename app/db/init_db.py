@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.db.base import Base
 from app.db.session import engine
 from app.models import (
+    builder,
     generated_test,
     log,
     project,

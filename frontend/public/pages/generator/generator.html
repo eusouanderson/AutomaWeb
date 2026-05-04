@@ -1,66 +1,52 @@
-<div class="section">
-  <h2>Gerar Teste Robot Framework</h2>
+<div class="section visual-builder-section">
+  <h2>Test Builder Visual (Robot Framework)</h2>
   <p class="muted">
-    Gere testes automatizados para o Robot Framework com base em prompts e contexto fornecidos.
+    Fluxo orientado por captura visual: inspecione e interaja na interface, capture os elementos e gere o teste
+    com apoio de LLM.
   </p>
 
-  <form id="generate-test-form">
+  <form id="visual-builder-form" class="visual-builder-form">
     <div class="form-group">
       <label for="test-project">Projeto</label>
       <select id="test-project" required>
         <option value="">Selecione um projeto</option>
       </select>
     </div>
-    <div id="gen-scan-cache-notice" class="scan-cache-notice hidden">
-      <span>✅ Scan em cache — <span id="gen-scan-cache-date"></span></span>
-      <button type="button" id="gen-rescan-btn" class="btn btn-ghost btn-sm">↻ Refazer scan</button>
-    </div>
-    <div class="form-group">
-      <button type="button" id="scan-page-btn" class="btn btn-secondary">Escanear Página</button>
-    </div>
-    <div id="scan-panel" class="scan-panel hidden">
-      <h3>Scanner de Elementos</h3>
-      <div id="scan-live-status" class="scan-live-status hidden" aria-live="polite">
-        <span id="scan-live-text">Escaneando</span>
-        <span class="scan-dots" aria-hidden="true">
-          <span>.</span><span>.</span><span>.</span>
-        </span>
-      </div>
-      <div id="scan-progress" class="scan-progress"></div>
-      <div id="scan-ready-message" class="scan-ready hidden">Página pronta para o prompt.</div>
-      <div id="scan-summary" class="scan-summary hidden">
-        <p><strong>Título:</strong> <span id="scan-title">-</span></p>
-        <p><strong>Total de Elementos:</strong> <span id="scan-total">0</span></p>
-        <p><strong>Resumo:</strong> <span id="scan-types">-</span></p>
-      </div>
-    </div>
-    <div class="form-group">
-      <label for="test-prompt">Prompt (o que deseja testar)</label>
-      <textarea id="test-prompt" rows="4" required minlength="5"
-        placeholder="Ex: Testar login no sistema com usuário válido e inválido"></textarea>
-    </div>
-    <div class="form-group">
-      <label for="test-context">Contexto Adicional (opcional)</label>
-      <textarea id="test-context" rows="3"
-        placeholder="Ex: URL: https://example.com, Seletores específicos, etc."></textarea>
-    </div>
-    <button id="generate-submit-btn" type="submit" class="btn btn-primary">Gerar Teste</button>
-  </form>
-</div>
-
-<div class="section visual-builder-section">
-  <h2>Test Builder Visual (Robot Framework)</h2>
-  <p class="muted">
-    Inicie uma sessão visual, interaja na página aberta pelo navegador e gere steps para Robot Framework
-    automaticamente.
-  </p>
-
-  <form id="visual-builder-form" class="visual-builder-form">
     <input id="builder-url" type="hidden" />
     <div class="form-group">
       <label for="builder-prompt">Objetivo do teste (opcional)</label>
       <textarea id="builder-prompt" rows="2"
         placeholder="Ex: validar login e mensagem de erro com credenciais inválidas"></textarea>
+    </div>
+    <div class="form-group">
+      <label for="builder-llm-model">Modelo LLM</label>
+      <div class="result-actions">
+        <select id="builder-llm-model">
+          <option value="">Padrão do servidor</option>
+        </select>
+        <button id="builder-llm-refresh-models-btn" type="button" class="btn btn-secondary">Atualizar Modelos</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="builder-llm-plan">Plan Builder</label>
+      <select id="builder-llm-plan">
+        <option value="balanced">Balanced</option>
+        <option value="strict">Strict / Deterministic</option>
+        <option value="exploratory">Exploratory</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="builder-llm-temperature">Temperature</label>
+      <input id="builder-llm-temperature" type="number" min="0" max="2" step="0.1" value="0.2" />
+    </div>
+    <div class="form-group">
+      <label for="builder-llm-max-tokens">Max Tokens</label>
+      <input id="builder-llm-max-tokens" type="number" min="256" max="32768" step="256" value="4096" />
+    </div>
+    <div class="form-group">
+      <label for="builder-llm-system-prompt">System Prompt (opcional)</label>
+      <textarea id="builder-llm-system-prompt" rows="3"
+        placeholder="Instruções extras para o modelo gerar o teste"></textarea>
     </div>
     <div class="result-actions">
       <button id="builder-start-btn" type="submit" class="btn btn-primary">Iniciar Captura Visual</button>

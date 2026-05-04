@@ -109,6 +109,39 @@ class CopilotProvider:
 
         return None
 
+    def _build_responses_payload(
+        self,
+        model: str,
+        messages: list[dict],
+        temperature: float,
+        max_tokens: Optional[int],
+        *,
+        legacy: bool = False,
+    ) -> dict:
+        """Build payload for responses API.
+
+        Uses modern format by default (``input`` / ``max_output_tokens``),
+        with optional legacy format fallback (``messages`` / ``max_tokens``).
+        """
+        if legacy:
+            payload = {
+                "model": model,
+                "messages": messages,
+                "temperature": temperature,
+            }
+            if max_tokens is not None:
+                payload["max_tokens"] = max_tokens
+            return payload
+
+        payload = {
+            "model": model,
+            "input": messages,
+            "temperature": temperature,
+        }
+        if max_tokens is not None:
+            payload["max_output_tokens"] = max_tokens
+        return payload
+
     async def chat(
         self,
         model: str,
@@ -188,17 +221,54 @@ class CopilotProvider:
             f"📤 Calling responses API for model: {model}"
         )
 
+        endpoint = f"{self.base_url}/responses"
         response = await self.http_client.post(
-            f"{self.base_url}/responses",
-            json={
-                "model": model,
-                "messages": messages,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-            },
+            endpoint,
+            json=self._build_responses_payload(
+                model,
+                messages,
+                temperature,
+                max_tokens,
+                legacy=False,
+            ),
         )
 
-        response.raise_for_status()
+        if not response.is_success:
+            self._logger.error(
+                "❌ responses %s — body: %s",
+                response.status_code,
+                response.text[:500],
+            )
+
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            status_code = exc.response.status_code if exc.response else None
+            if status_code != 400:
+                raise
+
+            self._logger.warning(
+                "⚠️ responses API returned 400 for model %s. Retrying with legacy payload format.",
+                model,
+            )
+            response = await self.http_client.post(
+                endpoint,
+                json=self._build_responses_payload(
+                    model,
+                    messages,
+                    temperature,
+                    max_tokens,
+                    legacy=True,
+                ),
+            )
+            if not response.is_success:
+                self._logger.error(
+                    "❌ responses legacy retry %s — body: %s",
+                    response.status_code,
+                    response.text[:500],
+                )
+            response.raise_for_status()
+
         data = response.json()
 
         try:
@@ -236,8 +306,10 @@ class CopilotProvider:
         Returns:
             Generated text
         """
-        # Determine endpoint
-        if model.startswith("gpt-5") and model != "gpt-5-mini":
+        # Determine endpoint:
+        # - responses API: OpenAI GPT-5+ advanced models only
+        # - chat API: everything else, including Claude and GPT-5-mini
+        if model.startswith("gpt-5") and model not in {"gpt-5-mini"}:
             endpoint = "responses"
         else:
             endpoint = "chat"

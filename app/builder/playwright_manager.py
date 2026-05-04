@@ -40,6 +40,12 @@ def _capture_script(session_id: str, backend_event_url: str) -> str:
   let hoveredEl = null;
   let inputTimer = null;
 
+  const truncate = (value, max = 180) => {{
+    const normalized = String(value || '').replace(/\\s+/g, ' ').trim();
+    if (!normalized) return '';
+    return normalized.length > max ? normalized.slice(0, max - 1) + '…' : normalized;
+  }};
+
   const cssEsc = (value) =>
     window.CSS?.escape ? window.CSS.escape(value) : String(value).replace(/[^\\w-]/g, '\\\\$&');
 
@@ -87,6 +93,57 @@ def _capture_script(session_id: str, backend_event_url: str) -> str:
     return target.closest(actionableSelector) || target;
   }};
 
+  const resolveLabelText = (el) => {{
+    if (!(el instanceof Element)) return '';
+
+    const ariaLabel = el.getAttribute('aria-label');
+    if (ariaLabel) return truncate(ariaLabel, 120);
+
+    const labels = 'labels' in el && Array.isArray(Array.from(el.labels || []))
+      ? Array.from(el.labels || []).map((label) => truncate(label.textContent || '', 120)).filter(Boolean)
+      : [];
+    if (labels.length) return labels[0];
+
+    const id = el.getAttribute('id');
+    if (id) {{
+      const label = document.querySelector('label[for="' + cssEsc(id) + '"]');
+      if (label) return truncate(label.textContent || '', 120);
+    }}
+
+    const placeholder = el.getAttribute('placeholder');
+    if (placeholder) return truncate(placeholder, 120);
+
+    return truncate(el.textContent || '', 120);
+  }};
+
+  const inferStepName = (action, target) => {{
+    const label = resolveLabelText(target);
+    if (action === 'input') {{
+      return label ? 'Preencher ' + label : 'Preencher campo';
+    }}
+    return label ? 'Clicar em ' + label : 'Clicar no elemento';
+  }};
+
+  const buildElementDetails = (target, action, selector, value = null, description = '') => {{
+    const text = truncate(target?.textContent || '', 220);
+    const href = target instanceof HTMLAnchorElement ? target.href : target?.getAttribute?.('href') || '';
+    const inputType = target instanceof HTMLInputElement ? target.type || '' : '';
+    return {{
+      session_id: SESSION_ID,
+      action,
+      selector,
+      value,
+      description,
+      step_name: inferStepName(action, target),
+      page_url: window.location.href,
+      page_title: truncate(document.title || '', 180),
+      element_tag: target?.tagName?.toLowerCase?.() || '',
+      element_text: text,
+      input_type: inputType,
+      href: href || '',
+    }};
+  }};
+
   const buildSelector = (el) => {{
     if (!el || !(el instanceof Element)) return '';
 
@@ -128,17 +185,16 @@ def _capture_script(session_id: str, backend_event_url: str) -> str:
       if (isUnique(selector, el)) return selector;
     }}
 
-    if (el.id) {{
-      const idSelector = '#' + cssEsc(el.id);
-      return idSelector;
-    }}
-
+    // Avoid returning non-unique IDs/names because they frequently trigger
+    // strict mode violations in Browser Library execution.
     if (name) {{
-      return el.tagName.toLowerCase() + '[name="' + cssEsc(name) + '"]';
+      const selector = el.tagName.toLowerCase() + '[name="' + cssEsc(name) + '"]';
+      if (isUnique(selector, el)) return selector;
     }}
 
     if (classes.length) {{
-      return el.tagName.toLowerCase() + classes.map((cls) => '.' + cssEsc(cls)).join('');
+      const selector = el.tagName.toLowerCase() + classes.map((cls) => '.' + cssEsc(cls)).join('');
+      if (isUnique(selector, el)) return selector;
     }}
 
     return fallbackPath(el);
@@ -198,7 +254,7 @@ def _capture_script(session_id: str, backend_event_url: str) -> str:
     }}
   }};
 
-  const createTooltip = (target, selector, initialDescription, onSave) => {{
+  const createTooltip = (target, selector, initialDescription, initialStepName, onSave) => {{
     removeTooltip();
     tooltipEl = document.createElement('div');
     tooltipEl.id = TOOLTIP_ID;
@@ -218,6 +274,8 @@ def _capture_script(session_id: str, backend_event_url: str) -> str:
     tooltipEl.innerHTML =
       '<div style="font-weight:600;color:#93c5fd">Visual Test Builder</div>' +
       '<div style="opacity:.85;word-break:break-all">' + selector + '</div>' +
+      '<input id="__aw_name_input__" type="text" placeholder="Nome do step" ' +
+      'style="width:100%;border-radius:6px;border:1px solid #1f2937;background:#0b1220;color:#f9fafb;padding:7px 8px" />' +
       '<input id="__aw_desc_input__" type="text" placeholder="Descreva o que validar" ' +
       'style="width:100%;border-radius:6px;border:1px solid #1f2937;background:#0b1220;color:#f9fafb;padding:7px 8px" />' +
       '<button id="__aw_desc_save__" style="cursor:pointer;border:none;background:#2563eb;color:white;border-radius:6px;padding:7px 8px;font-weight:600">Salvar Step</button>';
@@ -230,17 +288,28 @@ def _capture_script(session_id: str, backend_event_url: str) -> str:
     tooltipEl.style.left = left + 'px';
     tooltipEl.style.top = top + 'px';
 
+    const nameInput = tooltipEl.querySelector('#__aw_name_input__');
     const input = tooltipEl.querySelector('#__aw_desc_input__');
     const saveBtn = tooltipEl.querySelector('#__aw_desc_save__');
 
+    if (nameInput) {{
+      nameInput.value = initialStepName || '';
+    }}
+
     if (input) {{
       input.value = initialDescription || '';
+    }}
+
+    if (nameInput) {{
+      nameInput.focus();
+    }} else if (input) {{
       input.focus();
     }}
 
     const submit = () => {{
+      const stepName = nameInput ? String(nameInput.value || '').trim() : '';
       const description = input ? String(input.value || '').trim() : '';
-      onSave(description);
+      onSave(stepName, description);
       removeTooltip();
     }};
 
@@ -248,14 +317,14 @@ def _capture_script(session_id: str, backend_event_url: str) -> str:
       saveBtn.addEventListener('click', submit);
     }}
 
-    if (input) {{
-      input.addEventListener('keydown', (event) => {{
+    [nameInput, input].filter(Boolean).forEach((field) => {{
+      field.addEventListener('keydown', (event) => {{
         if (event.key === 'Enter') {{
           event.preventDefault();
           submit();
         }}
       }});
-    }}
+    }});
   }};
 
   const isBuilderUi = (target) =>
@@ -295,14 +364,12 @@ def _capture_script(session_id: str, backend_event_url: str) -> str:
 
       highlight(target);
 
-      const defaultDescription = (target.textContent || '').trim().slice(0, 120);
-      createTooltip(target, selector, defaultDescription, (description) => {{
+      const defaultDescription = truncate(target.textContent || '', 120);
+      const defaultStepName = inferStepName('click', target);
+      createTooltip(target, selector, defaultDescription, defaultStepName, (stepName, description) => {{
         void sendEvent({{
-          session_id: SESSION_ID,
-          action: 'click',
-          selector,
-          value: null,
-          description,
+          ...buildElementDetails(target, 'click', selector, null, description),
+          step_name: stepName || defaultStepName,
         }});
       }});
     }},
@@ -328,13 +395,7 @@ def _capture_script(session_id: str, backend_event_url: str) -> str:
       }}
 
       inputTimer = setTimeout(() => {{
-        void sendEvent({{
-          session_id: SESSION_ID,
-          action: 'input',
-          selector,
-          value: target.value,
-          description: 'Valor preenchido no campo',
-        }});
+        void sendEvent(buildElementDetails(target, 'input', selector, target.value, 'Valor preenchido no campo'));
       }}, INPUT_DEBOUNCE_MS);
     }},
     true,
@@ -349,13 +410,7 @@ def _capture_script(session_id: str, backend_event_url: str) -> str:
       const selector = buildSelector(target);
       if (!selector) return;
 
-      void sendEvent({{
-        session_id: SESSION_ID,
-        action: 'input',
-        selector,
-        value: target.value,
-        description: 'Opcao selecionada no campo',
-      }});
+      void sendEvent(buildElementDetails(target, 'input', selector, target.value, 'Opcao selecionada no campo'));
     }},
     true,
   );

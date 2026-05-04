@@ -1,9 +1,9 @@
 import { toast } from '../../components/toast.js';
 import {
-  deleteGeneratedTestService,
-  executeProjectTests,
-  getProjectGeneratedTests,
-  getProjects,
+    deleteGeneratedTestService,
+    executeProjectTests,
+    getProjectGeneratedTests,
+    getProjects,
 } from '../../services/test.service.js';
 import { loadTemplate, renderHTML } from '../../utils/dom.js';
 import { formatDate } from '../../utils/helpers.js';
@@ -23,21 +23,57 @@ export async function mount({ testsRoot, executeRoot }, options) {
 
 const SCANNER_STORAGE_FEEDBACK = 'scanner_feedback';
 
-function buildExecutionFeedback(data) {
+function buildExecutionFeedback(data, testIds = []) {
   let lines = [
-    'A execucao dos testes apresentou falhas. Corrija APENAS os test cases que falharam, mantendo INTACTOS todos os test cases que passaram.',
-    'Não deve apagar os testes e sim corrigi-lo conforme o erro se não encontrar como corrigir deve mostrar comentado no robot',
+    'A execucao dos testes apresentou falhas. Corrija APENAS os test cases marcados como FAIL e mantenha INTACTOS todos os test cases marcados como PASS.',
+    'Nao deve apagar testes. Corrija o codigo conforme o erro encontrado; se nao for possivel corrigir com seguranca, mantenha o test case e deixe um comentario no Robot explicando o ponto pendente.',
     `Resumo: total=${data.total_tests}, passed=${data.passed}, failed=${data.failed}, skipped=${data.skipped}`,
   ];
 
-  const failedCases = (data.test_cases || []).filter(
-    (tc) => (tc.status || '').toUpperCase() === 'FAIL'
-  );
+  if (Array.isArray(testIds) && testIds.length > 0) {
+    lines.push(`Testes/arquivos selecionados nesta execucao (IDs): ${testIds.join(', ')}`);
+  }
+
+  const allCases = Array.isArray(data.test_cases) ? data.test_cases : [];
+  const passedCases = allCases.filter((tc) => (tc.status || '').toUpperCase() === 'PASS');
+  const failedCases = allCases.filter((tc) => (tc.status || '').toUpperCase() === 'FAIL');
+
+  if (passedCases.length > 0) {
+    const passedNames = [...new Set(passedCases.map((tc) => tc.name).filter(Boolean))];
+    lines = lines.concat(['', 'Test cases que passaram e DEVEM permanecer intactos:']);
+    for (const name of passedNames) {
+      lines.push(`  - "${name}"`);
+    }
+  }
 
   if (failedCases.length > 0) {
-    lines = lines.concat(['', 'Test cases que falharam:']);
+    const groupedFailures = new Map();
     for (const tc of failedCases) {
-      lines.push(`  - "${tc.name}": ${tc.message || 'sem mensagem de erro'}`);
+      const message = tc.message || 'sem mensagem de erro';
+      const key = `${tc.name}:::${message}`;
+      groupedFailures.set(key, {
+        name: tc.name,
+        message,
+        count: (groupedFailures.get(key)?.count || 0) + 1,
+      });
+    }
+
+    lines = lines.concat(['', 'Test cases que falharam:']);
+    for (const failure of groupedFailures.values()) {
+      const suffix = failure.count > 1 ? ` (${failure.count} ocorrencias)` : '';
+      lines.push(`  - "${failure.name}": ${failure.message}${suffix}`);
+    }
+
+    const repeatedNames = [...new Set(failedCases.map((tc) => tc.name))].filter(
+      (name) => failedCases.filter((tc) => tc.name === name).length > 1
+    );
+    if (repeatedNames.length > 0) {
+      lines = lines.concat([
+        '',
+        'Observacao:',
+        ' - O mesmo nome de test case apareceu mais de uma vez na execucao. Isso normalmente significa que existe mais de um arquivo com o mesmo cenario.',
+        ' - Corrija cada ocorrencia com falha no arquivo correspondente, sem alterar os cenarios que passaram.',
+      ]);
     }
   }
 
@@ -49,9 +85,10 @@ function buildExecutionFeedback(data) {
     '',
     'INSTRUCOES IMPORTANTES:',
     '1. Retorne o arquivo Robot Framework COMPLETO, com TODOS os test cases originais.',
-    '2. Corrija apenas os test cases listados acima.',
-    '3. NAO remova test cases que passaram.',
-    '4. Mantenha a estrutura de Settings, Variables, Keywords intacta.',
+    '2. Corrija somente os test cases listados como FAIL.',
+    '3. NAO remova, renomeie ou reescreva desnecessariamente os test cases que passaram.',
+    '4. Mantenha a estrutura de Settings, Variables e Keywords intacta.',
+    '5. Se nao houver correcao segura, mantenha o test case e adicione comentario explicando o bloqueio.',
   ]);
 
   return lines.join('\n').slice(0, 8000);
@@ -164,7 +201,7 @@ export function initScannerPage({ store, onRecreateRequested }) {
     }
 
     recreatePanel.classList.remove('hidden');
-    executionFeedback.value = buildExecutionFeedback(data);
+    executionFeedback.value = buildExecutionFeedback(data, testIds);
     recreateButton.dataset.projectId = String(projectId);
     /* v8 ignore next */
     recreateButton.dataset.testIds = JSON.stringify(testIds || []);

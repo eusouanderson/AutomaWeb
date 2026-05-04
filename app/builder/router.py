@@ -12,6 +12,7 @@ router = APIRouter(prefix="/builder", tags=["builder"])
 
 class BuilderStartRequest(BaseModel):
     url: HttpUrl
+    project_id: int | None = None
 
 
 class BuilderStartResponse(BaseModel):
@@ -28,6 +29,13 @@ class BuilderEventRequest(BaseModel):
     selector: str | None = None
     value: str | None = None
     description: str | None = None
+    step_name: str | None = None
+    page_url: str | None = None
+    page_title: str | None = None
+    element_tag: str | None = None
+    element_text: str | None = None
+    input_type: str | None = None
+    href: str | None = None
 
     # Legacy fields kept to avoid breaking older clients.
     url: str | None = None
@@ -36,6 +44,7 @@ class BuilderEventRequest(BaseModel):
 
 class BuilderEventResponse(BaseModel):
     message: str
+    step_id: int | None = None
     step: int
     session_id: str
 
@@ -56,6 +65,11 @@ class BuilderGenerateResponse(BaseModel):
     code: str
 
 
+class BuilderStepUpdateRequest(BaseModel):
+    step_name: str | None = None
+    description: str | None = None
+
+
 @router.post("/start", response_model=BuilderStartResponse)
 async def start_builder(
     payload: BuilderStartRequest,
@@ -64,8 +78,10 @@ async def start_builder(
 ) -> BuilderStartResponse:
     try:
         backend_base_url = str(request.base_url).rstrip("/")
-        session_id = await service.start_builder(
-            str(payload.url), backend_base_url=backend_base_url
+        session_id = await service.start_builder_for_project(
+            str(payload.url),
+            backend_base_url=backend_base_url,
+            project_id=payload.project_id,
         )
     except Exception as exc:
         raise HTTPException(
@@ -91,6 +107,7 @@ async def capture_builder_event(
 
     return BuilderEventResponse(
         message="Event captured",
+        step_id=saved.get("id"),
         step=int(saved["step"]),
         session_id=str(saved["session_id"]),
     )
@@ -120,3 +137,19 @@ async def generate_builder_code(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return BuilderGenerateResponse(**generated)
+
+
+@router.put("/steps/{step_id}")
+async def update_builder_step(
+    step_id: int,
+    payload: BuilderStepUpdateRequest,
+    service: BuilderService = Depends(get_builder_service),
+) -> dict[str, Any]:
+    try:
+        return await service.update_step(
+            step_id,
+            step_name=payload.step_name,
+            description=payload.description,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

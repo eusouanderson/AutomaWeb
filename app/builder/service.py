@@ -44,6 +44,30 @@ class BuilderService:
             )
         return session.session_id
 
+    async def start_builder_for_project(
+        self, url: str, backend_base_url: str, project_id: int | None = None
+    ) -> str:
+        session = await self._event_store.create_session(url, project_id=project_id)
+        backend_event_url = f"{backend_base_url.rstrip('/')}/builder/event"
+
+        async def _record_from_browser(payload: dict[str, Any]) -> None:
+            await self.record_event(session.session_id, payload)
+
+        try:
+            await self._playwright_manager.start_session(
+                session_id=session.session_id,
+                url=url,
+                backend_event_url=backend_event_url,
+                event_handler=_record_from_browser,
+            )
+        except TypeError:
+            await self._playwright_manager.start_session(
+                session_id=session.session_id,
+                url=url,
+                backend_event_url=backend_event_url,
+            )
+        return session.session_id
+
     async def record_event(
         self, session_id: str, payload: dict[str, Any]
     ) -> dict[str, Any]:
@@ -62,6 +86,22 @@ class BuilderService:
 
     async def list_steps(self, session_id: str | None = None) -> list[dict[str, Any]]:
         return await self._event_store.get_steps(session_id)
+
+    async def update_step(
+        self,
+        step_id: int,
+        *,
+        step_name: str | None = None,
+        description: str | None = None,
+    ) -> dict[str, Any]:
+        updates: dict[str, Any] = {}
+        if step_name is not None:
+            updates["step_name"] = step_name
+        if description is not None:
+            updates["description"] = description
+        if not updates:
+            raise ValueError("No builder step updates provided")
+        return await self._event_store.update_step(step_id, updates)
 
     async def generate_code(self, session_id: str | None = None) -> dict[str, Any]:
         return await self.generate_code_with_prompt(session_id=session_id, prompt=None)
@@ -105,6 +145,13 @@ class BuilderService:
             "selector": selector,
             "value": None,
             "description": str(payload.get("description", "")).strip(),
+            "step_name": str(payload.get("step_name", "")).strip(),
+            "page_url": str(payload.get("page_url", "")).strip(),
+            "page_title": str(payload.get("page_title", "")).strip(),
+            "element_tag": str(payload.get("element_tag", "")).strip(),
+            "element_text": str(payload.get("element_text", "")).strip(),
+            "input_type": str(payload.get("input_type", "")).strip(),
+            "href": str(payload.get("href", "")).strip(),
         }
 
         if action == "input":
@@ -116,6 +163,15 @@ class BuilderService:
         legacy_text = str(payload.get("text", "")).strip()
         if legacy_text and not normalized["description"]:
             normalized["description"] = legacy_text
+
+        if not normalized["step_name"]:
+            normalized["step_name"] = normalized["description"]
+
+        if not normalized["step_name"]:
+            if action == "input":
+                normalized["step_name"] = "Preencher campo"
+            else:
+                normalized["step_name"] = "Interagir com elemento"
 
         return normalized
 

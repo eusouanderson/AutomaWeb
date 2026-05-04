@@ -21,10 +21,10 @@ vi.mock('../../../utils/dom.js', async () => {
 // ── imports ───────────────────────────────────────────────────────────────────
 import { toast } from '../../../components/toast.js';
 import {
-  deleteGeneratedTestService,
-  executeProjectTests,
-  getProjectGeneratedTests,
-  getProjects,
+    deleteGeneratedTestService,
+    executeProjectTests,
+    getProjectGeneratedTests,
+    getProjects,
 } from '../../../services/test.service.js';
 import { initScannerPage, mount } from '../scanner.page.js';
 
@@ -1081,5 +1081,59 @@ describe('scanner page – initScannerPage', () => {
     await vi.waitFor(() =>
       expect(document.getElementById('execution-feedback').value).toContain('sem mensagem de erro')
     );
+  });
+
+  it('buildExecutionFeedback lists passed cases and groups duplicate failed cases', async () => {
+    getProjects.mockResolvedValue([{ id: 1, name: 'Proj' }]);
+    getProjectGeneratedTests.mockResolvedValue([
+      { id: 11, file_path: 'tests/a.robot' },
+      { id: 12, file_path: 'tests/b.robot' },
+    ]);
+    executeProjectTests.mockResolvedValue({
+      total_tests: 4,
+      passed: 2,
+      failed: 2,
+      skipped: 0,
+      error_output: 'full robot output',
+      test_cases: [
+        { name: 'TC001 - AB Testing', status: 'PASS', message: null },
+        { name: 'TC001 - Add/Remove Elements', status: 'PASS', message: null },
+        {
+          name: 'TC001 - Basic Auth',
+          status: 'FAIL',
+          message: "'chrome-error://chromewebdata/' does not contain '/basic_auth'",
+        },
+        {
+          name: 'TC001 - Basic Auth',
+          status: 'FAIL',
+          message: "'chrome-error://chromewebdata/' does not contain '/basic_auth'",
+        },
+      ],
+    });
+
+    const { loadExecuteProjects } = initScannerPage({ onRecreateRequested: vi.fn() });
+    await loadExecuteProjects();
+
+    document.getElementById('execute-project').value = '1';
+    document.getElementById('execute-project').dispatchEvent(new Event('change'));
+    await vi.waitFor(() =>
+      expect(document.getElementById('execute-test-list-check').textContent).toContain('#11')
+    );
+    document
+      .getElementById('execute-tests-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+
+    await vi.waitFor(() =>
+      expect(document.getElementById('execution-feedback').value).toContain(
+        'Test cases que passaram e DEVEM permanecer intactos:'
+      )
+    );
+
+    const feedback = document.getElementById('execution-feedback').value;
+    expect(feedback).toContain('"TC001 - AB Testing"');
+    expect(feedback).toContain('"TC001 - Add/Remove Elements"');
+    expect(feedback).toContain('"TC001 - Basic Auth": \'chrome-error://chromewebdata/\' does not contain \'/basic_auth\' (2 ocorrencias)');
+    expect(feedback).toContain('O mesmo nome de test case apareceu mais de uma vez na execucao');
+    expect(feedback).toContain('Testes/arquivos selecionados nesta execucao (IDs):');
   });
 });

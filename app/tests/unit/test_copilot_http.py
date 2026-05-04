@@ -256,6 +256,20 @@ async def test_request_retries_on_network_error():
 
 
 @pytest.mark.asyncio
+async def test_request_retries_on_timeout_exception():
+    ok = _mock_response(200)
+
+    mock_inner = MagicMock(spec=httpx.AsyncClient)
+    mock_inner.request = AsyncMock(
+        side_effect=[httpx.ReadTimeout("read timeout"), ok]
+    )
+
+    client = _make_client(http_client=mock_inner, max_retries=1, retry_delay_ms=0)
+    result = await client.request("GET", "https://api.example.com/v1")
+    assert result.status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_request_raises_network_error_after_max_retries():
     mock_inner = MagicMock(spec=httpx.AsyncClient)
     mock_inner.request = AsyncMock(side_effect=httpx.ConnectError("no route"))

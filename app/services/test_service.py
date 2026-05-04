@@ -6,6 +6,8 @@ import asyncio
 from datetime import datetime
 from pathlib import Path
 
+import httpx
+
 # ---------------------------------------------------------------------------
 # Robot Framework syntax-correction constants
 # ---------------------------------------------------------------------------
@@ -69,6 +71,10 @@ class LLMServiceUnavailableError(Exception):
     """Raised when LLM provider is unavailable."""
 
 
+class LLMInvalidRequestError(Exception):
+    """Raised when LLM provider rejects request payload/model/options."""
+
+
 class ScanUnavailableError(Exception):
     """Raised when element scan fails during test generation."""
 
@@ -103,6 +109,10 @@ class TestService:
         project_id: int,
         prompt: str,
         context: str | None = None,
+        model: str | None = None,
+        system_prompt: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         ai_debug: bool = False,
         force_rescan: bool = False,
     ) -> GeneratedTest:
@@ -146,11 +156,27 @@ class TestService:
                 project.scan_cached_at = datetime.utcnow()
                 await session.flush()
 
+        generation_context = self._build_generation_context(
+            user_context=context,
+            test_directory=project.test_directory,
+        )
+
         try:
+            generation_options: dict[str, object] = {}
+            if model is not None:
+                generation_options["model"] = model
+            if system_prompt is not None:
+                generation_options["system_prompt"] = system_prompt
+            if temperature is not None:
+                generation_options["temperature"] = temperature
+            if max_tokens is not None:
+                generation_options["max_tokens"] = max_tokens
+
             content = await self._copilot_client.generate_robot_test(
                 prompt_text=prompt,
-                context_text=context,
+                context_text=generation_context,
                 page_structure=page_structure,
+                **generation_options,
             )
             self._last_generation_metadata = {
                 "strategy": "single",
@@ -172,7 +198,7 @@ class TestService:
                 try:
                     content = await self._generate_robot_test_chunked(
                         prompt,
-                        context,
+                        generation_context,
                         page_structure,
                     )
                 except PayloadTooLargeError:
@@ -196,16 +222,28 @@ class TestService:
                     "LLM request payload too large"
                 ) from exc
         except Exception as exc:
-            error_name = exc.__class__.__name__
-            if "APIConnectionError" in error_name or "APITimeoutError" in error_name:
+            classification = self._classify_llm_exception(exc)
+            if classification == "invalid-request":
+                test_request.status = "failed"
+                await self._test_repository.update_test_request(session, test_request)
+                status_code = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) and exc.response else None
+                logger.error(
+                    "Failed to generate test due to LLM request rejection: HTTP %s",
+                    status_code,
+                )
+                raise LLMInvalidRequestError(
+                    f"LLM request rejected by provider (HTTP {status_code}). "
+                    "Verifique modelo e parâmetros de geração."
+                ) from exc
+            if classification == "unavailable":
                 test_request.status = "failed"
                 await self._test_repository.update_test_request(session, test_request)
                 logger.error(
-                    "Failed to generate test due to LLM connectivity issue: %s",
-                    error_name,
+                    "Failed to generate test due to LLM availability issue: %s",
+                    exc.__class__.__name__,
                 )
                 raise LLMServiceUnavailableError(
-                    "LLM provider connection failed"
+                    self._build_llm_unavailable_message(exc)
                 ) from exc
             raise
 
@@ -268,7 +306,11 @@ class TestService:
         return True
 
     async def improve_robot_test(
-        self, session: AsyncSession, test_id: int, content: str
+        self,
+        session: AsyncSession,
+        test_id: int,
+        content: str,
+        feedback: str | None = None,
     ) -> str | None:
         """Send Robot Framework content to the AI (with page scan context) and return improved version."""
         generated = await self._test_repository.get_generated_test(session, test_id)
@@ -289,32 +331,75 @@ class TestService:
         if project and project.url:
             page_structure = await self._get_or_refresh_scan(session, project)
 
+        improvement_context = self._build_generation_context(
+            user_context=feedback,
+            test_directory=project.test_directory if project else None,
+            exclude_file_path=generated.file_path,
+        )
+
         improvement_prompt = (
             "Melhore o teste Robot Framework abaixo. "
             "Preserve a estrutura das seções (*** Settings ***, *** Variables ***, *** Test Cases ***, *** Keywords ***). "
             "Corrija problemas de sintaxe, melhore a legibilidade, otimize keywords, "
             "adicione waits onde necessário e sugira uma estrutura de teste melhor. "
+            "Se houver feedback da execução, trate-o como prioridade. "
+            "Use os testes existentes do diretório como referência de estilo e mantenha os testes que já passam alinhados com esse padrão. "
             "Retorne APENAS código Robot Framework válido, sem explicações ou markdown.\n\n"
             f"{content}"
         )
         try:
             improved = await self._copilot_client.generate_robot_test(
                 prompt_text=improvement_prompt,
-                context_text=None,
+                context_text=improvement_context,
                 page_structure=page_structure,
             )
         except Exception as exc:
-            error_name = exc.__class__.__name__
-            if (
-                "APIConnectionError" in error_name
-                or "APITimeoutError" in error_name
-                or "RetryError" in error_name
-            ):
+            if self._classify_llm_exception(exc) == "unavailable":
                 raise LLMServiceUnavailableError(
-                    "LLM provider connection failed"
+                    self._build_llm_unavailable_message(exc)
                 ) from exc
             raise
         return self._sanitize_robot_output(improved)
+
+    def _classify_llm_exception(self, exc: Exception) -> str | None:
+        """Classify provider exceptions into invalid-request vs temporary-unavailable."""
+        if isinstance(exc, httpx.HTTPStatusError):
+            status_code = exc.response.status_code if exc.response else None
+            if status_code is not None:
+                if status_code in {408, 429} or status_code >= 500:
+                    return "unavailable"
+                if 400 <= status_code < 500:
+                    return "invalid-request"
+
+        error_name = exc.__class__.__name__
+        connectivity_error_names = {
+            "APIConnectionError",
+            "APITimeoutError",
+            "ReadTimeout",
+            "ConnectTimeout",
+            "ConnectError",
+            "TimeoutException",
+            "NetworkError",
+            "RequestError",
+            "RetryError",
+        }
+        if error_name in connectivity_error_names or isinstance(exc, httpx.RequestError):
+            return "unavailable"
+        return None
+
+    def _build_llm_unavailable_message(self, exc: Exception) -> str:
+        if isinstance(exc, httpx.HTTPStatusError):
+            status_code = exc.response.status_code if exc.response else None
+            if status_code == 429:
+                response_text = (exc.response.text or "").lower() if exc.response else ""
+                if "weekly rate limit" in response_text or "exceeded your weekly rate limit" in response_text:
+                    return "LLM provider weekly rate limit exceeded"
+                return "LLM provider rate limit exceeded"
+            if status_code == 408:
+                return "LLM provider request timed out"
+            if status_code is not None and status_code >= 500:
+                return f"LLM provider unavailable (HTTP {status_code})"
+        return "LLM provider connection failed"
 
     async def _get_or_refresh_scan(self, session: AsyncSession, project) -> dict | None:
         """Return cached page scan if fresh, otherwise re-scan and update cache. Returns None on failure."""
@@ -384,6 +469,113 @@ class TestService:
             or "project"
         )
         return f"🧪_{safe}"
+
+    def _build_generation_context(
+        self,
+        user_context: str | None,
+        test_directory: str | None,
+        exclude_file_path: str | None = None,
+    ) -> str | None:
+        """Compose LLM context from user context + existing Robot tests on disk."""
+        user_part = (user_context or "").strip()
+        tests_part = self._collect_robot_tests_context(
+            test_directory,
+            exclude_file_path=exclude_file_path,
+        )
+
+        if user_part and tests_part:
+            merged = (
+                f"{user_part}\n\n"
+                "Contexto adicional (testes existentes no diretório do projeto):\n"
+                f"{tests_part}"
+            )
+        elif user_part:
+            merged = user_part
+        elif tests_part:
+            merged = (
+                "Contexto adicional (testes existentes no diretório do projeto):\n"
+                f"{tests_part}"
+            )
+        else:
+            return None
+
+        max_chars = max(200, int(settings.LLM_MAX_CONTEXT_CHARS))
+        if len(merged) <= max_chars:
+            return merged
+
+        # Keep explicit user input as priority, and use remaining space for file context.
+        if user_part:
+            if len(user_part) >= max_chars:
+                return user_part[:max_chars]
+            sep = "\n\nContexto adicional (parcial):\n"
+            remaining = max_chars - len(user_part) - len(sep)
+            if remaining > 0 and tests_part:
+                return f"{user_part}{sep}{tests_part[:remaining]}"
+            return user_part[:max_chars]
+
+        return merged[:max_chars]
+
+    def _collect_robot_tests_context(
+        self,
+        test_directory: str | None,
+        exclude_file_path: str | None = None,
+    ) -> str | None:
+        """Read existing .robot tests from project directory for prompt grounding."""
+        if not test_directory:
+            return None
+
+        base_dir = Path(test_directory)
+        if not base_dir.exists() or not base_dir.is_dir():
+            return None
+
+        max_files = 4
+        # Reserve part of context budget for disk-based examples.
+        max_total_chars = max(400, int(settings.LLM_MAX_CONTEXT_CHARS // 2))
+        remaining = max_total_chars
+        excluded_path = Path(exclude_file_path).resolve() if exclude_file_path else None
+
+        robot_files = sorted(
+            base_dir.rglob("*.robot"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+
+        snippets: list[str] = []
+        for path in robot_files:
+            if len(snippets) >= max_files or remaining <= 0:
+                break
+            try:
+                resolved_path = path.resolve()
+            except OSError:
+                continue
+            if excluded_path is not None and resolved_path == excluded_path:
+                continue
+            # Avoid huge generated outputs from logs/reports folders.
+            if any(part.lower() in {"report", "reports", "log", "logs"} for part in path.parts):
+                continue
+            try:
+                raw = path.read_text(encoding="utf-8", errors="ignore").strip()
+            except OSError:
+                continue
+            if not raw:
+                continue
+
+            rel = path.relative_to(base_dir)
+            header = f"\n### Arquivo: {rel.as_posix()}\n"
+            budget_for_content = max(120, remaining - len(header) - 1)
+            if budget_for_content <= 0:
+                break
+            body = raw[:budget_for_content]
+            if len(raw) > budget_for_content:
+                body += "\n... [conteúdo truncado]"
+            chunk = f"{header}{body}"
+            snippets.append(chunk)
+            remaining -= len(chunk)
+
+        if not snippets:
+            return None
+
+        return "\n".join(snippets).strip()
 
     async def _generate_robot_test_chunked(
         self, prompt: str, context: str | None, page_structure: dict
@@ -665,6 +857,10 @@ class TestService:
         filtered = []
         for line in cleaned:
             stripped = line.strip()
+            # LLM sometimes wraps output in markdown code fences (```robot ... ```),
+            # which Robot interprets as extra/empty test names.
+            if stripped.startswith("```"):
+                continue
             if stripped.startswith("**") and not stripped.startswith("***"):
                 continue
             if line.strip().lower().startswith("observação"):
@@ -675,6 +871,10 @@ class TestService:
         # Replace invalid libraries
         cleaned = [
             l.replace("PlaywrightLibrary", "Browser").replace("Playwright", "Browser")
+            for l in cleaned
+        ]
+        cleaned = [
+            l.replace("Library    SeleniumLibrary", "Library    Browser")
             for l in cleaned
         ]
 
@@ -772,7 +972,10 @@ class TestService:
         strict_selectors = self._extract_strict_mode_selectors(context)
         selector_keywords = {
             "Click",
+            "Click Element",
             "Wait For Elements State",
+            "Wait Until Element Is Visible",
+            "Wait Until Page Contains Element",
             "Get Element",
             "Get Elements",
             "Input Text",
@@ -790,6 +993,58 @@ class TestService:
             indent = line[: len(line) - len(line.lstrip())]
             parts = re.split(r"\s{2,}", stripped)
             keyword = parts[0] if parts else ""
+
+            keyword_aliases = {
+                "Click Element": "Click",
+                "Input Text": "Fill Text",
+                "Type Text": "Fill Text",
+            }
+            if keyword in keyword_aliases:
+                keyword = keyword_aliases[keyword]
+                parts[0] = keyword
+
+            if keyword == "Maximize Browser Window":
+                # Browser library does not need this Selenium keyword and it often
+                # causes execution errors when LLM mixes libraries.
+                continue
+
+            if keyword == "Wait Until Element Is Visible" and len(parts) >= 2:
+                timeout_value = self._extract_timeout_value(parts[2:], default="10s")
+                parts = ["Wait For Elements State", parts[1], "visible", timeout_value]
+                keyword = parts[0]
+
+            if keyword == "Wait Until Page Contains Element" and len(parts) >= 2:
+                timeout_value = self._extract_timeout_value(parts[2:], default="10s")
+                parts = ["Wait For Elements State", parts[1], "visible", timeout_value]
+                keyword = parts[0]
+
+            if keyword == "Wait Until Location Contains" and len(parts) >= 2:
+                timeout_value = self._extract_timeout_value(parts[2:], default="10s")
+                target_fragment = parts[1]
+                hardened.append(
+                    f"{indent}Wait For URL    **{target_fragment}*    timeout={timeout_value}"
+                )
+                continue
+
+            if keyword == "Wait Until Page Contains" and len(parts) >= 2:
+                timeout_value = self._extract_timeout_value(parts[2:], default="10s")
+                expected_text = parts[1]
+                hardened.append(
+                    f"{indent}Wait For Elements State    text={expected_text}    visible    {timeout_value}"
+                )
+                continue
+
+            if keyword == "Location Should Contain" and len(parts) >= 2:
+                target_fragment = parts[1]
+                hardened.append(f"{indent}${{__aw_current_url}}    Get Url")
+                hardened.append(f"{indent}Should Contain    ${{__aw_current_url}}    {target_fragment}")
+                continue
+
+            if keyword == "Page Should Contain" and len(parts) >= 2:
+                expected_text = parts[1]
+                hardened.append(f"{indent}${{__aw_page_text}}    Get Text    css=body")
+                hardened.append(f"{indent}Should Contain    ${{__aw_page_text}}    {expected_text}")
+                continue
 
             if keyword == "Open Browser" and len(parts) >= 2:
                 page_url = parts[1]
@@ -815,6 +1070,12 @@ class TestService:
                 if self._is_class_only_css_selector(selector):
                     selector = self._make_selector_unique(selector)
 
+                # IDs are expected to be unique, but many modern apps duplicate
+                # generic IDs (e.g. #button, #logo, #icon), which breaks Browser
+                # Library strict mode. Harden those deterministic high-risk IDs.
+                if self._is_potentially_ambiguous_id_selector(selector):
+                    selector = self._make_selector_unique(selector)
+
                 if (
                     selector in strict_selectors
                     or selector.replace("css=", "") in strict_selectors
@@ -832,6 +1093,17 @@ class TestService:
         # Get Title reads document.title from <head>, not from a visible element.
         hardened = self._fix_title_check_waits(hardened)
         return hardened
+
+    def _extract_timeout_value(self, args: list[str], default: str = "10s") -> str:
+        for arg in args:
+            if arg.startswith("timeout="):
+                value = arg.split("=", 1)[1].strip()
+                return value or default
+        for arg in args:
+            token = arg.strip()
+            if token:
+                return token
+        return default
 
     def _fix_title_check_waits(self, lines: list[str]) -> list[str]:
         """Remove Wait For Elements State that appear just before Get Title."""
@@ -863,7 +1135,16 @@ class TestService:
     def _extract_strict_mode_selectors(self, context: str | None) -> set[str]:
         if not context:
             return set()
-        return set(re.findall(r"locator\('([^']+)'\)", context))
+        selectors = set(re.findall(r"locator\('([^']+)'\)", context))
+
+        # Visual Builder context format:
+        # - step=1 | action=click | selector=#login
+        for raw_selector in re.findall(r"(?:\||\s)selector=([^|\n]+)", context):
+            cleaned = raw_selector.strip()
+            if cleaned and cleaned != "N/A":
+                selectors.add(cleaned)
+
+        return selectors
 
     def _normalize_selector(self, selector: str) -> str:
         if selector.startswith("id:"):
@@ -871,24 +1152,109 @@ class TestService:
         if selector.startswith("css:"):
             return f"css={selector[4:]}"
         if selector.startswith("xpath:"):
-            return f"xpath={selector[6:]}"
+            selector = f"xpath={selector[6:]}"
+            return self._relativize_xpath(selector)
         if selector.startswith("#"):
             return f"css={selector}"
         if selector.startswith("["):
             return f"css={selector}"
         if selector.startswith("/") or selector.startswith("("):
-            return f"xpath={selector}"
+            selector = f"xpath={selector}"
+            return self._relativize_xpath(selector)
+        if selector.startswith("xpath="):
+            return self._relativize_xpath(selector)
         if selector.startswith("."):
             return f"css={selector}"
         if re.match(r"^[a-zA-Z][\w-]*(?:[\[\.:#].*)?$", selector):
             return f"css={selector}"
         return selector
 
+    # ------------------------------------------------------------------
+    # XPath helpers
+    # ------------------------------------------------------------------
+
+    # Matches rooted absolute xpaths like /html/... or /html[1]/...
+    _ABS_XPATH_RE = re.compile(r"^xpath=/html(?:\[\d+\])?/", re.IGNORECASE)
+
+    def _relativize_xpath(self, selector: str) -> str:
+        """Convert an absolute xpath (xpath=/html/body/...) to a relative one (xpath=//...).
+
+        Absolute xpaths generated by LLMs are extremely brittle: the path
+        breaks whenever the page adds or removes a wrapper element.  A
+        double-slash prefix keeps the semantic intent while tolerating normal
+        DOM variation.
+
+        Examples::
+
+            xpath=/html/body/div[2]/div/h3  →  xpath=//div[2]/div/h3
+            xpath=/html[1]/body[1]/a[3]     →  xpath=//a[3]
+        """
+        if not self._ABS_XPATH_RE.match(selector):
+            return selector
+
+        # Strip the xpath= prefix and the leading /html.../body... segments
+        path = selector[len("xpath="):]
+        # Remove leading /html[N] and /body[N] segments to get a relative path
+        # that starts from the first "meaningful" element inside <body>
+        path = re.sub(r"^/html(?:\[\d+\])?/body(?:\[\d+\])?/?", "", path, flags=re.IGNORECASE)
+        if not path:
+            # degenerate case — just points at body itself
+            return "css=body"
+        relative = f"xpath=//{path}"
+        logger.debug("Relativized absolute xpath: %s → %s", selector, relative)
+        return relative
+
     def _is_class_only_css_selector(self, selector: str) -> bool:
         if not selector.startswith("css=."):
             return False
         body = selector[4:]
         return all(token not in body for token in (" ", ">", "+", "~", "[", ":", ">>"))
+
+    def _is_potentially_ambiguous_id_selector(self, selector: str) -> bool:
+        if not selector.startswith("css=#"):
+            return False
+
+        body = selector[5:]
+        # Compound selector (e.g. #container .btn) is not a plain ID hit.
+        if any(token in body for token in (" ", ">", "+", "~", "[", ":", ".", ">>")):
+            return False
+
+        normalized = body.strip().lower()
+        if not normalized:
+            return False
+
+        generic_ids = {
+            "button",
+            "btn",
+            "icon",
+            "logo",
+            "link",
+            "item",
+            "card",
+            "menu",
+            "tab",
+            "title",
+            "label",
+            "input",
+            "field",
+            "container",
+            "content",
+            "main",
+            "root",
+            "app",
+            "header",
+            "footer",
+            "nav",
+            "search",
+            "dialog",
+            "modal",
+        }
+
+        if normalized in generic_ids:
+            return True
+
+        # Very short ids are frequently reused (#x, #el, #btn1 etc.).
+        return len(normalized) <= 4
 
     def _make_selector_unique(self, selector: str) -> str:
         if selector.endswith(" >> nth=0"):

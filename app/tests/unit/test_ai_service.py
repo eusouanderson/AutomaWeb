@@ -108,11 +108,13 @@ async def test_generate_falls_back_to_env_model(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_generate_falls_back_to_default_when_no_env(monkeypatch):
+    from app.core.config import settings
+
     monkeypatch.delenv("COPILOT_MODEL", raising=False)
     service = _make_service()
     await service.generate(prompt="hi")
     call_args = service.provider.run_model.call_args
-    assert call_args[0][0] == "gpt-5-mini"
+    assert call_args[0][0] == settings.COPILOT_MODEL
 
 
 @pytest.mark.asyncio

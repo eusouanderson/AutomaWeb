@@ -11,7 +11,11 @@ from app.models.generated_test import GeneratedTest
 from app.models.project import Project
 from app.models.test_execution import TestExecution
 from app.services.element_scanner import ElementScannerError
-from app.services.test_service import LLMServiceUnavailableError, ScanUnavailableError
+from app.services.test_service import (
+    LLMInvalidRequestError,
+    LLMServiceUnavailableError,
+    ScanUnavailableError,
+)
 
 
 @pytest.mark.asyncio
@@ -434,6 +438,52 @@ async def test_generate_test_route_llm_unavailable(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_generate_test_route_llm_rate_limit_feedback(monkeypatch) -> None:
+    async def fake_generate_test(
+        self,
+        session: AsyncSession,
+        project_id: int,
+        prompt: str,
+        context: str | None = None,
+        ai_debug: bool = False,
+        force_rescan: bool = False,
+    ):
+        raise LLMServiceUnavailableError("LLM provider rate limit exceeded")
+
+    monkeypatch.setattr(routes.TestService, "generate_test", fake_generate_test)
+    payload = routes.TestGenerateRequest(project_id=1, prompt="Teste")
+
+    with pytest.raises(HTTPException) as exc:
+        await routes.generate_test(payload, session=None)  # type: ignore[arg-type]
+
+    assert exc.value.status_code == 503
+    assert "limite temporário de requisições" in exc.value.detail
+
+
+@pytest.mark.asyncio
+async def test_generate_test_route_llm_weekly_rate_limit_feedback(monkeypatch) -> None:
+    async def fake_generate_test(
+        self,
+        session: AsyncSession,
+        project_id: int,
+        prompt: str,
+        context: str | None = None,
+        ai_debug: bool = False,
+        force_rescan: bool = False,
+    ):
+        raise LLMServiceUnavailableError("LLM provider weekly rate limit exceeded")
+
+    monkeypatch.setattr(routes.TestService, "generate_test", fake_generate_test)
+    payload = routes.TestGenerateRequest(project_id=1, prompt="Teste")
+
+    with pytest.raises(HTTPException) as exc:
+        await routes.generate_test(payload, session=None)  # type: ignore[arg-type]
+
+    assert exc.value.status_code == 503
+    assert "limite semanal" in exc.value.detail
+
+
+@pytest.mark.asyncio
 async def test_generate_test_route_scan_unavailable(monkeypatch) -> None:
     async def fake_generate_test(
         self,
@@ -454,6 +504,75 @@ async def test_generate_test_route_scan_unavailable(monkeypatch) -> None:
 
     assert exc.value.status_code == 502
     assert "scan failed" in exc.value.detail
+
+
+@pytest.mark.asyncio
+async def test_generate_test_route_llm_invalid_request(monkeypatch) -> None:
+    async def fake_generate_test(
+        self,
+        session: AsyncSession,
+        project_id: int,
+        prompt: str,
+        context: str | None = None,
+        ai_debug: bool = False,
+        force_rescan: bool = False,
+    ):
+        raise LLMInvalidRequestError("invalid model/options")
+
+    monkeypatch.setattr(routes.TestService, "generate_test", fake_generate_test)
+    payload = routes.TestGenerateRequest(project_id=1, prompt="Teste")
+
+    with pytest.raises(HTTPException) as exc:
+        await routes.generate_test(payload, session=None)  # type: ignore[arg-type]
+
+    assert exc.value.status_code == 400
+    assert "invalid model/options" in exc.value.detail
+
+
+@pytest.mark.asyncio
+async def test_generate_test_route_runtime_authentication_required(monkeypatch) -> None:
+    async def fake_generate_test(
+        self,
+        session: AsyncSession,
+        project_id: int,
+        prompt: str,
+        context: str | None = None,
+        ai_debug: bool = False,
+        force_rescan: bool = False,
+    ):
+        raise RuntimeError("Authentication required for Copilot")
+
+    monkeypatch.setattr(routes.TestService, "generate_test", fake_generate_test)
+    payload = routes.TestGenerateRequest(project_id=1, prompt="Teste")
+
+    with pytest.raises(HTTPException) as exc:
+        await routes.generate_test(payload, session=None)  # type: ignore[arg-type]
+
+    assert exc.value.status_code == 401
+    assert "authorize" in exc.value.detail
+
+
+@pytest.mark.asyncio
+async def test_generate_test_route_runtime_generic_error(monkeypatch) -> None:
+    async def fake_generate_test(
+        self,
+        session: AsyncSession,
+        project_id: int,
+        prompt: str,
+        context: str | None = None,
+        ai_debug: bool = False,
+        force_rescan: bool = False,
+    ):
+        raise RuntimeError("unexpected runtime error")
+
+    monkeypatch.setattr(routes.TestService, "generate_test", fake_generate_test)
+    payload = routes.TestGenerateRequest(project_id=1, prompt="Teste")
+
+    with pytest.raises(HTTPException) as exc:
+        await routes.generate_test(payload, session=None)  # type: ignore[arg-type]
+
+    assert exc.value.status_code == 500
+    assert "unexpected runtime error" in exc.value.detail
 
 
 @pytest.mark.asyncio
@@ -479,6 +598,20 @@ async def test_get_llm_health_success(monkeypatch) -> None:
 
     assert result["ok"] is True
     assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_get_ai_metrics_returns_registry_values(monkeypatch) -> None:
+    class _Registry:
+        def as_dict(self):
+            return {"total": 10, "success": 8, "ratio": 0.8}
+
+    monkeypatch.setattr(routes.AIMetricsRegistry, "instance", staticmethod(lambda: _Registry()))
+
+    result = await routes.get_ai_metrics()
+    assert result["total"] == 10
+    assert result["success"] == 8
+    assert result["ratio"] == 0.8
 
 
 @pytest.mark.asyncio
@@ -647,7 +780,7 @@ async def test_list_project_executions_route_returns_empty(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_improve_robot_test_route_success(monkeypatch) -> None:
-    async def fake_improve_robot_test(self, session, test_id: int, content: str):
+    async def fake_improve_robot_test(self, session, test_id: int, content: str, feedback: str | None = None):
         return "*** Test Cases ***\nImproved Test\n    Log    improved"
 
     monkeypatch.setattr(
@@ -662,7 +795,7 @@ async def test_improve_robot_test_route_success(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_improve_robot_test_route_not_found(monkeypatch) -> None:
-    async def fake_improve_robot_test(self, session, test_id: int, content: str):
+    async def fake_improve_robot_test(self, session, test_id: int, content: str, feedback: str | None = None):
         return None
 
     monkeypatch.setattr(
@@ -675,6 +808,42 @@ async def test_improve_robot_test_route_not_found(monkeypatch) -> None:
 
     assert exc.value.status_code == 404
     assert exc.value.detail == "Test not found"
+
+
+@pytest.mark.asyncio
+async def test_improve_robot_test_route_feedback_passthrough(monkeypatch) -> None:
+    received = {}
+
+    async def fake_improve_robot_test(self, session, test_id: int, content: str, feedback: str | None = None):
+        received["feedback"] = feedback
+        return "*** Test Cases ***\nImproved Test\n    Log    improved"
+
+    monkeypatch.setattr(
+        routes.TestService, "improve_robot_test", fake_improve_robot_test
+    )
+
+    payload = routes.RobotImproveRequest(content="*** Test Cases ***\nOld Test", feedback="corrigir falha")
+    result = await routes.improve_robot_test(1, payload, session=None)  # type: ignore[arg-type]
+
+    assert result.content.startswith("*** Test Cases ***")
+    assert received["feedback"] == "corrigir falha"
+
+
+@pytest.mark.asyncio
+async def test_improve_robot_test_route_llm_rate_limit_feedback(monkeypatch) -> None:
+    async def fake_improve_robot_test(self, session, test_id: int, content: str, feedback: str | None = None):
+        raise LLMServiceUnavailableError("LLM provider rate limit exceeded")
+
+    monkeypatch.setattr(
+        routes.TestService, "improve_robot_test", fake_improve_robot_test
+    )
+
+    payload = routes.RobotImproveRequest(content="*** Test Cases ***")
+    with pytest.raises(HTTPException) as exc:
+        await routes.improve_robot_test(1, payload, session=None)  # type: ignore[arg-type]
+
+    assert exc.value.status_code == 503
+    assert "limite temporário de requisições" in exc.value.detail
 
 
 # ── update_robot_test_content ─────────────────────────────────────────────────

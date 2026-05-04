@@ -34,6 +34,8 @@ def _mock_response(json_data: dict, status_code: int = 200):
     resp.json.return_value = json_data
     resp.raise_for_status = MagicMock()
     resp.status_code = status_code
+    resp.is_success = status_code < 400
+    resp.text = str(json_data)
     return resp
 
 
@@ -150,6 +152,29 @@ async def test_chat_raises_on_invalid_response_format():
         await provider.chat("gpt-5-mini", [])
 
 
+@pytest.mark.asyncio
+async def test_chat_logs_error_and_raises_on_non_success_status():
+    """Covers line 148 — error log when response.is_success is False."""
+    import httpx
+
+    resp = MagicMock()
+    resp.json.return_value = {}
+    resp.status_code = 500
+    resp.is_success = False
+    resp.text = "Internal Server Error"
+    resp.raise_for_status = MagicMock(
+        side_effect=httpx.HTTPStatusError(
+            "500 error", request=MagicMock(), response=MagicMock()
+        )
+    )
+
+    provider = _make_provider(resp)
+    with pytest.raises(httpx.HTTPStatusError):
+        await provider.chat("gpt-5-mini", [{"role": "user", "content": "hi"}])
+
+    resp.raise_for_status.assert_called_once()
+
+
 # ---------------------------------------------------------------------------
 # responses()
 # ---------------------------------------------------------------------------
@@ -195,7 +220,41 @@ async def test_responses_posts_to_correct_url():
     body = call_args[1]["json"]
     assert body["model"] == "gpt-5"
     assert body["temperature"] == 0.0
-    assert body["max_tokens"] == 512
+    assert body["max_output_tokens"] == 512
+    assert body["input"] == [{"role": "user", "content": "q"}]
+
+
+@pytest.mark.asyncio
+async def test_responses_retries_with_legacy_payload_on_400():
+    import httpx
+
+    req = httpx.Request("POST", "https://api.githubcopilot.com/responses")
+
+    bad_response = _mock_response({"error": "bad payload"}, status_code=400)
+    bad_response.raise_for_status = MagicMock(
+        side_effect=httpx.HTTPStatusError(
+            "400 bad request",
+            request=req,
+            response=httpx.Response(400, request=req, text="bad payload"),
+        )
+    )
+
+    ok_response = _mock_response({"output_text": "legacy ok"})
+
+    provider = _make_provider()
+    provider.http_client.post = AsyncMock(side_effect=[bad_response, ok_response])
+
+    result = await provider.responses("gpt-5.4", [{"role": "user", "content": "go"}], temperature=0.0, max_tokens=256)
+
+    assert result == "legacy ok"
+    assert provider.http_client.post.await_count == 2
+
+    first_payload = provider.http_client.post.await_args_list[0].kwargs["json"]
+    second_payload = provider.http_client.post.await_args_list[1].kwargs["json"]
+    assert "input" in first_payload
+    assert first_payload["max_output_tokens"] == 256
+    assert "messages" in second_payload
+    assert second_payload["max_tokens"] == 256
 
 
 @pytest.mark.asyncio

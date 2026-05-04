@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite+aiosqlite:///./app.db"
     
     # Copilot Configuration
-    COPILOT_MODEL: str = "gpt-4o-mini"
+    COPILOT_MODEL: str = "claude-sonnet-4.6"
     COPILOT_TOKEN: str | None = None  # Optional static token for CI/CD
     COPILOT_ENTERPRISE_URL: str | None = None  # Optional GitHub Enterprise URL
     COPILOT_AUTH_FILE_PATH: str | None = None  # Path to store auth.json

@@ -1,16 +1,19 @@
 import {
-  createProject,
-  deleteGeneratedTest,
-  deleteProject,
-  generateRobotTest,
-  generateVisualBuilderCode,
-  getTestById,
-  getVisualBuilderSteps,
-  listGeneratedTests,
-  listProjectExecutions,
-  listProjects,
-  runTests,
-  startVisualBuilder,
+    createProject,
+    deleteGeneratedTest,
+    deleteProject,
+    generateRobotTest,
+    generateVisualBuilderCode,
+    getTestById,
+    getVisualBuilderSteps,
+    improveRobotTest,
+    listAiModels,
+    listGeneratedTests,
+    listProjectExecutions,
+    listProjects,
+    runTests,
+    startVisualBuilder,
+    updateVisualBuilderStep,
 } from '../api/automaweb.api.js';
 import { isValidUrl, requiredText } from '../utils/validators.js';
 
@@ -36,7 +39,16 @@ export async function deleteProjectService(projectId) {
   return deleteProject(projectId);
 }
 
-export async function generateTestFromPrompt({ projectId, prompt, context, forceRescan = false }) {
+export async function generateTestFromPrompt({
+  projectId,
+  prompt,
+  context,
+  forceRescan = false,
+  model,
+  systemPrompt,
+  temperature,
+  maxTokens,
+}) {
   if (!projectId) {
     throw new Error('Project is required');
   }
@@ -49,7 +61,19 @@ export async function generateTestFromPrompt({ projectId, prompt, context, force
     prompt,
     context: context?.trim() || null,
     force_rescan: forceRescan,
+    ...(model ? { model } : {}),
+    ...(systemPrompt ? { system_prompt: systemPrompt } : {}),
+    ...(Number.isFinite(Number(temperature))
+      ? { temperature: Number(temperature) }
+      : {}),
+    ...(Number.isInteger(Number(maxTokens)) && Number(maxTokens) > 0
+      ? { max_tokens: Number(maxTokens) }
+      : {}),
   });
+}
+
+export async function getAvailableAiModels() {
+  return listAiModels();
 }
 
 export async function executeProjectTests(projectId, testIds = null, options = {}) {
@@ -97,6 +121,17 @@ export async function getTestContent(testId) {
   return test?.content ?? null;
 }
 
+export async function improveExistingGeneratedTest(testId, content, feedback = null) {
+  if (!testId) {
+    throw new Error('Test id is required');
+  }
+  if (!requiredText(content, 5)) {
+    throw new Error('Test content is required');
+  }
+
+  return improveRobotTest(testId, content, feedback?.trim() || null);
+}
+
 export async function getProjectExecutions(projectId) {
   if (!projectId) {
     return [];
@@ -104,11 +139,11 @@ export async function getProjectExecutions(projectId) {
   return listProjectExecutions(projectId);
 }
 
-export async function startVisualBuilderSession(url) {
+export async function startVisualBuilderSession(url, projectId = null) {
   if (!isValidUrl(url)) {
     throw new Error('Builder URL must be valid');
   }
-  return startVisualBuilder(url);
+  return startVisualBuilder(url, projectId);
 }
 
 export async function getVisualBuilderCapturedSteps(sessionId) {
@@ -117,4 +152,25 @@ export async function getVisualBuilderCapturedSteps(sessionId) {
 
 export async function generateVisualBuilderPlaywrightCode(sessionId, prompt = null) {
   return generateVisualBuilderCode(sessionId || null, prompt || null);
+}
+
+export async function updateVisualBuilderCapturedStep(stepId, payload = {}) {
+  if (!stepId) {
+    throw new Error('Step id is required');
+  }
+
+  const normalizedPayload = {
+    ...(Object.prototype.hasOwnProperty.call(payload, 'step_name')
+      ? { step_name: String(payload.step_name || '').trim() || null }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(payload, 'description')
+      ? { description: String(payload.description || '').trim() || null }
+      : {}),
+  };
+
+  if (Object.keys(normalizedPayload).length === 0) {
+    throw new Error('At least one builder step field must be provided');
+  }
+
+  return updateVisualBuilderStep(stepId, normalizedPayload);
 }
