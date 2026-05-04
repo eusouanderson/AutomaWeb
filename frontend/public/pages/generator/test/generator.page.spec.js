@@ -7,6 +7,7 @@ vi.mock('../../../services/test.service.js', () => ({
   improveExistingGeneratedTest: vi.fn(),
   startVisualBuilderSession: vi.fn(),
   getVisualBuilderCapturedSteps: vi.fn(),
+  deleteVisualBuilderCapturedStep: vi.fn(),
   updateVisualBuilderCapturedStep: vi.fn(),
   getProjectGeneratedTests: vi.fn().mockResolvedValue([]),
   getTestContent: vi.fn().mockResolvedValue(null),
@@ -20,15 +21,16 @@ vi.mock('../../../utils/dom.js', async () => {
 
 import { toast } from '../../../components/toast.js';
 import {
-    generateTestFromPrompt,
-    getAvailableAiModels,
-    getProjectGeneratedTests,
-    getProjects,
-    getTestContent,
-    getVisualBuilderCapturedSteps,
-    improveExistingGeneratedTest,
-    startVisualBuilderSession,
-    updateVisualBuilderCapturedStep,
+  deleteVisualBuilderCapturedStep,
+  generateTestFromPrompt,
+  getAvailableAiModels,
+  getProjectGeneratedTests,
+  getProjects,
+  getTestContent,
+  getVisualBuilderCapturedSteps,
+  improveExistingGeneratedTest,
+  startVisualBuilderSession,
+  updateVisualBuilderCapturedStep,
 } from '../../../services/test.service.js';
 import { initGeneratorPage, mount } from '../generator.page.js';
 
@@ -72,6 +74,7 @@ function buildDOM() {
     <div id="builder-session-banner" class="hidden"><strong id="builder-session-id">-</strong></div>
     <div id="builder-steps-panel" class="hidden">
       <p id="builder-steps-summary"></p>
+      <p id="builder-selected-step-summary" class="hidden"></p>
       <ul id="builder-steps-list"></ul>
     </div>
     <div id="builder-code-panel" class="hidden">
@@ -169,6 +172,7 @@ describe('generator page (test builder only)', () => {
 
   it('updates active project and builder URL on project change', () => {
     const store = makeStore();
+    getVisualBuilderCapturedSteps.mockResolvedValue({ session_id: null, steps: [] });
     initGeneratorPage({ store });
 
     const select = document.getElementById('test-project');
@@ -179,13 +183,34 @@ describe('generator page (test builder only)', () => {
     expect(document.getElementById('builder-url').value).toBe('https://demo.com');
   });
 
+  it('loads project steps when project is selected', async () => {
+    getVisualBuilderCapturedSteps.mockResolvedValue({
+      session_id: 'session-project-1',
+      steps: [{ id: 4, step: 1, action: 'click', selector: '#project-step' }],
+    });
+
+    const store = makeStore();
+    initGeneratorPage({ store });
+
+    const select = document.getElementById('test-project');
+    select.value = '1';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await vi.waitFor(() => expect(getVisualBuilderCapturedSteps).toHaveBeenCalledWith(null, 1));
+    expect(document.getElementById('builder-session-id').textContent).toBe('session-project-1');
+    expect(document.getElementById('builder-steps-list').textContent).toContain('#project-step');
+  });
+
   it('blocks start when no project selected', () => {
     initGeneratorPage({ store: makeStore() });
     document.getElementById('test-project').value = '';
     document
       .getElementById('visual-builder-form')
       .dispatchEvent(new Event('submit', { bubbles: true }));
-    expect(toast).toHaveBeenCalledWith('Selecione um projeto antes de iniciar captura visual.', 'error');
+    expect(toast).toHaveBeenCalledWith(
+      'Selecione um projeto antes de iniciar captura visual.',
+      'error'
+    );
   });
 
   it('blocks start when selected project has no URL', () => {
@@ -194,7 +219,10 @@ describe('generator page (test builder only)', () => {
     document
       .getElementById('visual-builder-form')
       .dispatchEvent(new Event('submit', { bubbles: true }));
-    expect(toast).toHaveBeenCalledWith('Projeto sem URL. Selecione um projeto com URL válida.', 'error');
+    expect(toast).toHaveBeenCalledWith(
+      'Projeto sem URL. Selecione um projeto com URL válida.',
+      'error'
+    );
   });
 
   it('starts visual builder and exposes active session', async () => {
@@ -207,8 +235,12 @@ describe('generator page (test builder only)', () => {
       .getElementById('visual-builder-form')
       .dispatchEvent(new Event('submit', { bubbles: true }));
 
-    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledWith('https://demo.com', 1));
-    expect(document.getElementById('builder-session-banner').classList.contains('hidden')).toBe(false);
+    await vi.waitFor(() =>
+      expect(startVisualBuilderSession).toHaveBeenCalledWith('https://demo.com', 1)
+    );
+    expect(document.getElementById('builder-session-banner').classList.contains('hidden')).toBe(
+      false
+    );
     expect(document.getElementById('builder-session-id').textContent).toBe('session-1');
   });
 
@@ -226,7 +258,9 @@ describe('generator page (test builder only)', () => {
 
   it('refresh button requests captured steps and renders list', async () => {
     startVisualBuilderSession.mockResolvedValue({ session_id: 'session-2' });
-    getVisualBuilderCapturedSteps.mockResolvedValue({ steps: [{ step: 1, type: 'click', selector: '#a' }] });
+    getVisualBuilderCapturedSteps.mockResolvedValue({
+      steps: [{ step: 1, type: 'click', selector: '#a' }],
+    });
 
     initGeneratorPage({ store: makeStore() });
     document.getElementById('test-project').value = '1';
@@ -269,15 +303,63 @@ describe('generator page (test builder only)', () => {
     await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
 
     document.getElementById('builder-refresh-steps-btn').click();
-    await vi.waitFor(() => expect(document.getElementById('builder-steps-list').textContent).toContain('https://demo.com/login'));
+    await vi.waitFor(() =>
+      expect(document.getElementById('builder-steps-list').textContent).toContain(
+        'https://demo.com/login'
+      )
+    );
 
     const input = document.querySelector('.builder-step-name-input');
     input.value = 'Clicar em Entrar';
     document.querySelector('.builder-step-save-btn').click();
 
     await vi.waitFor(() =>
-      expect(updateVisualBuilderCapturedStep).toHaveBeenCalledWith(91, { step_name: 'Clicar em Entrar' })
+      expect(updateVisualBuilderCapturedStep).toHaveBeenCalledWith(91, {
+        step_name: 'Clicar em Entrar',
+      })
     );
+  });
+
+  it('deletes a captured step from the list', async () => {
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'session-del' });
+    getVisualBuilderCapturedSteps
+      .mockResolvedValueOnce({
+        steps: [
+          { id: 31, step: 1, action: 'click', selector: '#del' },
+          { id: 32, step: 2, action: 'click', selector: '#keep' },
+        ],
+      })
+      .mockResolvedValueOnce({
+        steps: [{ id: 32, step: 1, action: 'click', selector: '#keep' }],
+      });
+    deleteVisualBuilderCapturedStep.mockResolvedValue({ message: 'Step deleted', step_id: 31 });
+
+    const confirmMock = vi.fn().mockReturnValue(true);
+    vi.stubGlobal('confirm', confirmMock);
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+
+    document.getElementById('builder-refresh-steps-btn').click();
+    await vi.waitFor(() =>
+      expect(document.querySelectorAll('.builder-step-delete-btn').length).toBe(2)
+    );
+
+    document.querySelector('.builder-step-delete-btn[data-step-id="31"]').click();
+
+    await vi.waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(deleteVisualBuilderCapturedStep).toHaveBeenCalledWith(31));
+    await vi.waitFor(() =>
+      expect(document.getElementById('builder-steps-list').textContent).toContain('#keep')
+    );
+    expect(document.getElementById('builder-steps-list').textContent).not.toContain('#del');
+    expect(toast).toHaveBeenCalledWith('Step apagado com sucesso.');
+
+    vi.unstubAllGlobals();
   });
 
   it('refresh without session shows error path', () => {
@@ -339,8 +421,8 @@ describe('generator page (test builder only)', () => {
       expect(generateTestFromPrompt).toHaveBeenCalledWith(
         expect.objectContaining({
           projectId: 1,
-          prompt: 'validar login',
-          context: expect.stringContaining('Elementos testaveis capturados'),
+          prompt: expect.stringContaining('validar login'),
+          context: expect.stringContaining('Step selecionado para geracao'),
           model: 'gpt-5-mini',
           temperature: 0.4,
           maxTokens: 3072,
@@ -352,12 +434,17 @@ describe('generator page (test builder only)', () => {
     expect(document.getElementById('test-code').textContent).toContain('Builder');
     expect(document.getElementById('download-test-btn').dataset.testId).toBe('33');
     expect(document.getElementById('generated-result').classList.contains('hidden')).toBe(false);
-    expect(toast).toHaveBeenCalledWith('Teste Robot Framework criado a partir do Test Builder.');
+    expect(toast).toHaveBeenCalledWith(expect.stringContaining('Gerando teste para o step:'));
+    expect(toast).toHaveBeenCalledWith(
+      expect.stringContaining('Arquivo .robot gerado para o step:')
+    );
   });
 
   it('generate button uses default prompt and handles generation errors', async () => {
     startVisualBuilderSession.mockResolvedValue({ session_id: 'session-5' });
-    getVisualBuilderCapturedSteps.mockResolvedValue({ steps: [{ step: 1, action: 'click', selector: '#x' }] });
+    getVisualBuilderCapturedSteps.mockResolvedValue({
+      steps: [{ step: 1, action: 'click', selector: '#x' }],
+    });
     generateTestFromPrompt.mockRejectedValue(new Error('llm error'));
 
     initGeneratorPage({ store: makeStore() });
@@ -372,9 +459,54 @@ describe('generator page (test builder only)', () => {
     await vi.waitFor(() => expect(toast).toHaveBeenCalledWith('llm error', 'error'));
     expect(generateTestFromPrompt).toHaveBeenCalledWith(
       expect.objectContaining({
-        prompt: 'Gerar teste Robot Framework com base nos steps capturados no Visual Builder.',
+        prompt: expect.stringContaining('Gerar teste Robot Framework para o step selecionado:'),
       })
     );
+  });
+
+  it('generates directly from step action button', async () => {
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'session-8' });
+    getVisualBuilderCapturedSteps.mockResolvedValue({
+      steps: [
+        { id: 11, step: 1, action: 'click', selector: '#login', step_name: 'Abrir login' },
+        { id: 12, step: 2, action: 'input', selector: '#user', step_name: 'Preencher usuario' },
+      ],
+    });
+    generateTestFromPrompt.mockResolvedValue({ id: 55, content: '*** Test Cases ***\nStep' });
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+
+    document.getElementById('builder-refresh-steps-btn').click();
+    await vi.waitFor(() =>
+      expect(document.getElementById('builder-steps-list').textContent).toContain(
+        'Gerar .robot deste step'
+      )
+    );
+
+    document.querySelector('.builder-step-generate-btn').click();
+
+    await vi.waitFor(() =>
+      expect(generateTestFromPrompt).toHaveBeenCalledWith(
+        expect.objectContaining({
+          context: expect.stringContaining('step=1'),
+        })
+      )
+    );
+    expect(document.querySelector('.builder-step-generate-btn').textContent).toContain(
+      'Teste ja gerado'
+    );
+    expect(document.querySelector('.builder-step-generate-btn').className).toContain(
+      'builder-step-generate-btn--generated'
+    );
+    expect(document.getElementById('builder-generate-btn').textContent).toContain(
+      'Step Selecionado Ja Gerado'
+    );
+    expect(document.getElementById('download-test-btn').dataset.testId).toBe('55');
   });
 
   it('plan selection updates system prompt and persists llm settings', () => {
@@ -405,7 +537,9 @@ describe('generator page (test builder only)', () => {
   it('updates generation status detail after 30s while generating', async () => {
     vi.useFakeTimers();
     startVisualBuilderSession.mockResolvedValue({ session_id: 'session-6' });
-    getVisualBuilderCapturedSteps.mockResolvedValue({ steps: [{ step: 1, action: 'click', selector: '#x' }] });
+    getVisualBuilderCapturedSteps.mockResolvedValue({
+      steps: [{ step: 1, action: 'click', selector: '#x' }],
+    });
     let resolveGenerate;
     generateTestFromPrompt.mockImplementation(
       () =>
@@ -427,7 +561,9 @@ describe('generator page (test builder only)', () => {
     );
     vi.advanceTimersByTime(30000);
     expect(document.getElementById('generation-status-timer').textContent).toBe('30s');
-    expect(document.getElementById('generation-status-detail').textContent).toContain('Aguardando resposta do LLM');
+    expect(document.getElementById('generation-status-detail').textContent).toContain(
+      'Aguardando resposta do LLM'
+    );
 
     resolveGenerate({ id: 1, content: 'ok' });
     await vi.waitFor(() =>

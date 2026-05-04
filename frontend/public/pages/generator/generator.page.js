@@ -1,5 +1,6 @@
 import { toast } from '../../components/toast.js';
 import {
+  deleteVisualBuilderCapturedStep,
   generateTestFromPrompt,
   getAvailableAiModels,
   getProjectGeneratedTests,
@@ -82,12 +83,16 @@ export function initGeneratorPage({ store }) {
   const builderSessionIdEl = document.getElementById('builder-session-id');
   const builderStepsPanel = document.getElementById('builder-steps-panel');
   const builderStepsSummary = document.getElementById('builder-steps-summary');
+  const builderSelectedStepSummary = document.getElementById('builder-selected-step-summary');
   const builderStepsList = document.getElementById('builder-steps-list');
   const builderCodePanel = document.getElementById('builder-code-panel');
   const builderCodeEl = document.getElementById('builder-code');
   const builderCopyCodeBtn = document.getElementById('builder-copy-code-btn');
 
   let builderSessionId = null;
+  let builderLatestSteps = [];
+  let builderSelectedStepKey = null;
+  let generatedBuilderStepKeys = new Set();
   let builderPollTimer = null;
   let generationTimer = null;
 
@@ -218,23 +223,137 @@ export function initGeneratorPage({ store }) {
     generationStatus?.classList.add('hidden');
   }
 
+  function getBuilderStepKey(step, index) {
+    const stepId = Number(step?.id || 0);
+    if (Number.isInteger(stepId) && stepId > 0) {
+      return `id:${stepId}`;
+    }
+    return `idx:${index}`;
+  }
+
+  function updateSelectedStepSummary(steps = []) {
+    if (!builderSelectedStepSummary) {
+      return;
+    }
+
+    if (!Array.isArray(steps) || steps.length === 0 || !builderSelectedStepKey) {
+      builderSelectedStepSummary.textContent = '';
+      builderSelectedStepSummary.classList.add('hidden');
+      return;
+    }
+
+    const selectedIndex = steps.findIndex(
+      (step, index) => getBuilderStepKey(step, index) === builderSelectedStepKey
+    );
+    if (selectedIndex < 0) {
+      builderSelectedStepSummary.textContent = '';
+      builderSelectedStepSummary.classList.add('hidden');
+      return;
+    }
+
+    const selectedStep = steps[selectedIndex];
+    const displayName =
+      String(selectedStep.step_name || selectedStep.description || '').trim() ||
+      `Step ${selectedStep.step || selectedIndex + 1}`;
+
+    builderSelectedStepSummary.textContent = `Step selecionado para geracao: ${displayName}`;
+    builderSelectedStepSummary.classList.remove('hidden');
+  }
+
+  function findBuilderStepByKey(stepKey, steps = builderLatestSteps) {
+    if (!stepKey || !Array.isArray(steps)) {
+      return null;
+    }
+
+    const index = steps.findIndex(
+      (step, itemIndex) => getBuilderStepKey(step, itemIndex) === stepKey
+    );
+    if (index < 0) {
+      return null;
+    }
+
+    return {
+      step: steps[index],
+      index,
+    };
+  }
+
+  function getSelectedBuilderStep(steps = builderLatestSteps) {
+    const selected = findBuilderStepByKey(builderSelectedStepKey, steps);
+    if (selected) {
+      return selected;
+    }
+
+    if (!Array.isArray(steps) || steps.length === 0) {
+      return null;
+    }
+
+    builderSelectedStepKey = getBuilderStepKey(steps[0], 0);
+    return {
+      step: steps[0],
+      index: 0,
+    };
+  }
+
+  function updateBuilderGenerateButtonState(steps = builderLatestSteps) {
+    if (!builderGenerateBtn) {
+      return;
+    }
+
+    const selected = getSelectedBuilderStep(steps);
+    if (!selected) {
+      builderGenerateBtn.classList.remove('builder-generate-btn--generated');
+      builderGenerateBtn.textContent = 'Gerar .robot do Step Selecionado';
+      return;
+    }
+
+    const stepKey = getBuilderStepKey(selected.step, selected.index);
+    const alreadyGenerated = generatedBuilderStepKeys.has(stepKey);
+    builderGenerateBtn.classList.toggle('builder-generate-btn--generated', alreadyGenerated);
+    builderGenerateBtn.textContent = alreadyGenerated
+      ? 'Step Selecionado Ja Gerado (.robot)'
+      : 'Gerar .robot do Step Selecionado';
+  }
+
   function renderBuilderSteps(steps = []) {
     if (!builderStepsPanel || !builderStepsList || !builderStepsSummary) {
       return;
     }
 
-    if (!Array.isArray(steps) || steps.length === 0) {
+    builderLatestSteps = Array.isArray(steps) ? steps : [];
+
+    if (builderLatestSteps.length > 0) {
+      const availableStepKeys = new Set(
+        builderLatestSteps.map((step, index) => getBuilderStepKey(step, index))
+      );
+      generatedBuilderStepKeys = new Set(
+        Array.from(generatedBuilderStepKeys).filter((stepKey) => availableStepKeys.has(stepKey))
+      );
+    } else {
+      generatedBuilderStepKeys = new Set();
+    }
+
+    if (builderLatestSteps.length === 0) {
+      builderSelectedStepKey = null;
       builderStepsSummary.textContent = 'Nenhum step capturado ainda.';
       builderStepsList.innerHTML = '';
+      updateSelectedStepSummary([]);
+      updateBuilderGenerateButtonState([]);
       builderStepsPanel.classList.remove('hidden');
       return;
     }
 
-    builderStepsSummary.textContent = `${steps.length} step(s) capturado(s).`;
-    builderStepsList.innerHTML = steps
-      .map((step) => {
+    const selected = getSelectedBuilderStep(builderLatestSteps);
+    builderSelectedStepKey = selected ? getBuilderStepKey(selected.step, selected.index) : null;
+
+    builderStepsSummary.textContent = `${builderLatestSteps.length} step(s) capturado(s).`;
+    builderStepsList.innerHTML = builderLatestSteps
+      .map((step, index) => {
         const action = String(step.action || step.type || 'unknown').toLowerCase();
         const stepId = Number(step.id || 0);
+        const stepKey = getBuilderStepKey(step, index);
+        const isSelected = stepKey === builderSelectedStepKey;
+        const isGenerated = generatedBuilderStepKeys.has(stepKey);
         const name = String(step.step_name || '').trim();
         const description = String(step.description || step.text || '').trim();
         const metadata = [
@@ -250,11 +369,28 @@ export function initGeneratorPage({ store }) {
         ].filter(Boolean);
 
         return `
-          <li class="builder-step-item" data-step-id="${stepId || ''}">
-            <div><strong>[${escapeHtml(step.step)}]</strong> ${escapeHtml(action)}</div>
+          <li class="builder-step-item ${isSelected ? 'is-selected' : ''}" data-step-id="${stepId || ''}" data-step-key="${escapeHtml(stepKey)}">
+            <div class="builder-step-header">
+              <div class="builder-step-header-main">
+                <input
+                  class="builder-step-select-input"
+                  type="radio"
+                  name="builder-selected-step"
+                  data-step-key="${escapeHtml(stepKey)}"
+                  ${isSelected ? 'checked' : ''}
+                />
+                <span class="builder-step-index">[${escapeHtml(step.step)}]</span>
+                <span class="builder-step-action">${escapeHtml(action)}</span>
+              </div>
+              <button
+                type="button"
+                class="btn ${isGenerated ? 'btn-secondary builder-step-generate-btn--generated' : 'btn-primary'} builder-step-generate-btn"
+                data-step-key="${escapeHtml(stepKey)}"
+              >${isGenerated ? 'Teste ja gerado' : 'Gerar .robot deste step'}</button>
+            </div>
             <div class="form-group">
               <label>Nome do step</label>
-              <div class="result-actions">
+              <div class="builder-step-actions">
                 <input
                   class="builder-step-name-input"
                   data-step-id="${stepId || ''}"
@@ -268,24 +404,36 @@ export function initGeneratorPage({ store }) {
                   data-step-id="${stepId || ''}"
                   ${stepId ? '' : 'disabled'}
                 >Salvar nome</button>
+                <button
+                  type="button"
+                  class="btn btn-danger builder-step-delete-btn"
+                  data-step-id="${stepId || ''}"
+                  ${stepId ? '' : 'disabled'}
+                >Apagar step</button>
               </div>
             </div>
-            <div>${metadata.map((item) => `<div>${escapeHtml(item)}</div>`).join('')}</div>
+            <div class="builder-step-meta">${metadata
+              .map((item) => `<div>${escapeHtml(item)}</div>`)
+              .join('')}</div>
           </li>
         `;
       })
       .join('');
 
+    updateSelectedStepSummary(builderLatestSteps);
+    updateBuilderGenerateButtonState(builderLatestSteps);
     builderStepsPanel.classList.remove('hidden');
   }
 
   function setBuilderSession(sessionId) {
     builderSessionId = sessionId || null;
     if (builderSessionId) {
+      generatedBuilderStepKeys = new Set();
       if (builderSessionIdEl) builderSessionIdEl.textContent = builderSessionId;
       builderSessionBanner?.classList.remove('hidden');
       startBuilderPoll();
     } else {
+      generatedBuilderStepKeys = new Set();
       if (builderSessionIdEl) builderSessionIdEl.textContent = '-';
       builderSessionBanner?.classList.add('hidden');
       stopBuilderPoll();
@@ -338,58 +486,141 @@ export function initGeneratorPage({ store }) {
     await refreshBuilderSteps();
   }
 
-  function buildVisualBuilderContext(steps = [], sessionId = null, pageUrl = '') {
-    const normalizedSteps = Array.isArray(steps)
-      ? steps.map((step, index) => ({
-          index: Number(step?.step || index + 1),
-          action: String(step?.action || step?.type || '')
-            .trim()
-            .toLowerCase(),
-          selector: String(step?.selector || '').trim(),
-          value: step?.value == null ? '' : String(step.value),
-          description: String(step?.description || step?.text || '').trim(),
-          stepName: String(step?.step_name || '').trim(),
-          pageUrl: String(step?.page_url || '').trim(),
-          pageTitle: String(step?.page_title || '').trim(),
-          elementTag: String(step?.element_tag || '').trim(),
-          elementText: String(step?.element_text || '').trim(),
-          inputType: String(step?.input_type || '').trim(),
-          href: String(step?.href || '').trim(),
-        }))
-      : [];
+  async function deleteBuilderStep(stepId) {
+    await deleteVisualBuilderCapturedStep(stepId);
+    toast('Step apagado com sucesso.');
+    await refreshBuilderSteps();
+  }
 
-    const lines = normalizedSteps.map((step) => {
-      const parts = [
-        `- step=${step.index}`,
-        `action=${step.action || 'unknown'}`,
-        `selector=${step.selector || 'N/A'}`,
-      ];
-      if (step.value) parts.push(`value=${step.value}`);
-      if (step.stepName) parts.push(`step_name=${step.stepName}`);
-      if (step.description) parts.push(`description=${step.description}`);
-      if (step.pageUrl) parts.push(`page_url=${step.pageUrl}`);
-      if (step.pageTitle) parts.push(`page_title=${step.pageTitle}`);
-      if (step.elementTag) parts.push(`element_tag=${step.elementTag}`);
-      if (step.inputType) parts.push(`input_type=${step.inputType}`);
-      if (step.href) parts.push(`href=${step.href}`);
-      if (step.elementText) parts.push(`element_text=${step.elementText}`);
-      return parts.join(' | ');
-    });
+  function normalizeBuilderStep(step, index) {
+    return {
+      index: Number(step?.step || index + 1),
+      action: String(step?.action || step?.type || '')
+        .trim()
+        .toLowerCase(),
+      selector: String(step?.selector || '').trim(),
+      value: step?.value == null ? '' : String(step.value),
+      description: String(step?.description || step?.text || '').trim(),
+      stepName: String(step?.step_name || '').trim(),
+      pageUrl: String(step?.page_url || '').trim(),
+      pageTitle: String(step?.page_title || '').trim(),
+      elementTag: String(step?.element_tag || '').trim(),
+      elementText: String(step?.element_text || '').trim(),
+      inputType: String(step?.input_type || '').trim(),
+      href: String(step?.href || '').trim(),
+    };
+  }
+
+  function buildVisualBuilderStepContext(
+    selectedStep,
+    allSteps = [],
+    sessionId = null,
+    pageUrl = ''
+  ) {
+    const normalizedSelectedStep = normalizeBuilderStep(selectedStep, 0);
+
+    const parts = [
+      `- step=${normalizedSelectedStep.index}`,
+      `action=${normalizedSelectedStep.action || 'unknown'}`,
+      `selector=${normalizedSelectedStep.selector || 'N/A'}`,
+    ];
+    if (normalizedSelectedStep.value) parts.push(`value=${normalizedSelectedStep.value}`);
+    if (normalizedSelectedStep.stepName) parts.push(`step_name=${normalizedSelectedStep.stepName}`);
+    if (normalizedSelectedStep.description)
+      parts.push(`description=${normalizedSelectedStep.description}`);
+    if (normalizedSelectedStep.pageUrl) parts.push(`page_url=${normalizedSelectedStep.pageUrl}`);
+    if (normalizedSelectedStep.pageTitle)
+      parts.push(`page_title=${normalizedSelectedStep.pageTitle}`);
+    if (normalizedSelectedStep.elementTag)
+      parts.push(`element_tag=${normalizedSelectedStep.elementTag}`);
+    if (normalizedSelectedStep.inputType)
+      parts.push(`input_type=${normalizedSelectedStep.inputType}`);
+    if (normalizedSelectedStep.href) parts.push(`href=${normalizedSelectedStep.href}`);
+    if (normalizedSelectedStep.elementText)
+      parts.push(`element_text=${normalizedSelectedStep.elementText}`);
 
     return [
       'Origem: Visual Test Builder',
       `Session ID: ${sessionId || 'N/A'}`,
-      `Page URL: ${pageUrl || 'N/A'}`,
-      `Total de steps: ${normalizedSteps.length}`,
+      `Page URL: ${pageUrl || normalizedSelectedStep.pageUrl || 'N/A'}`,
+      `Total de steps na sessao: ${Array.isArray(allSteps) ? allSteps.length : 0}`,
       '',
-      'Elementos testaveis capturados (use preferencialmente estes seletores):',
-      ...lines,
+      'Step selecionado para geracao (envie somente este para o backend/LLM):',
+      parts.join(' | '),
       '',
       'Instrucoes:',
+      '- Gere UM arquivo .robot focado apenas no step selecionado.',
+      '- Use seletores e metadados capturados neste step.',
       '- Gere Robot Framework valido para a Library Browser.',
-      '- Utilize os seletores capturados e mantenha robustez com esperas necessarias.',
       '- Retorne apenas codigo Robot Framework.',
     ].join('\n');
+  }
+
+  async function generateFromBuilderStep(step, allSteps = [], stepKey = null) {
+    if (!step) {
+      throw new Error('Nenhum step selecionado para geracao.');
+    }
+
+    const projectId = Number.parseInt(projectSelect.value, 10);
+    if (!projectId) {
+      throw new Error('Selecione um projeto antes de gerar o teste visual.');
+    }
+
+    const selectedProjectOption = projectSelect.selectedOptions[0];
+    const selectedProjectUrl = selectedProjectOption?.dataset?.url || builderUrlInput?.value || '';
+    const rawPrompt = builderPromptInput?.value?.trim() || '';
+    const normalizedStep = normalizeBuilderStep(step, 0);
+    const stepLabel =
+      normalizedStep.stepName ||
+      normalizedStep.description ||
+      normalizedStep.selector ||
+      'step selecionado';
+
+    toast(`Gerando teste para o step: ${stepLabel}...`);
+
+    const prompt =
+      rawPrompt.length >= 5
+        ? `${rawPrompt}\n\nFoque apenas no step selecionado: ${stepLabel}.`
+        : `Gerar teste Robot Framework para o step selecionado: ${stepLabel}.`;
+
+    const context = buildVisualBuilderStepContext(
+      step,
+      allSteps,
+      builderSessionId,
+      selectedProjectUrl
+    );
+    const model = llmModelSelect?.value?.trim() || null;
+    const systemPrompt = llmSystemPromptInput?.value?.trim() || null;
+    const temperature = Number.parseFloat(llmTemperatureInput?.value || '');
+    const maxTokens = Number.parseInt(llmMaxTokensInput?.value || '', 10);
+
+    showGenerationStatus('Gerando .robot do step selecionado...');
+    const generated = await generateTestFromPrompt({
+      projectId,
+      prompt,
+      context,
+      ...(model ? { model } : {}),
+      ...(systemPrompt ? { systemPrompt } : {}),
+      ...(Number.isFinite(temperature) ? { temperature } : {}),
+      ...(Number.isInteger(maxTokens) && maxTokens > 0 ? { maxTokens } : {}),
+    });
+    hideGenerationStatus();
+
+    if (builderCodeEl) {
+      builderCodeEl.textContent = generated?.content || '';
+    }
+    if (codeElement) {
+      codeElement.textContent = generated?.content || '';
+    }
+
+    builderCodePanel?.classList.remove('hidden');
+    resultSection?.classList.remove('hidden');
+    downloadButton.dataset.testId = String(generated?.id || '');
+    if (stepKey) {
+      generatedBuilderStepKeys.add(stepKey);
+      renderBuilderSteps(allSteps);
+    }
+    toast(`Arquivo .robot gerado para o step: ${stepLabel}.`);
   }
 
   async function loadProjectsDropdown() {
@@ -412,9 +643,24 @@ export function initGeneratorPage({ store }) {
       }
 
       syncBuilderUrlWithSelectedProject();
+      if (activeId) {
+        await loadBuilderStepsForProject(activeId);
+      }
     } catch (error) {
       toast(error.message, 'error');
     }
+  }
+
+  async function loadBuilderStepsForProject(projectId) {
+    if (!projectId) {
+      setBuilderSession(null);
+      renderBuilderSteps([]);
+      return;
+    }
+
+    const response = await getVisualBuilderCapturedSteps(null, projectId);
+    setBuilderSession(response?.session_id || null);
+    renderBuilderSteps(response?.steps || []);
   }
 
   void loadAiModelsDropdown();
@@ -469,10 +715,15 @@ export function initGeneratorPage({ store }) {
     );
   }
 
-  projectSelect.addEventListener('change', () => {
+  projectSelect.addEventListener('change', async () => {
     const projectId = Number.parseInt(projectSelect.value, 10) || null;
     store.setState({ activeProjectId: projectId });
     syncBuilderUrlWithSelectedProject();
+    try {
+      await loadBuilderStepsForProject(projectId);
+    } catch (error) {
+      toast(error.message || 'Nao foi possivel carregar os steps do projeto.', 'error');
+    }
   });
 
   copyButton?.addEventListener('click', async () => {
@@ -535,25 +786,108 @@ export function initGeneratorPage({ store }) {
       return;
     }
 
-    const button = event.target.closest('.builder-step-save-btn');
-    if (!button) {
+    const saveButton = event.target.closest('.builder-step-save-btn');
+    if (saveButton) {
+      const stepId = Number.parseInt(saveButton.dataset.stepId || '', 10);
+      if (!stepId) {
+        toast('Step inválido para atualização.', 'error');
+        return;
+      }
+
+      try {
+        saveButton.disabled = true;
+        await saveBuilderStepName(stepId);
+      } catch (error) {
+        toast(error.message, 'error');
+      } finally {
+        saveButton.disabled = false;
+      }
       return;
     }
 
-    const stepId = Number.parseInt(button.dataset.stepId || '', 10);
-    if (!stepId) {
-      toast('Step inválido para atualização.', 'error');
+    const deleteButton = event.target.closest('.builder-step-delete-btn');
+    if (deleteButton) {
+      const stepId = Number.parseInt(deleteButton.dataset.stepId || '', 10);
+      if (!stepId) {
+        toast('Step inválido para exclusão.', 'error');
+        return;
+      }
+
+      const shouldDelete =
+        typeof globalThis.confirm === 'function'
+          ? globalThis.confirm('Tem certeza que deseja apagar este step?')
+          : true;
+
+      if (!shouldDelete) {
+        return;
+      }
+
+      try {
+        deleteButton.disabled = true;
+        await deleteBuilderStep(stepId);
+      } catch (error) {
+        toast(error.message, 'error');
+      } finally {
+        deleteButton.disabled = false;
+      }
       return;
     }
 
-    try {
-      button.disabled = true;
-      await saveBuilderStepName(stepId);
-    } catch (error) {
-      toast(error.message, 'error');
-    } finally {
-      button.disabled = false;
+    const generateButton = event.target.closest('.builder-step-generate-btn');
+    if (generateButton) {
+      const stepKey = String(generateButton.dataset.stepKey || '').trim();
+      if (!stepKey) {
+        toast('Step inválido para geração.', 'error');
+        return;
+      }
+
+      try {
+        generateButton.disabled = true;
+        builderSelectedStepKey = stepKey;
+        const steps = await refreshBuilderSteps();
+        const selected = findBuilderStepByKey(stepKey, steps);
+        if (!selected?.step) {
+          toast('Step selecionado não encontrado após atualização.', 'error');
+          return;
+        }
+        await generateFromBuilderStep(selected.step, steps, stepKey);
+      } catch (error) {
+        hideGenerationStatus();
+        toast(error.message, 'error');
+      } finally {
+        generateButton.disabled = false;
+      }
+      return;
     }
+
+    const stepItem = event.target.closest('.builder-step-item');
+    if (stepItem) {
+      const stepKey = String(stepItem.dataset.stepKey || '').trim();
+      if (!stepKey) {
+        return;
+      }
+      builderSelectedStepKey = stepKey;
+      renderBuilderSteps(builderLatestSteps);
+    }
+  });
+
+  builderStepsList?.addEventListener('change', (event) => {
+    if (!(event.target instanceof Element)) {
+      return;
+    }
+
+    const input = event.target.closest('.builder-step-select-input');
+    if (!input) {
+      return;
+    }
+
+    const stepKey = String(input.dataset.stepKey || '').trim();
+    if (!stepKey) {
+      return;
+    }
+
+    builderSelectedStepKey = stepKey;
+    renderBuilderSteps(builderLatestSteps);
   });
 
   builderStepsList?.addEventListener('keydown', async (event) => {
@@ -585,12 +919,6 @@ export function initGeneratorPage({ store }) {
       return;
     }
 
-    const projectId = Number.parseInt(projectSelect.value, 10);
-    if (!projectId) {
-      toast('Selecione um projeto antes de gerar o teste visual.', 'error');
-      return;
-    }
-
     try {
       const steps = await refreshBuilderSteps();
 
@@ -599,39 +927,14 @@ export function initGeneratorPage({ store }) {
         return;
       }
 
-      const selectedProjectOption = projectSelect.selectedOptions[0];
-      const selectedProjectUrl =
-        selectedProjectOption?.dataset?.url || builderUrlInput?.value || '';
-      const rawPrompt = builderPromptInput?.value?.trim() || '';
-      const prompt =
-        rawPrompt.length >= 5
-          ? rawPrompt
-          : 'Gerar teste Robot Framework com base nos steps capturados no Visual Builder.';
-      const context = buildVisualBuilderContext(steps, builderSessionId, selectedProjectUrl);
-      const model = llmModelSelect?.value?.trim() || null;
-      const systemPrompt = llmSystemPromptInput?.value?.trim() || null;
-      const temperature = Number.parseFloat(llmTemperatureInput?.value || '');
-      const maxTokens = Number.parseInt(llmMaxTokensInput?.value || '', 10);
-
-      showGenerationStatus();
-      const generated = await generateTestFromPrompt({
-        projectId,
-        prompt,
-        context,
-        ...(model ? { model } : {}),
-        ...(systemPrompt ? { systemPrompt } : {}),
-        ...(Number.isFinite(temperature) ? { temperature } : {}),
-        ...(Number.isInteger(maxTokens) && maxTokens > 0 ? { maxTokens } : {}),
-      });
-      hideGenerationStatus();
-
-      if (builderCodeEl) {
-        builderCodeEl.textContent = generated?.content || '';
+      const selected = getSelectedBuilderStep(steps);
+      if (!selected?.step) {
+        toast('Selecione um step para gerar o arquivo .robot.', 'error');
+        return;
       }
 
-      builderCodePanel?.classList.remove('hidden');
-      downloadButton.dataset.testId = String(generated?.id || '');
-      toast('Teste Robot Framework criado a partir do Test Builder.');
+      const selectedStepKey = getBuilderStepKey(selected.step, selected.index);
+      await generateFromBuilderStep(selected.step, steps, selectedStepKey);
     } catch (error) {
       hideGenerationStatus();
       toast(error.message, 'error');

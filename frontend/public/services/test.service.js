@@ -1,19 +1,20 @@
 import {
-    createProject,
-    deleteGeneratedTest,
-    deleteProject,
-    generateRobotTest,
-    generateVisualBuilderCode,
-    getTestById,
-    getVisualBuilderSteps,
-    improveRobotTest,
-    listAiModels,
-    listGeneratedTests,
-    listProjectExecutions,
-    listProjects,
-    runTests,
-    startVisualBuilder,
-    updateVisualBuilderStep,
+  createProject,
+  deleteGeneratedTest,
+  deleteProject,
+  deleteVisualBuilderStep,
+  generateRobotTest,
+  generateVisualBuilderCode,
+  getTestById,
+  getVisualBuilderSteps,
+  improveRobotTest,
+  listAiModels,
+  listGeneratedTests,
+  listProjectExecutions,
+  listProjects,
+  runTests,
+  startVisualBuilder,
+  updateVisualBuilderStep,
 } from '../api/automaweb.api.js';
 import { isValidUrl, requiredText } from '../utils/validators.js';
 
@@ -63,9 +64,7 @@ export async function generateTestFromPrompt({
     force_rescan: forceRescan,
     ...(model ? { model } : {}),
     ...(systemPrompt ? { system_prompt: systemPrompt } : {}),
-    ...(Number.isFinite(Number(temperature))
-      ? { temperature: Number(temperature) }
-      : {}),
+    ...(Number.isFinite(Number(temperature)) ? { temperature: Number(temperature) } : {}),
     ...(Number.isInteger(Number(maxTokens)) && Number(maxTokens) > 0
       ? { max_tokens: Number(maxTokens) }
       : {}),
@@ -146,8 +145,8 @@ export async function startVisualBuilderSession(url, projectId = null) {
   return startVisualBuilder(url, projectId);
 }
 
-export async function getVisualBuilderCapturedSteps(sessionId) {
-  return getVisualBuilderSteps(sessionId || null);
+export async function getVisualBuilderCapturedSteps(sessionId = null, projectId = null) {
+  return getVisualBuilderSteps(sessionId || null, projectId ?? null);
 }
 
 export async function generateVisualBuilderPlaywrightCode(sessionId, prompt = null) {
@@ -173,4 +172,12 @@ export async function updateVisualBuilderCapturedStep(stepId, payload = {}) {
   }
 
   return updateVisualBuilderStep(stepId, normalizedPayload);
+}
+
+export async function deleteVisualBuilderCapturedStep(stepId) {
+  if (!stepId) {
+    throw new Error('Step id is required');
+  }
+
+  return deleteVisualBuilderStep(stepId);
 }

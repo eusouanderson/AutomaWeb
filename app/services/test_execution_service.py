@@ -243,10 +243,52 @@ class TestExecutionService:
         )
         return list(result.scalars().all())
 
+    # Detects embedded HTTP Basic Auth credentials in URLs: https://user:pass@host
+    _BASIC_AUTH_URL_RE = re.compile(r"https?://([^:/@\s]+):([^@/\s]+)@")
+
+    def _inject_basic_auth_credentials(self, content: str) -> str:
+        """If the robot file has URLs with embedded credentials (https://user:pass@host),
+        inject httpCredentials into New Context so visible-mode runs don't trigger the
+        native auth dialog that Playwright cannot dismiss."""
+        match = self._BASIC_AUTH_URL_RE.search(content)
+        if not match:
+            return content
+
+        username, password = match.group(1), match.group(2)
+
+        # Skip if New Context already has httpCredentials
+        if re.search(r"New Context\s+httpCredentials", content):
+            return content
+
+        # Variable block to add to the Variables section
+        var_block = (
+            f"${{__AW_HTTP_USER}}    {username}\n"
+            f"${{__AW_HTTP_PASS}}    {password}\n"
+            f"&{{__AW_HTTP_CREDS}}    username=$__AW_HTTP_USER    password=$__AW_HTTP_PASS\n"
+        )
+
+        if "*** Variables ***" in content:
+            content = content.replace("*** Variables ***\n", f"*** Variables ***\n{var_block}", 1)
+        else:
+            content = content.replace(
+                "*** Test Cases ***",
+                f"*** Variables ***\n{var_block}\n*** Test Cases ***",
+                1,
+            )
+
+        # Replace bare `New Context` (no existing httpCredentials) with injected version
+        content = re.sub(
+            r"([ \t]+New Context)(?!\s+http)(\s*\n)",
+            r"\1    httpCredentials=${__AW_HTTP_CREDS}\2",
+            content,
+        )
+        return content
+
     def _prepare_test_files(
         self, test_files: list[str], headless: bool, speed_ms: int
     ) -> tuple[list[str], Path]:
-        """Copy test files to a temp dir, injecting headless=${HEADLESS} in every New Browser call."""
+        """Copy test files to a temp dir, injecting headless=${HEADLESS} in every New Browser call.
+        Also injects httpCredentials into New Context when URLs contain embedded credentials."""
         temp_dir = Path(tempfile.mkdtemp(prefix="robot_run_"))
         prepared: list[str] = []
         for fp in test_files:
@@ -263,6 +305,8 @@ class TestExecutionService:
                 r"\1    slowMo=${SPEED_MS}ms",
                 content,
             )
+            # Inject httpCredentials when URLs contain embedded user:pass@host
+            content = self._inject_basic_auth_credentials(content)
             dst = temp_dir / src.name
             dst.write_text(content, encoding="utf-8")
             prepared.append(str(dst))

@@ -116,9 +116,10 @@ async def capture_builder_event(
 @router.get("/steps", response_model=BuilderStepsResponse)
 async def get_builder_steps(
     session_id: str | None = None,
+    project_id: int | None = None,
     service: BuilderService = Depends(get_builder_service),
 ) -> BuilderStepsResponse:
-    steps = await service.list_steps(session_id)
+    steps = await service.list_steps(session_id=session_id, project_id=project_id)
     resolved_session_id = session_id or (steps[0]["session_id"] if steps else None)
     return BuilderStepsResponse(session_id=resolved_session_id, steps=steps)
 
@@ -153,3 +154,16 @@ async def update_builder_step(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.delete("/steps/{step_id}")
+async def delete_builder_step(
+    step_id: int,
+    service: BuilderService = Depends(get_builder_service),
+) -> dict[str, Any]:
+    try:
+        await service.delete_step(step_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return {"message": "Step deleted", "step_id": step_id}

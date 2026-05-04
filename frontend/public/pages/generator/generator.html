@@ -51,7 +51,8 @@
     <div class="result-actions">
       <button id="builder-start-btn" type="submit" class="btn btn-primary">Iniciar Captura Visual</button>
       <button id="builder-refresh-steps-btn" type="button" class="btn btn-secondary">Atualizar Steps</button>
-      <button id="builder-generate-btn" type="button" class="btn btn-secondary">Gerar Código Robot</button>
+      <button id="builder-generate-btn" type="button" class="btn btn-secondary">Gerar .robot do Step
+        Selecionado</button>
     </div>
   </form>
 
@@ -61,6 +62,7 @@
 
   <div id="builder-steps-panel" class="generation-parts hidden">
     <p id="builder-steps-summary" class="generation-parts-summary">Nenhum step capturado ainda.</p>
+    <p id="builder-selected-step-summary" class="generation-parts-summary hidden"></p>
     <ul id="builder-steps-list" class="generation-parts-list"></ul>
   </div>
 
@@ -79,17 +81,4 @@
     <span id="generation-status-detail" class="generation-status-detail"></span>
   </div>
   <span id="generation-status-timer" class="generation-status-timer">0s</span>
-</div>
-
-<div id="generated-result" class="section hidden">
-  <h2>Teste Gerado</h2>
-  <div id="generation-parts" class="generation-parts hidden" aria-live="polite">
-    <p id="generation-parts-summary" class="generation-parts-summary"></p>
-    <ul id="generation-parts-list" class="generation-parts-list"></ul>
-  </div>
-  <div class="result-actions">
-    <button id="copy-test-btn" class="btn btn-secondary">Copiar Código</button>
-    <button id="download-test-btn" class="btn btn-secondary">Download .robot</button>
-  </div>
-  <pre><code id="test-code"></code></pre>
 </div>

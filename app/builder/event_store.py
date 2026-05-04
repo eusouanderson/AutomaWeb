@@ -107,8 +107,49 @@ class InMemoryEventStore:
                 self._latest_session_id = step.session_id
                 return self._serialize_step(step)
 
-    async def get_steps(self, session_id: str | None = None) -> list[dict[str, Any]]:
-        resolved_session = session_id or self._latest_session_id
+    async def delete_step(self, step_id: int) -> None:
+        async with self._lock:
+            async with self._session_factory() as db_session:
+                step = await db_session.get(BuilderStep, step_id)
+                if not step:
+                    raise ValueError(f"Builder step '{step_id}' not found")
+
+                session_id = step.session_id
+                await db_session.delete(step)
+                await db_session.flush()
+
+                remaining_result = await db_session.execute(
+                    select(BuilderStep)
+                    .where(BuilderStep.session_id == session_id)
+                    .order_by(BuilderStep.step.asc(), BuilderStep.id.asc())
+                )
+                remaining_steps = remaining_result.scalars().all()
+                for index, remaining_step in enumerate(remaining_steps, start=1):
+                    remaining_step.step = index
+
+                await db_session.commit()
+                self._latest_session_id = session_id
+
+    async def get_steps(
+        self,
+        session_id: str | None = None,
+        project_id: int | None = None,
+    ) -> list[dict[str, Any]]:
+        resolved_session = session_id
+
+        if not resolved_session and project_id is not None:
+            async with self._session_factory() as db_session:
+                session_result = await db_session.execute(
+                    select(BuilderSessionModel)
+                    .where(BuilderSessionModel.project_id == project_id)
+                    .order_by(BuilderSessionModel.created_at.desc())
+                )
+                project_session = session_result.scalars().first()
+                resolved_session = project_session.session_id if project_session else None
+
+        if not resolved_session:
+            resolved_session = self._latest_session_id
+
         if not resolved_session:
             session = await self.get_session()
             resolved_session = session.session_id if session else None

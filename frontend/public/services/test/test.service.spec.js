@@ -4,6 +4,7 @@ vi.mock('../../api/automaweb.api.js', () => ({
   listProjects: vi.fn(),
   createProject: vi.fn(),
   deleteProject: vi.fn(),
+  deleteVisualBuilderStep: vi.fn(),
   startVisualBuilder: vi.fn(),
   getVisualBuilderSteps: vi.fn(),
   generateVisualBuilderCode: vi.fn(),
@@ -19,37 +20,39 @@ vi.mock('../../api/automaweb.api.js', () => ({
 }));
 
 import {
-    createProject,
-    deleteGeneratedTest,
-    deleteProject,
-    generateRobotTest,
-    generateVisualBuilderCode,
-    getTestById,
-    getVisualBuilderSteps,
-    listAiModels,
-    listGeneratedTests,
-    listProjectExecutions,
-    listProjects,
-    runTests,
-    startVisualBuilder,
-    updateVisualBuilderStep
+  createProject,
+  deleteGeneratedTest,
+  deleteProject,
+  deleteVisualBuilderStep,
+  generateRobotTest,
+  generateVisualBuilderCode,
+  getTestById,
+  getVisualBuilderSteps,
+  listAiModels,
+  listGeneratedTests,
+  listProjectExecutions,
+  listProjects,
+  runTests,
+  startVisualBuilder,
+  updateVisualBuilderStep,
 } from '../../api/automaweb.api.js';
 
 import {
-    createProjectService,
-    deleteGeneratedTestService,
-    deleteProjectService,
-    executeProjectTests,
-    generateTestFromPrompt,
-    generateVisualBuilderPlaywrightCode,
-    getAvailableAiModels,
-    getProjectExecutions,
-    getProjectGeneratedTests,
-    getProjects,
-    getTestContent,
-    getVisualBuilderCapturedSteps,
-    startVisualBuilderSession,
-    updateVisualBuilderCapturedStep,
+  createProjectService,
+  deleteGeneratedTestService,
+  deleteProjectService,
+  deleteVisualBuilderCapturedStep,
+  executeProjectTests,
+  generateTestFromPrompt,
+  generateVisualBuilderPlaywrightCode,
+  getAvailableAiModels,
+  getProjectExecutions,
+  getProjectGeneratedTests,
+  getProjects,
+  getTestContent,
+  getVisualBuilderCapturedSteps,
+  startVisualBuilderSession,
+  updateVisualBuilderCapturedStep,
 } from '../test.service.js';
 
 beforeEach(() => vi.clearAllMocks());
@@ -314,7 +317,13 @@ describe('visual builder service helpers', () => {
   it('getVisualBuilderCapturedSteps delegates with null fallback', async () => {
     getVisualBuilderSteps.mockResolvedValue({ steps: [] });
     await getVisualBuilderCapturedSteps();
-    expect(getVisualBuilderSteps).toHaveBeenCalledWith(null);
+    expect(getVisualBuilderSteps).toHaveBeenCalledWith(null, null);
+  });
+
+  it('getVisualBuilderCapturedSteps forwards project id', async () => {
+    getVisualBuilderSteps.mockResolvedValue({ steps: [] });
+    await getVisualBuilderCapturedSteps(null, 9);
+    expect(getVisualBuilderSteps).toHaveBeenCalledWith(null, 9);
   });
 
   it('generateVisualBuilderPlaywrightCode delegates with session id', async () => {
@@ -339,5 +348,15 @@ describe('visual builder service helpers', () => {
     await expect(updateVisualBuilderCapturedStep(7, {})).rejects.toThrow(
       'At least one builder step field must be provided'
     );
+  });
+
+  it('deleteVisualBuilderCapturedStep delegates with step id', async () => {
+    deleteVisualBuilderStep.mockResolvedValue({ message: 'ok' });
+    await deleteVisualBuilderCapturedStep(7);
+    expect(deleteVisualBuilderStep).toHaveBeenCalledWith(7);
+  });
+
+  it('deleteVisualBuilderCapturedStep validates step id', async () => {
+    await expect(deleteVisualBuilderCapturedStep(0)).rejects.toThrow('Step id is required');
   });
 });

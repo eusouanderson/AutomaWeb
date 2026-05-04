@@ -88,8 +88,12 @@ class BuilderService:
 
         return await self.record_event(session_id, payload)
 
-    async def list_steps(self, session_id: str | None = None) -> list[dict[str, Any]]:
-        return await self._event_store.get_steps(session_id)
+    async def list_steps(
+        self,
+        session_id: str | None = None,
+        project_id: int | None = None,
+    ) -> list[dict[str, Any]]:
+        return await self._event_store.get_steps(session_id, project_id=project_id)
 
     async def update_step(
         self,
@@ -106,6 +110,9 @@ class BuilderService:
         if not updates:
             raise ValueError("No builder step updates provided")
         return await self._event_store.update_step(step_id, updates)
+
+    async def delete_step(self, step_id: int) -> None:
+        await self._event_store.delete_step(step_id)
 
     async def generate_code(self, session_id: str | None = None) -> dict[str, Any]:
         return await self.generate_code_with_prompt(session_id=session_id, prompt=None)

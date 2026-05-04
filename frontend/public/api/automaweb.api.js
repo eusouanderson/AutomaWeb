@@ -75,8 +75,15 @@ export function startVisualBuilder(url, projectId = null) {
   });
 }
 
-export function getVisualBuilderSteps(sessionId = null) {
-  const query = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : '';
+export function getVisualBuilderSteps(sessionId = null, projectId = null) {
+  const params = new URLSearchParams();
+  if (sessionId) {
+    params.set('session_id', sessionId);
+  }
+  if (projectId != null) {
+    params.set('project_id', String(projectId));
+  }
+  const query = params.toString() ? `?${params.toString()}` : '';
   return request({ method: 'GET', url: `/builder/steps${query}` });
 }
 
@@ -90,4 +97,8 @@ export function generateVisualBuilderCode(sessionId = null, prompt = null) {
 
 export function updateVisualBuilderStep(stepId, payload) {
   return request({ method: 'PUT', url: `/builder/steps/${stepId}`, data: payload });
+}
+
+export function deleteVisualBuilderStep(stepId) {
+  return request({ method: 'DELETE', url: `/builder/steps/${stepId}` });
 }

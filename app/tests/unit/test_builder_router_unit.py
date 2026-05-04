@@ -20,7 +20,11 @@ class DummyBuilderService:
     async def ingest_event(self, payload: dict):
         return {"id": 11, "step": 1, "session_id": "session-1", **payload}
 
-    async def list_steps(self, session_id: str | None = None):
+    async def list_steps(
+        self,
+        session_id: str | None = None,
+        project_id: int | None = None,
+    ):
         return [
             {
                 "id": 11,
@@ -36,6 +40,9 @@ class DummyBuilderService:
         self, step_id: int, *, step_name: str | None = None, description: str | None = None
     ):
         return {"id": step_id, "step_name": step_name, "description": description}
+
+    async def delete_step(self, step_id: int):
+        return None
 
     async def generate_code_with_prompt(
         self, session_id: str | None = None, prompt: str | None = None
@@ -73,8 +80,17 @@ class FailingUpdateService(DummyBuilderService):
         raise ValueError("missing step")
 
 
+class FailingDeleteService(DummyBuilderService):
+    async def delete_step(self, step_id: int):
+        raise ValueError("missing step")
+
+
 class EmptyStepsService(DummyBuilderService):
-    async def list_steps(self, session_id: str | None = None):
+    async def list_steps(
+        self,
+        session_id: str | None = None,
+        project_id: int | None = None,
+    ):
         return []
 
 
@@ -207,6 +223,33 @@ async def test_get_builder_steps_route_handles_empty_steps(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_get_builder_steps_route_forwards_project_id(monkeypatch) -> None:
+    class ProjectAwareService(DummyBuilderService):
+        def __init__(self) -> None:
+            super().__init__()
+            self.received_project_id: int | None = None
+
+        async def list_steps(
+            self,
+            session_id: str | None = None,
+            project_id: int | None = None,
+        ):
+            self.received_project_id = project_id
+            return await super().list_steps(session_id=session_id, project_id=project_id)
+
+    service = ProjectAwareService()
+    monkeypatch.setattr(builder_routes, "get_builder_service", lambda: service)
+
+    result = await builder_routes.get_builder_steps(
+        project_id=12,
+        service=service,  # type: ignore[arg-type]
+    )
+
+    assert service.received_project_id == 12
+    assert result.session_id == "session-1"
+
+
+@pytest.mark.asyncio
 async def test_generate_builder_code_route(monkeypatch) -> None:
     service = DummyBuilderService()
     monkeypatch.setattr(builder_routes, "get_builder_service", lambda: service)
@@ -262,6 +305,35 @@ async def test_update_builder_step_route_returns_http_400(monkeypatch) -> None:
         await builder_routes.update_builder_step(
             11,
             payload,
+            service=service,  # type: ignore[arg-type]
+        )
+
+    assert exc.value.status_code == 400
+    assert exc.value.detail == "missing step"
+
+
+@pytest.mark.asyncio
+async def test_delete_builder_step_route(monkeypatch) -> None:
+    service = DummyBuilderService()
+    monkeypatch.setattr(builder_routes, "get_builder_service", lambda: service)
+
+    result = await builder_routes.delete_builder_step(
+        11,
+        service=service,  # type: ignore[arg-type]
+    )
+
+    assert result["message"] == "Step deleted"
+    assert result["step_id"] == 11
+
+
+@pytest.mark.asyncio
+async def test_delete_builder_step_route_returns_http_400(monkeypatch) -> None:
+    service = FailingDeleteService()
+    monkeypatch.setattr(builder_routes, "get_builder_service", lambda: service)
+
+    with pytest.raises(HTTPException) as exc:
+        await builder_routes.delete_builder_step(
+            11,
             service=service,  # type: ignore[arg-type]
         )
 

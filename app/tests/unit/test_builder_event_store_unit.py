@@ -87,3 +87,30 @@ async def test_update_step_persists_new_name() -> None:
     assert updated["step_name"] == "Clicar em login"
     assert updated["page_url"] == "https://example.com/login"
     assert (await store.get_session(session.session_id)).project_id == 7
+
+
+@pytest.mark.asyncio
+async def test_delete_step_removes_step_and_reindexes_sequence() -> None:
+    store = await _make_store()
+    session = await store.create_session("https://example.com")
+
+    first = await store.add_event(session.session_id, {"action": "click", "selector": "#a"})
+    second = await store.add_event(session.session_id, {"action": "click", "selector": "#b"})
+    third = await store.add_event(session.session_id, {"action": "click", "selector": "#c"})
+
+    await store.delete_step(second["id"])
+    steps = await store.get_steps(session.session_id)
+
+    assert len(steps) == 2
+    assert steps[0]["id"] == first["id"]
+    assert steps[0]["step"] == 1
+    assert steps[1]["id"] == third["id"]
+    assert steps[1]["step"] == 2
+
+
+@pytest.mark.asyncio
+async def test_delete_step_raises_for_unknown_step() -> None:
+    store = await _make_store()
+
+    with pytest.raises(ValueError, match="not found"):
+        await store.delete_step(999)

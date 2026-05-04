@@ -309,6 +309,27 @@ async def test_builder_service_update_step_requires_at_least_one_field() -> None
 
 
 @pytest.mark.asyncio
+async def test_builder_service_delete_step_removes_saved_step() -> None:
+    manager = DummyPlaywrightManager()
+    service = await _make_service(manager)  # type: ignore[arg-type]
+
+    session_id = await service.start_builder(
+        "https://example.com", "http://localhost:8000"
+    )
+    saved = await service.ingest_event(
+        {
+            "session_id": session_id,
+            "action": "click",
+            "selector": "#delete",
+        }
+    )
+
+    await service.delete_step(saved["id"])
+    steps = await service.list_steps(session_id)
+    assert steps == []
+
+
+@pytest.mark.asyncio
 async def test_builder_service_input_without_labels_uses_default_step_name() -> None:
     manager = DummyPlaywrightManager()
     service = await _make_service(manager)  # type: ignore[arg-type]
