@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -18,6 +19,9 @@ from app.services.element_scanner import ElementScannerService
 async def lifespan(app: FastAPI):
     setup_logging()
     await init_db()
+    # Warm up rfbrowser in background so first test execution is not delayed
+    from app.services.test_execution_service import TestExecutionService
+    asyncio.get_event_loop().run_in_executor(None, TestExecutionService()._ensure_rfbrowser)
     yield
     await get_builder_service().shutdown()
     await ElementScannerService.close_shared_browser()

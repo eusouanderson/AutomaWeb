@@ -21,10 +21,10 @@ vi.mock('../../../utils/dom.js', async () => {
 // ── imports ───────────────────────────────────────────────────────────────────
 import { toast } from '../../../components/toast.js';
 import {
-    deleteGeneratedTestService,
-    executeProjectTests,
-    getProjectGeneratedTests,
-    getProjects,
+  deleteGeneratedTestService,
+  executeProjectTests,
+  getProjectGeneratedTests,
+  getProjects,
 } from '../../../services/test.service.js';
 import { initScannerPage, mount } from '../scanner.page.js';
 
@@ -63,6 +63,7 @@ function buildDOM() {
     <input type="checkbox" id="exec-headless" checked />
     <input type="number" id="exec-timeout" value="300" />
     <input type="number" id="exec-speed" value="0" />
+    <input type="number" id="exec-parallel-workers" value="4" />
   `;
 }
 
@@ -193,6 +194,8 @@ describe('scanner page – initScannerPage', () => {
       headless: true,
       timeoutSeconds: 300,
       speedMs: 0,
+      skipHeal: true,
+      parallelWorkers: 4,
     });
   });
 
@@ -875,6 +878,8 @@ describe('scanner page – initScannerPage', () => {
       headless: true,
       timeoutSeconds: 300,
       speedMs: 0,
+      skipHeal: true,
+      parallelWorkers: 4,
     });
   });
 
@@ -1132,7 +1137,9 @@ describe('scanner page – initScannerPage', () => {
     const feedback = document.getElementById('execution-feedback').value;
     expect(feedback).toContain('"TC001 - AB Testing"');
     expect(feedback).toContain('"TC001 - Add/Remove Elements"');
-    expect(feedback).toContain('"TC001 - Basic Auth": \'chrome-error://chromewebdata/\' does not contain \'/basic_auth\' (2 ocorrencias)');
+    expect(feedback).toContain(
+      "\"TC001 - Basic Auth\": 'chrome-error://chromewebdata/' does not contain '/basic_auth' (2 ocorrencias)"
+    );
     expect(feedback).toContain('O mesmo nome de test case apareceu mais de uma vez na execucao');
     expect(feedback).toContain('Testes/arquivos selecionados nesta execucao (IDs):');
   });

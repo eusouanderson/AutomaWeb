@@ -33,6 +33,11 @@
       <span>Modo silencioso (sem abrir o navegador)</span>
     </label>
 
+    <label class="headless-toggle">
+      <input type="checkbox" id="exec-skip-heal" checked />
+      <span>Execução rápida (pular validação AI antes de executar)</span>
+    </label>
+
     <div class="form-group">
       <label for="exec-timeout">Timeout da execucao (segundos)</label>
       <input id="exec-timeout" type="number" min="30" max="3600" step="1" value="300" />
@@ -41,6 +46,11 @@
     <div class="form-group">
       <label for="exec-speed">Velocidade entre acoes (ms)</label>
       <input id="exec-speed" type="number" min="0" max="10000" step="50" value="0" />
+    </div>
+
+    <div class="form-group">
+      <label for="exec-parallel-workers">Workers paralelos (pabot)</label>
+      <input id="exec-parallel-workers" type="number" min="1" max="64" step="1" value="4" />
     </div>
   </form>
 

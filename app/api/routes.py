@@ -292,6 +292,8 @@ async def execute_tests(
             headless=payload.headless,
             timeout_seconds=payload.timeout_seconds,
             speed_ms=payload.speed_ms,
+            skip_heal=payload.skip_heal,
+            parallel_workers=payload.parallel_workers,
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

@@ -379,6 +379,34 @@ class TestTestValidator:
         assert report.has_errors is True
 
     @pytest.mark.asyncio
+    async def test_strict_mode_text_locator_prefers_header_scope(self, monkeypatch):
+        content = """\
+*** Test Cases ***
+Foo
+    Click    text=Segmentos
+"""
+
+        async def _bulk_many(self_la, page_url, locators, navigation_timeout_ms=10000):
+            return {loc: 2 for loc in locators}
+
+        monkeypatch.setattr(LocatorAnalyzer, "count_matches_bulk", _bulk_many)
+        monkeypatch.setattr(
+            "app.ai_validation.test_validator.settings",
+            type(
+                "S",
+                (),
+                {"AI_LIVE_CHECK_ENABLED": True, "AI_LIVE_CHECK_TIMEOUT_SECONDS": 15},
+            )(),
+        )
+
+        report = await self.validator.validate(content, page_url="http://example.com")
+        strict_violations = [
+            i for i in report.issues if i.issue_type == "strict_mode_violation"
+        ]
+        assert len(strict_violations) == 1
+        assert strict_violations[0].suggested_locator == "header >> text=Segmentos >> nth=0"
+
+    @pytest.mark.asyncio
     async def test_detects_element_not_found(self, monkeypatch):
         async def _bulk_zero(self_la, page_url, locators, navigation_timeout_ms=10000):
             return {loc: 0 for loc in locators}
@@ -665,6 +693,21 @@ class TestTestFixer:
         )
         result = await self.fixer.apply_fixes(content, [issue])
         assert result.applied_fixes == []
+
+    @pytest.mark.asyncio
+    async def test_strict_mode_without_suggestion_uses_fallback_derivation(self):
+        content = "*** Test Cases ***\nFoo\n    Click    text=Segmentos\n"
+        issue = ValidationIssue(
+            line_number=3,
+            keyword="Click",
+            locator="text=Segmentos",
+            issue_type="strict_mode_violation",
+            message="2 elements",
+            suggested_locator=None,
+        )
+        result = await self.fixer.apply_fixes(content, [issue])
+        assert "header >> text=Segmentos >> nth=0" in result.content
+        assert any("strict_mode_violation" in f for f in result.applied_fixes)
 
     def test_build_wait_line_returns_none_for_no_locator(self):
         result = self.fixer._build_wait_line("    NoArgs")

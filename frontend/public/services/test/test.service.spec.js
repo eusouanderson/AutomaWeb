@@ -192,6 +192,8 @@ describe('executeProjectTests', () => {
       headless: true,
       timeout_seconds: 300,
       speed_ms: 0,
+      skip_heal: true,
+      parallel_workers: 4,
     });
   });
 
@@ -204,6 +206,8 @@ describe('executeProjectTests', () => {
       headless: true,
       timeout_seconds: 300,
       speed_ms: 0,
+      skip_heal: true,
+      parallel_workers: 4,
     });
   });
 
@@ -228,6 +232,8 @@ describe('executeProjectTests', () => {
       headless: false,
       timeout_seconds: 420,
       speed_ms: 250,
+      skip_heal: true,
+      parallel_workers: 4,
     });
   });
 

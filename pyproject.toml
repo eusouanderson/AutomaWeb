@@ -27,6 +27,7 @@ dependencies = [
     "pytest-cov>=4.1.0",
     "robotframework>=7.0",
     "robotframework-browser>=18.0.0",
+    "robotframework-pabot>=4.0.0",
     "mkdocs>=1.5.0",
     "mkdocs-material>=9.5.0",
     "lxml (>=6.0.2,<7.0.0)",

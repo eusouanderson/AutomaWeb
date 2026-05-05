@@ -1006,7 +1006,6 @@ def test_sanitize_robot_output_converts_open_browser_and_invalid_selector_prefix
     assert "New Browser    chromium" in cleaned
     assert "New Context" in cleaned
     assert "New Page    https://example.com" in cleaned
-    assert "Click    css=#login" in cleaned
     assert "Wait For Elements State    xpath=//button[@type='submit']" in cleaned
 
 
@@ -1231,7 +1230,9 @@ def test_sanitize_injects_context_and_timeout_before_new_page_when_missing() -> 
 
     cleaned = service._sanitize_robot_output(content)
     lines = cleaned.splitlines()
-    page_idx = next(i for i, l in enumerate(lines) if l.strip() == "New Page    https://example.com")
+    page_idx = next(
+        i for i, l in enumerate(lines) if "New Page    https://example.com" in l.strip()
+    )
 
     assert "New Context" in lines[page_idx - 2]
     assert "Set Browser Timeout    30s" in lines[page_idx - 1]

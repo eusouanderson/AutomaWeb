@@ -9,6 +9,7 @@ def test_test_execution_request_defaults() -> None:
     assert req.test_ids is None
     assert req.timeout_seconds == 300
     assert req.speed_ms == 0
+    assert req.parallel_workers == 4
 
 
 def test_test_execution_result_schema() -> None:

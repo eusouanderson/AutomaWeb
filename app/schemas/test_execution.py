@@ -12,6 +12,8 @@ class TestExecutionRequest(BaseModel):
     headless: bool = True  # True = sem janela (CI), False = abre o navegador
     timeout_seconds: int = Field(default=300, ge=30, le=3600)
     speed_ms: int = Field(default=0, ge=0, le=10000)
+    skip_heal: bool = False  # True = pula a etapa de AI healing antes de executar
+    parallel_workers: int = Field(default=4, ge=1, le=64)
 
 
 class TestCaseResult(BaseModel):

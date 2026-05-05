@@ -1,9 +1,9 @@
 import { toast } from '../../components/toast.js';
 import {
-    deleteGeneratedTestService,
-    executeProjectTests,
-    getProjectGeneratedTests,
-    getProjects,
+  deleteGeneratedTestService,
+  executeProjectTests,
+  getProjectGeneratedTests,
+  getProjects,
 } from '../../services/test.service.js';
 import { loadTemplate, renderHTML } from '../../utils/dom.js';
 import { formatDate } from '../../utils/helpers.js';
@@ -145,11 +145,17 @@ export function initScannerPage({ store, onRecreateRequested }) {
   const execSelectAllBtn = document.getElementById('exec-select-all');
   const execDeselectAllBtn = document.getElementById('exec-deselect-all');
   const execHeadlessCheckbox = document.getElementById('exec-headless');
+  const execSkipHealCheckbox = document.getElementById('exec-skip-heal');
   const execTimeoutInput = document.getElementById('exec-timeout');
   const execSpeedInput = document.getElementById('exec-speed');
+  const execParallelWorkersInput = document.getElementById('exec-parallel-workers');
 
   function getHeadless() {
     return execHeadlessCheckbox ? execHeadlessCheckbox.checked : true;
+  }
+
+  function getSkipHeal() {
+    return execSkipHealCheckbox ? execSkipHealCheckbox.checked : true;
   }
 
   function getTimeoutSeconds() {
@@ -162,6 +168,12 @@ export function initScannerPage({ store, onRecreateRequested }) {
     const raw = Number.parseInt(execSpeedInput?.value || '', 10);
     if (!Number.isFinite(raw)) return 0;
     return Math.min(10000, Math.max(0, raw));
+  }
+
+  function getParallelWorkers() {
+    const raw = Number.parseInt(execParallelWorkersInput?.value || '', 10);
+    if (!Number.isFinite(raw)) return 4;
+    return Math.min(64, Math.max(1, raw));
   }
 
   function getSelectedTestIds() {
@@ -379,7 +391,7 @@ export function initScannerPage({ store, onRecreateRequested }) {
 
   const EXEC_PHASES = [
     { id: 'prepare', label: 'Preparando ambiente' },
-    { id: 'heal', label: 'Validando e curando testes (AI)' },
+    { id: 'heal', label: 'Validando testes... ' },
     { id: 'run', label: 'Executando testes Robot' },
     { id: 'report', label: 'Gerando relatórios' },
   ];
@@ -496,13 +508,14 @@ export function initScannerPage({ store, onRecreateRequested }) {
         headless: getHeadless(),
         timeoutSeconds: getTimeoutSeconds(),
         speedMs: getSpeedMs(),
+        skipHeal: getSkipHeal(),
+        parallelWorkers: getParallelWorkers(),
       });
 
       clearTimeout(t1);
       clearTimeout(t2);
       currentPhase = 'report';
       tracker.activate('report');
-      await new Promise((r) => setTimeout(r, 600));
       tracker.complete();
 
       executionResult.style.display = 'block';
@@ -528,7 +541,7 @@ export function initScannerPage({ store, onRecreateRequested }) {
         data.status === 'failed' || Number(data.failed || 0) > 0 || Boolean(data.error_output);
 
       toast(extractExecutionMessage(data), hasFailure ? 'error' : 'success');
-      setTimeout(() => executionLoading.classList.add('hidden'), 1500);
+      setTimeout(() => executionLoading.classList.add('hidden'), 400);
     } catch (error) {
       if (tracker) tracker.error(currentPhase);
       toast(error.message, 'error');

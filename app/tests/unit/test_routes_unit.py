@@ -317,6 +317,8 @@ async def test_execute_tests_route_success(monkeypatch) -> None:
         headless: bool = True,
         timeout_seconds: int = 300,
         speed_ms: int = 0,
+        skip_heal: bool = False,
+        parallel_workers: int = 4,
     ):
         return TestExecution(
             id=1,
@@ -353,6 +355,8 @@ async def test_execute_tests_route_error(monkeypatch) -> None:
         headless: bool = True,
         timeout_seconds: int = 300,
         speed_ms: int = 0,
+        skip_heal: bool = False,
+        parallel_workers: int = 4,
     ):
         raise ValueError("Project not found")
 

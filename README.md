@@ -7,7 +7,7 @@ Sistema de geração e execução automática de testes Robot Framework usando I
 
 ## Características
 
-- 🤖 Geração de testes Robot Framework com IA (Groq/LLama)
+- 🤖 Geração de testes Robot Framework com IA (Copilot)
 - 🧪 Execução automática de testes com Robot Framework + Browser Library
 - 📊 Relatórios MkDocs integrados
 - 🎯 Interface web intuitiva
@@ -18,7 +18,8 @@ Sistema de geração e execução automática de testes Robot Framework usando I
 - **Backend**: FastAPI + SQLAlchemy (async)
 - **Frontend**: Vanilla JS + Axios
 - **Testes**: Robot Framework + Browser Library
-- **IA**: Groq API (LLama 3.3 70B)
+- **Execução paralela**: Pabot (robotframework-pabot)
+- **IA**: GitHub Copilot
 - **Documentação**: MkDocs Material
 
 ## Instalação
@@ -32,7 +33,7 @@ docker pull ghcr.io/OWNER/automaweb:latest
 # 2. Executar o container
 docker run -d \
   -p 8888:8888 \
-  -e GROQ_API_KEY=sua_chave_aqui \
+  -e COPILOT_API_KEY=sua_chave_aqui \
   -v $(pwd)/app.db:/app/app.db \
   -v $(pwd)/reports:/app/app/static/reports \
   ghcr.io/OWNER/automaweb:latest
@@ -46,7 +47,7 @@ http://localhost:8888
 ```bash
 # 1. Configure as variáveis de ambiente
 cp .env.example .env
-# Edite .env e adicione sua GROQ_API_KEY
+# Edite .env e adicione sua COPILOT_API_KEY
 
 # 2. Execute com Docker Compose
 docker-compose up -d
@@ -61,7 +62,10 @@ http://localhost:8888
 # 1. Instale as dependências
 poetry install
 
-# 1.1 (obrigatório para o Smart Element Scanner)
+# 1.1 (obrigatório: bibliotecas nativas do sistema para Playwright)
+poetry run playwright install-deps chromium
+
+# 1.2 (obrigatório para o Smart Element Scanner)
 poetry run playwright install chromium
 
 # 2. Configure as variáveis de ambiente
@@ -82,6 +86,15 @@ Atalho via Makefile:
 
 ```bash
 make setup
+```
+
+Observação: `make setup` pode solicitar senha de `sudo` para instalar dependências nativas do Chromium.
+O `pabot` já é instalado automaticamente via dependências do projeto (`poetry install` / `requirements.txt`).
+
+Para validar no ambiente local:
+
+```bash
+poetry run pabot --version
 ```
 
 Para garantir que rode em outro PC, versione também o arquivo de lock:
@@ -192,6 +205,9 @@ docker compose up -d --build
 
 **Solução**:
 ```bash
+# Instale dependências nativas do sistema
+poetry run playwright install-deps chromium
+
 # Instale os browsers do Playwright
 poetry run playwright install chromium
 
@@ -205,6 +221,19 @@ make setup
 ```bash
 poetry install
 poetry run playwright install chromium
+```
+
+### Erro: "pabot: command not found"
+
+**Solução**:
+```bash
+# Se usa Poetry
+poetry install
+poetry run pabot --version
+
+# Se usa pip
+pip install -r requirements.txt
+pabot --version
 ```
 
 ## Licença

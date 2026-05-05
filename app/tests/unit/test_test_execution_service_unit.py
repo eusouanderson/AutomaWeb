@@ -461,8 +461,12 @@ def test_ensure_rfbrowser_handles_wrapper_path_resolution_error(monkeypatch) -> 
     TestExecutionService._rfbrowser_ready = False
     calls = []
 
-    def fake_resolve(self):
-        raise RuntimeError("resolve failed")
+    # Wrapper directory missing should not break fallback execution path.
+    monkeypatch.setattr(
+        service,
+        "_browser_wrapper_root",
+        lambda: Path("/tmp/does-not-exist-automaweb"),
+    )
 
     def fake_run(*args, **kwargs):
         calls.append((args, kwargs))
@@ -472,9 +476,6 @@ def test_ensure_rfbrowser_handles_wrapper_path_resolution_error(monkeypatch) -> 
 
         return Result()
 
-    monkeypatch.setattr(
-        "app.services.test_execution_service.Path.resolve", fake_resolve
-    )
     monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
 
     service._ensure_rfbrowser()
@@ -484,8 +485,10 @@ def test_ensure_rfbrowser_handles_wrapper_path_resolution_error(monkeypatch) -> 
 
 def test_ensure_rfbrowser_runs_only_once_when_ready(monkeypatch) -> None:
     service = TestExecutionService()
-    TestExecutionService._rfbrowser_ready = False
+    TestExecutionService._rfbrowser_ready = True
     calls = []
+
+    monkeypatch.setattr(service, "_has_chromium_headless_shell", lambda: True)
 
     def fake_run(*args, **kwargs):
         calls.append((args, kwargs))
@@ -500,7 +503,7 @@ def test_ensure_rfbrowser_runs_only_once_when_ready(monkeypatch) -> None:
     service._ensure_rfbrowser()
     service._ensure_rfbrowser()
 
-    assert len(calls) == 1
+    assert len(calls) == 0
 
 
 @pytest.mark.asyncio

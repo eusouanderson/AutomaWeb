@@ -615,7 +615,9 @@ export function initGeneratorPage({ store }) {
 
     builderCodePanel?.classList.remove('hidden');
     resultSection?.classList.remove('hidden');
-    downloadButton.dataset.testId = String(generated?.id || '');
+    if (downloadButton) {
+      downloadButton.dataset.testId = String(generated?.id || '');
+    }
     if (stepKey) {
       generatedBuilderStepKeys.add(stepKey);
       renderBuilderSteps(allSteps);
@@ -706,7 +708,9 @@ export function initGeneratorPage({ store }) {
 
     codeElement.textContent = result.content || '';
     resultSection.classList.remove('hidden');
-    downloadButton.dataset.testId = String(targetTestId || result.id || '');
+    if (downloadButton) {
+      downloadButton.dataset.testId = String(targetTestId || result.id || '');
+    }
     projectSelect.value = String(projectId);
     toast(
       targetTestId

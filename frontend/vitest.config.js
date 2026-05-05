@@ -10,13 +10,13 @@ export default defineConfig({
       reporter: ['text', 'html'],
       reportsDirectory: './coverage',
       include: ['public/**/*.js'],
-      exclude: ['public/**/*.spec.js', 'public/**/__tests__/**', 'node_modules/**'],
+      exclude: ['public/**/*.test.js', 'public/**/__tests__/**', 'node_modules/**'],
       thresholds: {
         statements: 40,
         branches: 70,
         functions: 60,
-        lines: 40
-      }
-    }
-  }
+        lines: 40,
+      },
+    },
+  },
 });

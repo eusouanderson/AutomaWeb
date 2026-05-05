@@ -14,4 +14,5 @@ pytest-asyncio>=0.23.0
 pytest-cov>=4.1.0
 robotframework>=7.0
 robotframework-browser>=18.0.0
+robotframework-pabot>=4.0.0
 mkdocs>=1.5.0

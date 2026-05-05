@@ -1053,7 +1053,9 @@ class TestService:
                 )
                 hardened.append(f"{indent}New Context")
                 hardened.append(f"{indent}Set Browser Timeout    30s")
-                hardened.append(f"{indent}New Page    {page_url}")
+                hardened.append(
+                    f"{indent}New Page    {page_url}    wait_until=domcontentloaded"
+                )
                 continue
 
             if keyword == "New Context":
@@ -1070,8 +1072,21 @@ class TestService:
                 # to its 10s default and page.goto can fail on slower sites.
                 hardened.append(f"{indent}New Context")
                 hardened.append(f"{indent}Set Browser Timeout    30s")
-                hardened.append(line)
+                if len(parts) >= 2 and not any(
+                    p.startswith("wait_until=") for p in parts[2:]
+                ):
+                    parts.append("wait_until=domcontentloaded")
+                    hardened.append(f"{indent}{'    '.join(parts)}")
+                else:
+                    hardened.append(line)
                 has_context_timeout = True
+                continue
+
+            if keyword == "New Page" and len(parts) >= 2 and not any(
+                p.startswith("wait_until=") for p in parts[2:]
+            ):
+                parts.append("wait_until=domcontentloaded")
+                hardened.append(f"{indent}{'    '.join(parts)}")
                 continue
 
             if keyword in selector_keywords and len(parts) >= 2:

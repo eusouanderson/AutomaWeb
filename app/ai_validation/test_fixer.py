@@ -29,13 +29,17 @@ class TestFixer:
         for issue in issues:
             if issue.line_number <= 0 or issue.line_number > len(lines):
                 continue
-            if not issue.suggested_locator:
-                continue
             if issue.issue_type not in {"generic_xpath", "strict_mode_violation"}:
                 continue
 
             current = lines[issue.line_number - 1]
-            updated = self._replace_locator(current, issue.suggested_locator)
+            suggested = issue.suggested_locator
+            if not suggested and issue.issue_type == "strict_mode_violation":
+                suggested = self._derive_strict_mode_locator(current)
+            if not suggested:
+                continue
+
+            updated = self._replace_locator(current, suggested)
             if updated != current:
                 lines[issue.line_number - 1] = updated
                 applied_fixes.append(
@@ -106,3 +110,15 @@ class TestFixer:
         return stripped.startswith("Wait For Elements State") or stripped.startswith(
             "Wait For Selector"
         )
+
+    def _derive_strict_mode_locator(self, line: str) -> str | None:
+        stripped = line.strip()
+        parts = re.split(r"\s{2,}", stripped)
+        if len(parts) < 2:
+            return None
+        locator = parts[1]
+        if ">> nth=" in locator:
+            return locator
+        if locator.startswith("text="):
+            return f"header >> {locator} >> nth=0"
+        return f"{locator} >> nth=0"

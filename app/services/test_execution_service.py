@@ -1,11 +1,13 @@
 """Service for executing Robot Framework tests and generating reports"""
 
 import asyncio
+import json
 import logging
 import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -26,6 +28,7 @@ class TestExecutionService:
 
     _running_projects: set[int] = set()
     _rfbrowser_ready = False
+    _rfbrowser_lock_file = Path(tempfile.gettempdir()) / "automaweb-rfbrowser-init.lock"
 
     def __init__(
         self,
@@ -45,6 +48,8 @@ class TestExecutionService:
         headless: bool = True,
         timeout_seconds: int = 300,
         speed_ms: int = 0,
+        skip_heal: bool = False,
+        parallel_workers: int = 4,
     ) -> TestExecution:
         """Execute Robot Framework tests for a project."""
 
@@ -111,7 +116,7 @@ class TestExecutionService:
             if not test_files:
                 raise ValueError(f"No test files found in {project_dir}")
 
-            if settings.AI_VALIDATION_ENABLED:
+            if settings.AI_VALIDATION_ENABLED and not skip_heal:
                 test_files = await self._apply_pre_execution_healing(
                     test_files=test_files,
                     page_url=str(project.url) if project.url else None,
@@ -143,38 +148,45 @@ class TestExecutionService:
                 created_at=datetime.utcnow(),
             )
 
-            await asyncio.to_thread(self._ensure_rfbrowser)
-
             # Prepare temp copies with headless variable injected
             prepared_files, temp_dir = self._prepare_test_files(
                 test_files, headless, speed_ms
             )
             headless_var = "True" if headless else "False"
+            command = self._build_robot_command(
+                output_dir=output_dir,
+                headless_var=headless_var,
+                speed_ms=speed_ms,
+                prepared_files=prepared_files,
+                parallel_workers=parallel_workers,
+            )
 
             # Execute Robot Framework tests
             result = await asyncio.to_thread(
                 subprocess.run,
-                [
-                    "robot",
-                    "--outputdir",
-                    str(output_dir),
-                    "--log",
-                    "log.html",
-                    "--report",
-                    "report.html",
-                    "--output",
-                    "output.xml",
-                    "--variable",
-                    f"HEADLESS:{headless_var}",
-                    "--variable",
-                    f"SPEED_MS:{int(speed_ms)}",
-                    *prepared_files,
-                ],
+                command,
                 capture_output=True,
                 text=True,
                 stdin=subprocess.DEVNULL,
                 timeout=int(timeout_seconds),
             )
+
+            # One-time self-heal when Playwright executable is missing.
+            if result.returncode != 0:
+                robot_output = f"{result.stderr or ''}\n{result.stdout or ''}"
+                if self._is_missing_playwright_executable_error(robot_output):
+                    logger.warning(
+                        "Robot failed due to missing Playwright executable; attempting one-time repair"
+                    )
+                    await asyncio.to_thread(self._ensure_rfbrowser)
+                    result = await asyncio.to_thread(
+                        subprocess.run,
+                        command,
+                        capture_output=True,
+                        text=True,
+                        stdin=subprocess.DEVNULL,
+                        timeout=int(timeout_seconds),
+                    )
 
             # Parse output.xml to get statistics
             stats = self._parse_robot_output(output_dir / "output.xml")
@@ -193,9 +205,9 @@ class TestExecutionService:
             # Ensure report files exist even on failure
             self._ensure_report_files(output_dir, execution.error_output)
 
-            # Generate MkDocs documentation
-            await self._generate_mkdocs_report(project, output_dir, stats)
-            self._sync_reports_for_static(output_dir, public_output_dir)
+            # Generate MkDocs documentation in background — does not block execution result
+            asyncio.create_task(self._generate_mkdocs_report(project, output_dir, stats))
+            asyncio.create_task(asyncio.to_thread(self._sync_reports_for_static, output_dir, public_output_dir))
             execution.mkdocs_index = mkdocs_index_url
 
         except subprocess.TimeoutExpired:
@@ -305,6 +317,7 @@ class TestExecutionService:
                 r"\1    slowMo=${SPEED_MS}ms",
                 content,
             )
+            content = self._harden_runtime_locators(content)
             # Inject httpCredentials when URLs contain embedded user:pass@host
             content = self._inject_basic_auth_credentials(content)
             dst = temp_dir / src.name
@@ -312,19 +325,79 @@ class TestExecutionService:
             prepared.append(str(dst))
         return prepared, temp_dir
 
+    def _harden_runtime_locators(self, content: str) -> str:
+        """Apply lightweight deterministic hardening to reduce strict-mode flakes.
+
+        This runs even when skip_heal=True and does not call any AI service.
+        """
+        selector_keywords = {
+            "Click",
+            "Click Element",
+            "Wait For Elements State",
+            "Wait Until Element Is Visible",
+            "Wait Until Page Contains Element",
+            "Get Element",
+            "Get Elements",
+            "Input Text",
+            "Fill Text",
+            "Type Text",
+        }
+
+        hardened: list[str] = []
+        for line in content.splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("***"):
+                hardened.append(line)
+                continue
+
+            indent = line[: len(line) - len(line.lstrip())]
+            parts = re.split(r"\s{2,}", stripped)
+            keyword = parts[0] if parts else ""
+
+            if keyword in selector_keywords and len(parts) >= 2:
+                selector = parts[1]
+                if (
+                    ">> nth=" not in selector
+                    and not selector.startswith("text=")
+                    and not selector.startswith("role=")
+                    and (
+                        selector.startswith("css=")
+                        or selector.startswith("xpath=")
+                        or selector.startswith("#")
+                        or selector.startswith(".")
+                        or selector.startswith("[")
+                    )
+                ):
+                    if selector.startswith("#") or selector.startswith(".") or selector.startswith("["):
+                        selector = f"css={selector}"
+                    selector = f"{selector} >> nth=0"
+                    parts[1] = selector
+                    hardened.append(f"{indent}{'    '.join(parts)}")
+                    continue
+
+            if keyword == "New Page" and len(parts) >= 2 and not any(
+                p.startswith("wait_until=") for p in parts[2:]
+            ):
+                parts.append("wait_until=domcontentloaded")
+                hardened.append(f"{indent}{'    '.join(parts)}")
+                continue
+
+            hardened.append(line)
+
+        return "\n".join(hardened) + "\n"
+
     async def _apply_pre_execution_healing(
         self,
         test_files: list[str],
         page_url: str | None,
         ai_debug: bool,
     ) -> list[str]:
-        """Validate and heal generated .robot files before execution."""
-        healed_files: list[str] = []
-        for file_path in test_files:
-            path = Path(file_path)
-            if not path.exists():
-                continue
+        """Validate and heal generated .robot files before execution (parallel)."""
+        existing = [Path(fp) for fp in test_files if Path(fp).exists()]
+        if not existing:
+            return []
 
+        async def _heal_one(path: Path) -> str:
             content = path.read_text(encoding="utf-8")
             healed = await self._self_healing.heal_test(
                 content=content,
@@ -333,30 +406,138 @@ class TestExecutionService:
             )
             if healed.final_content != content:
                 path.write_text(healed.final_content, encoding="utf-8")
+            return str(path)
 
-            healed_files.append(str(path))
-
-        return healed_files
+        healed_files = await asyncio.gather(*(_heal_one(p) for p in existing))
+        return list(healed_files)
 
     def _ensure_rfbrowser(self) -> None:
         """Install Browser dependencies if missing."""
         if self.__class__._rfbrowser_ready:
+            self._ensure_playwright_package_compat()
+            if self._has_chromium_headless_shell():
+                return
+            logger.warning("rfbrowser marked ready but chromium_headless_shell is missing; repairing")
+
+        wrapper_root = self._browser_wrapper_root()
+        rfbrowser_bin = Path(sys.prefix) / "bin" / "rfbrowser"
+        rfbrowser_cmd = str(rfbrowser_bin) if rfbrowser_bin.exists() else "rfbrowser"
+
+        # Fast path: if wrapper already has chromium_headless_shell, we're ready.
+        if self._has_chromium_headless_shell():
+            self.__class__._rfbrowser_ready = True
+            self._ensure_playwright_package_compat()
+            logger.info("Playwright wrapper already has chromium_headless_shell")
             return
 
+        # Try to install missing shell directly in wrapper first.
         try:
-            wrapper_path = Path(__file__).resolve().parent.parent.parent / ".venv"
+            if wrapper_root.exists():
+                logger.warning("Wrapper missing chromium_headless_shell; installing in wrapper")
+                repair = subprocess.run(
+                    ["npx", "playwright", "install", "chromium", "chromium-headless-shell"],
+                    cwd=str(wrapper_root),
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
+                )
+                if repair.returncode == 0 and self._has_chromium_headless_shell():
+                    self.__class__._rfbrowser_ready = True
+                    self._ensure_playwright_package_compat()
+                    logger.info("Installed chromium_headless_shell in Browser wrapper")
+                    return
         except Exception:
-            wrapper_path = None
+            pass
 
-        # If rfbrowser is available, run init to ensure deps
+        # In multi-worker mode (e.g. start.py workers=4), prevent concurrent init.
+        lock_fd = None
         try:
-            result = subprocess.run(
-                ["rfbrowser", "init"], capture_output=True, text=True, timeout=120
-            )
-            if result.returncode == 0:
-                self.__class__._rfbrowser_ready = True
+            import fcntl
+
+            lock_fd = os.open(str(self.__class__._rfbrowser_lock_file), os.O_CREAT | os.O_RDWR)
+            try:
+                fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                logger.info("Another worker is warming rfbrowser; skipping duplicate init")
+                return
+        except Exception:
+            # If lock is unavailable, continue best-effort init.
+            lock_fd = None
+
+        # Slow path: run full rfbrowser init (downloads browsers if needed)
+        # Retry once on transient failure (e.g. npm network timeout)
+        try:
+            for attempt in range(2):
+                try:
+                    result = subprocess.run(
+                        [rfbrowser_cmd, "init"], capture_output=True, text=True, timeout=180
+                    )
+                    if result.returncode == 0:
+                        self.__class__._rfbrowser_ready = True
+                        self._ensure_playwright_package_compat()
+                        logger.info("rfbrowser init completed successfully")
+                        return
+
+                    stderr = (result.stderr or "").strip()
+                    summary = stderr.splitlines()[-1] if stderr else "unknown error"
+                    logger.warning(
+                        "rfbrowser init attempt %s failed: %s",
+                        attempt + 1,
+                        summary,
+                    )
+                except Exception as exc:
+                    logger.warning(f"rfbrowser init attempt {attempt + 1} exception: {exc}")
+            logger.error("rfbrowser init failed after 2 attempts — robot tests may fail")
+        finally:
+            if lock_fd is not None:
+                try:
+                    import fcntl
+
+                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                except Exception:
+                    pass
+                os.close(lock_fd)
+
+    def _ensure_playwright_package_compat(self) -> None:
+        """Ensure playwright-core/lib/package.json exists for Browser wrapper runtime.
+
+        Some wrapper distributions resolve "./../../../package.json" from
+        lib/server/utils/userAgent.js, which points to lib/package.json.
+        """
+        try:
+            wrapper_root = Path(sys.prefix) / "lib" / f"python{sys.version_info.major}.{sys.version_info.minor}" / "site-packages" / "Browser" / "wrapper"
+            root_pkg = wrapper_root / "node_modules" / "playwright-core" / "package.json"
+            lib_pkg = wrapper_root / "node_modules" / "playwright-core" / "lib" / "package.json"
+
+            if lib_pkg.exists() or not root_pkg.exists():
+                return
+
+            data = json.loads(root_pkg.read_text(encoding="utf-8"))
+            lib_pkg.write_text(json.dumps(data, ensure_ascii=True), encoding="utf-8")
+            logger.info("Created playwright-core compatibility file at lib/package.json")
         except Exception as exc:
-            logger.warning(f"rfbrowser init failed or not available: {exc}")
+            logger.warning("Could not create playwright-core compatibility file: %s", exc)
+
+    def _browser_wrapper_root(self) -> Path:
+        return (
+            Path(sys.prefix)
+            / "lib"
+            / f"python{sys.version_info.major}.{sys.version_info.minor}"
+            / "site-packages"
+            / "Browser"
+            / "wrapper"
+        )
+
+    def _has_chromium_headless_shell(self) -> bool:
+        wrapper_root = self._browser_wrapper_root()
+        base = wrapper_root / "node_modules" / "playwright-core" / ".local-browsers"
+        if not base.exists():
+            return False
+
+        for shell_bin in base.glob("chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell"):
+            if shell_bin.exists():
+                return True
+        return False
 
     def _ensure_report_files(self, output_dir: Path, error_output: str | None) -> None:
         """Create fallback report/log/output files if Robot didn't generate them."""
@@ -394,6 +575,51 @@ class TestExecutionService:
             f"<html><head><title>{title}</title></head><body>"
             f"<h1>{title}</h1><pre>{message}</pre></body></html>"
         )
+
+    def _is_missing_playwright_executable_error(self, output: str) -> bool:
+        text = (output or "").lower()
+        return "executable doesn't exist" in text and "playwright" in text
+
+    def _resolve_pabot_command(self) -> str | None:
+        pabot_bin = Path(sys.prefix) / "bin" / "pabot"
+        if pabot_bin.exists():
+            return str(pabot_bin)
+        return shutil.which("pabot")
+
+    def _build_robot_command(
+        self,
+        output_dir: Path,
+        headless_var: str,
+        speed_ms: int,
+        prepared_files: list[str],
+        parallel_workers: int,
+    ) -> list[str]:
+        base_args = [
+            "--outputdir",
+            str(output_dir),
+            "--log",
+            "log.html",
+            "--report",
+            "report.html",
+            "--output",
+            "output.xml",
+            "--variable",
+            f"HEADLESS:{headless_var}",
+            "--variable",
+            f"SPEED_MS:{int(speed_ms)}",
+            *prepared_files,
+        ]
+
+        workers = max(1, int(parallel_workers or 1))
+        if workers > 1 and len(prepared_files) > 1:
+            pabot_cmd = self._resolve_pabot_command()
+            if pabot_cmd:
+                # No benefit in using more workers than files.
+                workers = min(workers, len(prepared_files))
+                return [pabot_cmd, "--processes", str(workers), "--testlevelsplit", *base_args]
+            logger.warning("parallel_workers requested, but pabot is not installed; falling back to robot")
+
+        return ["robot", *base_args]
 
     def _parse_robot_output(self, output_file: Path) -> dict:
         """Parse Robot Framework output.xml to extract statistics and per-test results."""

@@ -139,6 +139,10 @@ class TestValidator:
                         )
                     )
                 elif count > 1:
+                    suggested = self._build_strict_mode_suggestion(
+                        locator=locator,
+                        normalized_locator=inspection.normalized_locator,
+                    )
                     issues.append(
                         ValidationIssue(
                             line_number=idx,
@@ -147,7 +151,7 @@ class TestValidator:
                             issue_type="strict_mode_violation",
                             message=f"Locator corresponde a {count} elementos.",
                             severity="error",
-                            suggested_locator=f"{inspection.normalized_locator} >> nth=0",
+                            suggested_locator=suggested,
                         )
                     )
 
@@ -163,3 +167,20 @@ class TestValidator:
             if parts and parts[0] in self.WAIT_KEYWORDS:
                 return True
         return False
+
+    def _build_strict_mode_suggestion(
+        self, locator: str, normalized_locator: str
+    ) -> str:
+        base = normalized_locator
+
+        # Common case in generated tests: text locators target duplicated menu
+        # entries in header + footer. Prefer a nav/header scope first.
+        if self._is_text_locator(base) and "header" not in base and "nav" not in base:
+            return f"header >> {base} >> nth=0"
+
+        if ">> nth=" not in base:
+            return f"{base} >> nth=0"
+        return base
+
+    def _is_text_locator(self, locator: str) -> bool:
+        return locator.startswith("text=") or " >> text=" in locator

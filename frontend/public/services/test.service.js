@@ -89,6 +89,11 @@ export async function executeProjectTests(projectId, testIds = null, options = {
   const speedMs = Number.isFinite(Number(normalizedOptions.speedMs))
     ? Math.min(10000, Math.max(0, Number(normalizedOptions.speedMs)))
     : 0;
+  const parallelWorkers = Number.isFinite(Number(normalizedOptions.parallelWorkers))
+    ? Math.min(64, Math.max(1, Number(normalizedOptions.parallelWorkers)))
+    : 4;
+
+  const skipHeal = normalizedOptions.skipHeal ?? true;
 
   return runTests({
     project_id: projectId,
@@ -96,6 +101,8 @@ export async function executeProjectTests(projectId, testIds = null, options = {
     headless,
     timeout_seconds: timeoutSeconds,
     speed_ms: speedMs,
+    skip_heal: skipHeal,
+    parallel_workers: parallelWorkers,
   });
 }
 
