@@ -372,8 +372,30 @@ class TestExecutionService:
                         selector = f"css={selector}"
                     selector = f"{selector} >> nth=0"
                     parts[1] = selector
-                    hardened.append(f"{indent}{'    '.join(parts)}")
-                    continue
+
+                # Cookie consent / GDPR banners are position:fixed but outside the
+                # viewport in headless mode. Use JS click fallback instead of
+                # actionability-dependent native click.
+                if keyword == "Click" and re.search(
+                    r"(cookie|consent|accept|hs-eu|onetrust|gdpr|lgpd|cookielaw|"
+                    r"cc-accept|accept-all|cookie-btn|cookie-ok|cookie-agree)",
+                    parts[1],
+                    re.IGNORECASE,
+                ):
+                    css_query = parts[1]
+                    if css_query.startswith("css="):
+                        css_query = css_query[4:]
+                    elif not css_query.startswith(("#", ".", "[")):
+                        css_query = ""
+
+                    if css_query:
+                        hardened.append(
+                            f'{indent}Evaluate JavaScript    ${{None}}    () => {{ const b = document.querySelector("{css_query}"); if (b) b.click(); }}'
+                        )
+                        continue
+
+                hardened.append(f"{indent}{'    '.join(parts)}")
+                continue
 
             if keyword == "New Page" and len(parts) >= 2 and not any(
                 p.startswith("wait_until=") for p in parts[2:]

@@ -1109,6 +1109,18 @@ class TestService:
                     selector = self._make_selector_unique(selector)
 
                 parts[1] = selector
+
+                # Cookie consent / GDPR banners (e.g. HubSpot #hs-eu-confirmation-button,
+                # OneTrust, etc.) often render outside viewport in headless mode.
+                # Use JS click fallback to bypass viewport/actionability restrictions.
+                if keyword == "Click" and self._is_cookie_consent_selector(selector):
+                    css_query = self._selector_to_css_query(selector)
+                    if css_query:
+                        hardened.append(
+                            f'{indent}Evaluate JavaScript    ${{None}}    () => {{ const b = document.querySelector("{css_query}"); if (b) b.click(); }}'
+                        )
+                        continue
+
                 hardened.append(f"{indent}{'    '.join(parts)}")
                 continue
 
@@ -1281,6 +1293,27 @@ class TestService:
 
         # Very short ids are frequently reused (#x, #el, #btn1 etc.).
         return len(normalized) <= 4
+
+    # Patterns that identify cookie consent / GDPR banner buttons.
+    # These elements are typically position:fixed but render outside the
+    # viewport in headless Chromium, causing plain Click to timeout.
+    _COOKIE_CONSENT_PATTERNS = re.compile(
+        r"(cookie|consent|accept|hs-eu|onetrust|gdpr|lgpd|cookielaw|"
+        r"cc-accept|accept-all|cookie-btn|cookie-ok|cookie-agree)",
+        re.IGNORECASE,
+    )
+
+    def _is_cookie_consent_selector(self, selector: str) -> bool:
+        """Return True if the selector targets a known cookie consent button."""
+        return bool(self._COOKIE_CONSENT_PATTERNS.search(selector))
+
+    def _selector_to_css_query(self, selector: str) -> str | None:
+        normalized = selector.strip()
+        if normalized.startswith("css="):
+            return normalized[4:]
+        if normalized.startswith(("#", ".", "[")):
+            return normalized
+        return None
 
     def _make_selector_unique(self, selector: str) -> str:
         if selector.endswith(" >> nth=0"):
