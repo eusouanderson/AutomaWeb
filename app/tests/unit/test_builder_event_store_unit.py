@@ -90,6 +90,28 @@ async def test_update_step_persists_new_name() -> None:
 
 
 @pytest.mark.asyncio
+async def test_update_step_persists_description_and_raises_when_missing() -> None:
+    store = await _make_store()
+    session = await store.create_session("https://example.com")
+
+    saved = await store.add_event(
+        session.session_id,
+        {
+            "action": "click",
+            "selector": "#login",
+            "description": "Descricao inicial",
+        },
+    )
+
+    updated = await store.update_step(saved["id"], {"description": "Descricao final"})
+
+    assert updated["description"] == "Descricao final"
+
+    with pytest.raises(ValueError, match="not found"):
+        await store.update_step(999999, {"description": "x"})
+
+
+@pytest.mark.asyncio
 async def test_delete_step_removes_step_and_reindexes_sequence() -> None:
     store = await _make_store()
     session = await store.create_session("https://example.com")
@@ -114,3 +136,31 @@ async def test_delete_step_raises_for_unknown_step() -> None:
 
     with pytest.raises(ValueError, match="not found"):
         await store.delete_step(999)
+
+
+@pytest.mark.asyncio
+async def test_get_steps_resolves_latest_session_by_project_id() -> None:
+    store = await _make_store()
+    session_a = await store.create_session("https://example.com/a", project_id=5)
+    session_b = await store.create_session("https://example.com/b", project_id=5)
+
+    await store.add_event(session_a.session_id, {"action": "click", "selector": "#a"})
+    await store.add_event(session_b.session_id, {"action": "click", "selector": "#b"})
+
+    steps = await store.get_steps(project_id=5)
+
+    assert len(steps) == 1
+    assert steps[0]["selector"] == "#b"
+
+
+@pytest.mark.asyncio
+async def test_get_session_returns_none_for_explicit_missing_id_and_for_stale_known_ids() -> None:
+    store = await _make_store()
+    session = await store.create_session("https://example.com")
+
+    assert await store.get_session("missing-session-id") is None
+
+    await store.clear_session(session.session_id)
+    store._known_session_ids.add("stale-session")
+
+    assert await store.get_session() is None

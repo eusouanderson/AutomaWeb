@@ -1,6 +1,9 @@
 from datetime import datetime
+import os
 from pathlib import Path
 import subprocess
+import sys
+import types
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -770,3 +773,413 @@ async def test_list_executions_by_project_returns_empty_list() -> None:
     results = await service.list_executions_by_project(session, project_id=99)
 
     assert results == []
+
+
+def test_inject_basic_auth_credentials_inserts_variables_and_context() -> None:
+    service = TestExecutionService()
+    content = """*** Variables ***
+${HEADLESS}    ${TRUE}
+
+*** Test Cases ***
+Login
+    New Browser    chromium
+    New Context
+    New Page    https://user123:pass456@example.com
+"""
+
+    out = service._inject_basic_auth_credentials(content)
+
+    assert "${__AW_HTTP_USER}    user123" in out
+    assert "${__AW_HTTP_PASS}    pass456" in out
+    assert "&{__AW_HTTP_CREDS}" in out
+    assert "New Context    httpCredentials=${__AW_HTTP_CREDS}" in out
+
+
+def test_inject_basic_auth_credentials_inserts_variables_section_when_missing() -> None:
+    service = TestExecutionService()
+    content = """*** Test Cases ***
+Login
+    New Context
+    New Page    https://abc:def@example.com
+"""
+
+    out = service._inject_basic_auth_credentials(content)
+
+    assert "*** Variables ***" in out
+    assert "${__AW_HTTP_USER}    abc" in out
+
+
+def test_inject_basic_auth_credentials_skips_when_context_already_has_credentials() -> None:
+    service = TestExecutionService()
+    content = """*** Variables ***
+${HEADLESS}    ${TRUE}
+
+*** Test Cases ***
+Login
+    New Context    httpCredentials=${SOME_CREDS}
+    New Page    https://abc:def@example.com
+"""
+
+    out = service._inject_basic_auth_credentials(content)
+    assert out == content
+
+
+def test_harden_runtime_locators_adds_nth_wait_until_and_cookie_js() -> None:
+    service = TestExecutionService()
+    content = """*** Test Cases ***
+Case
+    Click    .btn
+    Click    css=#hs-eu-confirmation-button
+    New Page    https://example.com
+"""
+
+    out = service._harden_runtime_locators(content)
+
+    assert "Click    css=.btn >> nth=0" in out
+    assert "Evaluate JavaScript    ${None}" in out
+    assert "querySelector(\"#hs-eu-confirmation-button >> nth=0\")" in out
+    assert "New Page    https://example.com    wait_until=domcontentloaded" in out
+
+
+def test_harden_runtime_locators_cookie_non_css_selector_falls_back_to_click() -> None:
+    service = TestExecutionService()
+    content = """*** Test Cases ***
+Case
+    Click    text=accept cookie
+"""
+
+    out = service._harden_runtime_locators(content)
+    assert "Evaluate JavaScript" not in out
+    assert "Click    text=accept cookie" in out
+
+
+def test_resolve_pabot_command_prefers_virtualenv_bin(tmp_path, monkeypatch) -> None:
+    service = TestExecutionService()
+    fake_prefix = tmp_path / "venv"
+    fake_bin = fake_prefix / "bin"
+    fake_bin.mkdir(parents=True, exist_ok=True)
+    pabot = fake_bin / "pabot"
+    pabot.write_text("#!/bin/sh\n", encoding="utf-8")
+
+    monkeypatch.setattr(sys, "prefix", str(fake_prefix))
+    monkeypatch.setattr("app.services.test_execution_service.shutil.which", lambda _: None)
+
+    assert service._resolve_pabot_command() == str(pabot)
+
+
+def test_resolve_pabot_command_falls_back_to_which(monkeypatch, tmp_path) -> None:
+    service = TestExecutionService()
+    monkeypatch.setattr(sys, "prefix", str(tmp_path / "venv"))
+    monkeypatch.setattr("app.services.test_execution_service.shutil.which", lambda _: "/usr/bin/pabot")
+
+    assert service._resolve_pabot_command() == "/usr/bin/pabot"
+
+
+def test_build_robot_command_uses_pabot_when_parallel_and_available(monkeypatch, tmp_path) -> None:
+    service = TestExecutionService()
+    monkeypatch.setattr(service, "_resolve_pabot_command", lambda: "/usr/bin/pabot")
+
+    cmd = service._build_robot_command(
+        output_dir=tmp_path,
+        headless_var="True",
+        speed_ms=0,
+        prepared_files=["a.robot", "b.robot", "c.robot"],
+        parallel_workers=4,
+    )
+
+    assert cmd[0] == "/usr/bin/pabot"
+    assert "--processes" in cmd
+    assert "3" in cmd  # workers capped by file count
+
+
+def test_build_robot_command_falls_back_to_robot_when_pabot_missing(monkeypatch, tmp_path) -> None:
+    service = TestExecutionService()
+    monkeypatch.setattr(service, "_resolve_pabot_command", lambda: None)
+
+    cmd = service._build_robot_command(
+        output_dir=tmp_path,
+        headless_var="True",
+        speed_ms=10,
+        prepared_files=["a.robot", "b.robot"],
+        parallel_workers=2,
+    )
+
+    assert cmd[0] == "robot"
+    assert "--variable" in cmd
+
+
+def test_has_chromium_headless_shell_returns_false_when_base_exists_but_empty(tmp_path, monkeypatch) -> None:
+    service = TestExecutionService()
+    base = tmp_path / "node_modules" / "playwright-core" / ".local-browsers"
+    base.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(service, "_browser_wrapper_root", lambda: tmp_path)
+
+    assert service._has_chromium_headless_shell() is False
+
+
+def test_ensure_playwright_package_compat_creates_lib_package_json(tmp_path, monkeypatch) -> None:
+    service = TestExecutionService()
+    wrapper_root = (
+        tmp_path
+        / "lib"
+        / f"python{sys.version_info.major}.{sys.version_info.minor}"
+        / "site-packages"
+        / "Browser"
+        / "wrapper"
+        / "node_modules"
+        / "playwright-core"
+    )
+    wrapper_root.mkdir(parents=True, exist_ok=True)
+    root_pkg = wrapper_root / "package.json"
+    lib_pkg = wrapper_root / "lib" / "package.json"
+    lib_pkg.parent.mkdir(parents=True, exist_ok=True)
+    root_pkg.write_text('{"name":"playwright-core","version":"1.0.0"}', encoding="utf-8")
+
+    monkeypatch.setattr(sys, "prefix", str(tmp_path))
+    service._ensure_playwright_package_compat()
+
+    assert lib_pkg.exists()
+    assert "playwright-core" in lib_pkg.read_text(encoding="utf-8")
+
+
+def test_ensure_playwright_package_compat_handles_exception(monkeypatch, tmp_path) -> None:
+    service = TestExecutionService()
+    monkeypatch.setattr(sys, "prefix", str(tmp_path))
+
+    wrapper_root = (
+        tmp_path
+        / "lib"
+        / f"python{sys.version_info.major}.{sys.version_info.minor}"
+        / "site-packages"
+        / "Browser"
+        / "wrapper"
+        / "node_modules"
+        / "playwright-core"
+    )
+    wrapper_root.mkdir(parents=True, exist_ok=True)
+    (wrapper_root / "package.json").write_text('{"name":"playwright-core"}', encoding="utf-8")
+
+    # Force exception in the guarded block.
+    monkeypatch.setattr("app.services.test_execution_service.json.loads", lambda *_: (_ for _ in ()).throw(OSError("boom")))
+    service._ensure_playwright_package_compat()
+
+
+@pytest.mark.asyncio
+async def test_execute_tests_retries_once_on_missing_playwright_executable(tmp_path, monkeypatch) -> None:
+    settings.STATIC_DIR = str(tmp_path / "static")
+    project = _prepare_project(tmp_path)
+    service = TestExecutionService(
+        project_repository=DummyProjectRepo(project),  # type: ignore[arg-type]
+        test_repository=DummyTestRepo(),  # type: ignore[arg-type]
+    )
+    _create_robot_file(project)
+
+    calls = {"runs": 0, "repair": 0}
+
+    def fake_run(*args, **kwargs):
+        calls["runs"] += 1
+
+        class Result:
+            if calls["runs"] == 1:
+                returncode = 1
+                stdout = ""
+                stderr = "Playwright executable doesn't exist"
+            else:
+                returncode = 0
+                stdout = ""
+                stderr = ""
+
+        return Result()
+
+    async def fake_generate_mkdocs_report(project, output_dir, stats):
+        return None
+
+    monkeypatch.setattr(service, "_ensure_rfbrowser", lambda: calls.__setitem__("repair", calls["repair"] + 1))
+    monkeypatch.setattr(
+        service,
+        "_parse_robot_output",
+        lambda *_: {"total": 1, "passed": 1, "failed": 0, "skipped": 0},
+    )
+    monkeypatch.setattr(service, "_generate_mkdocs_report", fake_generate_mkdocs_report)
+    monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
+
+    execution = await service.execute_tests(session=None, project_id=1)  # type: ignore[arg-type]
+
+    assert execution.status == "completed"
+    assert calls["runs"] == 2
+    assert calls["repair"] == 1
+
+
+def test_ensure_rfbrowser_ready_but_shell_missing_triggers_repair_path(monkeypatch, tmp_path) -> None:
+    service = TestExecutionService()
+    TestExecutionService._rfbrowser_ready = True
+
+    wrapper = tmp_path / "wrapper"
+    wrapper.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(service, "_browser_wrapper_root", lambda: wrapper)
+
+    calls = {"n": 0}
+
+    def fake_has_shell():
+        calls["n"] += 1
+        return calls["n"] >= 2
+
+    def fake_run(*args, **kwargs):
+        class Result:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        return Result()
+
+    monkeypatch.setattr(service, "_has_chromium_headless_shell", fake_has_shell)
+    monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
+
+    service._ensure_rfbrowser()
+    assert TestExecutionService._rfbrowser_ready is True
+
+
+def test_ensure_rfbrowser_wrapper_repair_success_path(monkeypatch, tmp_path) -> None:
+    service = TestExecutionService()
+    TestExecutionService._rfbrowser_ready = False
+
+    wrapper = tmp_path / "wrapper2"
+    wrapper.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(service, "_browser_wrapper_root", lambda: wrapper)
+
+    calls = {"has_shell": 0, "run": 0}
+
+    def fake_has_shell():
+        calls["has_shell"] += 1
+        # first check false (line 449), second check true after repair (line 466)
+        return calls["has_shell"] >= 2
+
+    def fake_run(*args, **kwargs):
+        calls["run"] += 1
+
+        class Result:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        return Result()
+
+    monkeypatch.setattr(service, "_has_chromium_headless_shell", fake_has_shell)
+    monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
+
+    service._ensure_rfbrowser()
+    assert calls["run"] == 1
+    assert TestExecutionService._rfbrowser_ready is True
+
+
+def test_ensure_rfbrowser_wrapper_install_exception_is_ignored(monkeypatch, tmp_path) -> None:
+    service = TestExecutionService()
+    TestExecutionService._rfbrowser_ready = False
+
+    wrapper = tmp_path / "wrapper3"
+    wrapper.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(service, "_browser_wrapper_root", lambda: wrapper)
+    monkeypatch.setattr(service, "_has_chromium_headless_shell", lambda: False)
+    monkeypatch.setattr("app.services.test_execution_service.os.open", lambda *a, **k: (_ for _ in ()).throw(OSError("no lock")))
+
+    calls = {"n": 0}
+
+    def fake_run(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("wrapper install failed")
+
+        class Result:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        return Result()
+
+    monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
+
+    service._ensure_rfbrowser()
+    assert calls["n"] >= 2
+
+
+def test_ensure_rfbrowser_lock_already_held_returns_early(monkeypatch, tmp_path) -> None:
+    service = TestExecutionService()
+    TestExecutionService._rfbrowser_ready = False
+    monkeypatch.setattr(service, "_has_chromium_headless_shell", lambda: False)
+    monkeypatch.setattr(service, "_browser_wrapper_root", lambda: tmp_path / "missing")
+
+    lock_file = tmp_path / "lock"
+    lock_file.write_text("x", encoding="utf-8")
+    fd = os.open(str(lock_file), os.O_RDWR)
+
+    fake_fcntl = types.SimpleNamespace(LOCK_EX=1, LOCK_NB=2)
+
+    def fake_flock(_fd, _flags):
+        raise BlockingIOError()
+
+    fake_fcntl.flock = fake_flock
+    monkeypatch.setitem(sys.modules, "fcntl", fake_fcntl)
+    monkeypatch.setattr("app.services.test_execution_service.os.open", lambda *a, **k: fd)
+
+    service._ensure_rfbrowser()
+
+
+def test_ensure_rfbrowser_logs_when_init_fails_twice(monkeypatch, tmp_path) -> None:
+    service = TestExecutionService()
+    TestExecutionService._rfbrowser_ready = False
+    monkeypatch.setattr(service, "_has_chromium_headless_shell", lambda: False)
+    monkeypatch.setattr(service, "_browser_wrapper_root", lambda: tmp_path / "missing")
+    monkeypatch.setattr("app.services.test_execution_service.os.open", lambda *a, **k: (_ for _ in ()).throw(OSError("no lock")))
+
+    calls = {"n": 0}
+
+    def fake_run(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            class Result:
+                returncode = 1
+                stderr = "line1\nline2"
+                stdout = ""
+
+            return Result()
+        raise RuntimeError("network")
+
+    monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
+    service._ensure_rfbrowser()
+    assert calls["n"] == 2
+
+
+def test_ensure_rfbrowser_unlock_error_is_ignored(monkeypatch, tmp_path) -> None:
+    service = TestExecutionService()
+    TestExecutionService._rfbrowser_ready = False
+    monkeypatch.setattr(service, "_has_chromium_headless_shell", lambda: False)
+    monkeypatch.setattr(service, "_browser_wrapper_root", lambda: tmp_path / "missing")
+
+    lock_file = tmp_path / "lock2"
+    lock_file.write_text("x", encoding="utf-8")
+    fd = os.open(str(lock_file), os.O_RDWR)
+
+    fake_fcntl = types.SimpleNamespace(LOCK_EX=1, LOCK_NB=2, LOCK_UN=8)
+    flock_calls = {"n": 0}
+
+    def fake_flock(_fd, _flags):
+        flock_calls["n"] += 1
+        if _flags == fake_fcntl.LOCK_UN:
+            raise OSError("unlock failed")
+
+    fake_fcntl.flock = fake_flock
+    monkeypatch.setitem(sys.modules, "fcntl", fake_fcntl)
+    monkeypatch.setattr("app.services.test_execution_service.os.open", lambda *a, **k: fd)
+
+    def fake_run(*args, **kwargs):
+        class Result:
+            returncode = 0
+            stderr = ""
+            stdout = ""
+
+        return Result()
+
+    monkeypatch.setattr("app.services.test_execution_service.subprocess.run", fake_run)
+
+    service._ensure_rfbrowser()
+    assert flock_calls["n"] >= 2

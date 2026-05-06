@@ -101,6 +101,10 @@ output.xml
 log.html
 report.html
 playwright-log.txt
+.pabotsuitenames
+coverage-python.xml
+**/reports/**
+**/pabot_results/**
 browser/
 **/browser/
 **/traces/

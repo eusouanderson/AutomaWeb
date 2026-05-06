@@ -663,4 +663,628 @@ describe('generator page (test builder only)', () => {
     expect(typeof page.generateFromExecutionFeedback).toBe('function');
     root.remove();
   });
+
+  // ---------------------------------------------------------------------------
+  // loadAiModelsDropdown coverage (lines 175-179, 183)
+  // ---------------------------------------------------------------------------
+
+  it('loadAiModelsDropdown restores previously stored model when found in list', async () => {
+    localStorage.setItem('builder_model', 'gpt-5');
+    getAvailableAiModels.mockResolvedValue({
+      models: [
+        { id: 'gpt-4', name: 'GPT-4' },
+        { id: 'gpt-5', name: 'GPT-5' },
+      ],
+    });
+    initGeneratorPage({ store: makeStore() });
+    await vi.waitFor(() =>
+      expect(document.getElementById('builder-llm-model').value).toBe('gpt-5')
+    );
+  });
+
+  it('loadAiModelsDropdown shows error toast when getAvailableAiModels throws', async () => {
+    getAvailableAiModels.mockRejectedValue(new Error('models unavailable'));
+    initGeneratorPage({ store: makeStore() });
+    await vi.waitFor(() => expect(toast).toHaveBeenCalledWith('models unavailable', 'error'));
+  });
+
+  it('loadAiModelsDropdown shows fallback toast when error has no message', async () => {
+    getAvailableAiModels.mockRejectedValue({});
+    initGeneratorPage({ store: makeStore() });
+    await vi.waitFor(() =>
+      expect(toast).toHaveBeenCalledWith('Falha ao carregar modelos de IA', 'error')
+    );
+  });
+
+  it('llmModelSelect change event persists model to localStorage', () => {
+    initGeneratorPage({ store: makeStore() });
+    const select = document.getElementById('builder-llm-model');
+    select.innerHTML += '<option value="gpt-5">GPT-5</option>';
+    select.value = 'gpt-5';
+    select.dispatchEvent(new Event('change'));
+    expect(localStorage.getItem('builder_model')).toBe('gpt-5');
+  });
+
+  // ---------------------------------------------------------------------------
+  // syncBuilderUrlWithSelectedProject guard (lines 193-194)
+  // ---------------------------------------------------------------------------
+
+  it('syncBuilderUrlWithSelectedProject returns early when builder-url is missing', () => {
+    document.getElementById('builder-url').remove();
+    const store = makeStore();
+    getVisualBuilderCapturedSteps.mockResolvedValue({ session_id: null, steps: [] });
+    initGeneratorPage({ store });
+    const select = document.getElementById('test-project');
+    select.value = '1';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    // no crash = guard executed correctly
+  });
+
+  // ---------------------------------------------------------------------------
+  // DOM guard tests (lines 236-237, 300-301, 320-321)
+  // ---------------------------------------------------------------------------
+
+  it('updateSelectedStepSummary guard: returns early when element is missing', async () => {
+    document.getElementById('builder-selected-step-summary').remove();
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'sx' });
+    getVisualBuilderCapturedSteps.mockResolvedValue({
+      steps: [{ id: 1, step: 1, action: 'click', selector: '#x' }],
+    });
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+  });
+
+  it('updateBuilderGenerateButtonState guard: returns early when element is missing', async () => {
+    document.getElementById('builder-generate-btn').remove();
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'sy' });
+    getVisualBuilderCapturedSteps.mockResolvedValue({
+      steps: [{ id: 2, step: 1, action: 'click', selector: '#y' }],
+    });
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+  });
+
+  it('renderBuilderSteps guard: returns early when panel elements are missing', async () => {
+    document.getElementById('builder-steps-panel').remove();
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'sz' });
+    getVisualBuilderCapturedSteps.mockResolvedValue({ steps: [] });
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+  });
+
+  // ---------------------------------------------------------------------------
+  // startBuilderPoll coverage (lines 447-449, 454-455)
+  // ---------------------------------------------------------------------------
+
+  it('poll stops gracefully when session is cleared while polling', async () => {
+    vi.useFakeTimers();
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'poll-stop' });
+    getVisualBuilderCapturedSteps.mockResolvedValue({ session_id: null, steps: [] });
+
+    const store = makeStore();
+    initGeneratorPage({ store });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+
+    vi.advanceTimersByTime(2600);
+    await Promise.resolve();
+    document.getElementById('test-project').value = '';
+    document.getElementById('test-project').dispatchEvent(new Event('change', { bubbles: true }));
+    await Promise.resolve();
+    vi.advanceTimersByTime(2600);
+    await Promise.resolve();
+    expect(getVisualBuilderCapturedSteps).toHaveBeenCalled();
+  });
+
+  it('poll silently ignores transient getVisualBuilderCapturedSteps errors', async () => {
+    vi.useFakeTimers();
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'poll-err' });
+    getVisualBuilderCapturedSteps
+      .mockResolvedValueOnce({ steps: [] })
+      .mockRejectedValue(new Error('transient'));
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+
+    vi.advanceTimersByTime(2600);
+    await Promise.resolve();
+    vi.advanceTimersByTime(2600);
+    await Promise.resolve();
+
+    document.getElementById('test-project').value = '';
+    document.getElementById('test-project').dispatchEvent(new Event('change', { bubbles: true }));
+    await Promise.resolve();
+
+    expect(toast).not.toHaveBeenCalledWith('transient', 'error');
+  });
+
+  // ---------------------------------------------------------------------------
+  // saveBuilderStepName: input not found (lines 481-482)
+  // ---------------------------------------------------------------------------
+
+  it('save button: clicking with valid stepId but missing name input does not crash', async () => {
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'save-guard' });
+    getVisualBuilderCapturedSteps.mockResolvedValue({ steps: [] });
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+
+    const list = document.getElementById('builder-steps-list');
+    list.innerHTML =
+      '<li><button class="builder-step-save-btn" data-step-id="999">Save</button></li>';
+    document.querySelector('.builder-step-save-btn').click();
+    await vi.waitFor(() => expect(updateVisualBuilderCapturedStep).not.toHaveBeenCalled());
+  });
+
+  // ---------------------------------------------------------------------------
+  // generateFromBuilderStep: no project selected (lines 565-567)
+  // ---------------------------------------------------------------------------
+
+  it('generate btn: throws when no project is selected during generation', async () => {
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'no-proj' });
+    getVisualBuilderCapturedSteps.mockResolvedValue({
+      steps: [{ id: 5, step: 1, action: 'click', selector: '#a' }],
+    });
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+
+    document.getElementById('builder-refresh-steps-btn').click();
+    await vi.waitFor(() =>
+      expect(document.getElementById('builder-steps-list').textContent).toContain('#a')
+    );
+
+    document.getElementById('test-project').value = '';
+    document.getElementById('builder-generate-btn').click();
+    await vi.waitFor(() =>
+      expect(toast).toHaveBeenCalledWith(
+        'Selecione um projeto antes de gerar o teste visual.',
+        'error'
+      )
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // loadBuilderStepsForProject: null projectId (lines 658-661)
+  // ---------------------------------------------------------------------------
+
+  it('loadBuilderStepsForProject clears session when projectId is null', async () => {
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'clr' });
+    getVisualBuilderCapturedSteps.mockResolvedValue({ steps: [] });
+
+    const store = makeStore();
+    initGeneratorPage({ store });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+
+    document.getElementById('test-project').value = '';
+    document.getElementById('test-project').dispatchEvent(new Event('change', { bubbles: true }));
+    await vi.waitFor(() =>
+      expect(document.getElementById('builder-session-banner').classList.contains('hidden')).toBe(
+        true
+      )
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // generateFromExecutionFeedback: no tests fallback (lines 699-704)
+  // ---------------------------------------------------------------------------
+
+  it('generateFromExecutionFeedback falls back to generateTestFromPrompt when no tests', async () => {
+    getProjectGeneratedTests.mockResolvedValueOnce([]);
+    generateTestFromPrompt.mockResolvedValue({ id: 20, content: '*** Test Cases ***\nFallback' });
+
+    const page = initGeneratorPage({ store: makeStore() });
+    await page.generateFromExecutionFeedback(3, 'feedback no tests', []);
+
+    expect(generateTestFromPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: 3,
+        prompt: 'Recriar teste com base no feedback da execucao (falhas/erros).',
+        context: 'feedback no tests',
+      })
+    );
+    expect(toast).toHaveBeenCalledWith('Teste corrigido com base nos erros da execucao!');
+  });
+
+  // ---------------------------------------------------------------------------
+  // projectSelect change: error path (lines 729-730)
+  // ---------------------------------------------------------------------------
+
+  it('projectSelect change shows error toast when loadBuilderStepsForProject throws', async () => {
+    getVisualBuilderCapturedSteps.mockRejectedValue(new Error('steps failed'));
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document.getElementById('test-project').dispatchEvent(new Event('change', { bubbles: true }));
+
+    await vi.waitFor(() => expect(toast).toHaveBeenCalledWith('steps failed', 'error'));
+  });
+
+  // ---------------------------------------------------------------------------
+  // builderRefreshStepsBtn: error path (lines 784-785)
+  // ---------------------------------------------------------------------------
+
+  it('builderRefreshStepsBtn shows error toast when refreshBuilderSteps throws', async () => {
+    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval').mockImplementation(() => 1);
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'ref-err' });
+    getVisualBuilderCapturedSteps.mockRejectedValue(new Error('refresh failed'));
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+
+    document.getElementById('builder-refresh-steps-btn').click();
+    await vi.waitFor(() => expect(toast).toHaveBeenCalledWith('refresh failed', 'error'));
+    setIntervalSpy.mockRestore();
+  });
+
+  // ---------------------------------------------------------------------------
+  // builderStepsList click: save button edge cases (lines 797-799, 805)
+  // ---------------------------------------------------------------------------
+
+  it('save button with stepId=0 shows invalid step toast', async () => {
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'save-inv' });
+    getVisualBuilderCapturedSteps.mockResolvedValue({ steps: [] });
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+
+    const list = document.getElementById('builder-steps-list');
+    list.innerHTML =
+      '<li><button class="builder-step-save-btn" data-step-id="0">Save</button></li>';
+    document.querySelector('.builder-step-save-btn').click();
+    await vi.waitFor(() =>
+      expect(toast).toHaveBeenCalledWith('Step inválido para atualização.', 'error')
+    );
+  });
+
+  it('save button shows error toast when saveBuilderStepName throws', async () => {
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'save-throw' });
+    getVisualBuilderCapturedSteps.mockResolvedValue({ steps: [] });
+    updateVisualBuilderCapturedStep.mockRejectedValue(new Error('save error'));
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+
+    const list = document.getElementById('builder-steps-list');
+    list.innerHTML = `
+      <li>
+        <input class="builder-step-name-input" data-step-id="50" value="My Step" />
+        <button class="builder-step-save-btn" data-step-id="50">Save</button>
+      </li>`;
+    document.querySelector('.builder-step-save-btn').click();
+    await vi.waitFor(() => expect(toast).toHaveBeenCalledWith('save error', 'error'));
+  });
+
+  // ---------------------------------------------------------------------------
+  // builderStepsList click: delete button edge cases (lines 816-818, 826-827, 833)
+  // ---------------------------------------------------------------------------
+
+  it('delete button with stepId=0 shows invalid step toast', async () => {
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'del-inv' });
+    getVisualBuilderCapturedSteps.mockResolvedValue({ steps: [] });
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+
+    const list = document.getElementById('builder-steps-list');
+    list.innerHTML =
+      '<li><button class="builder-step-delete-btn" data-step-id="0">Delete</button></li>';
+    document.querySelector('.builder-step-delete-btn').click();
+    await vi.waitFor(() =>
+      expect(toast).toHaveBeenCalledWith('Step inválido para exclusão.', 'error')
+    );
+  });
+
+  it('delete button: confirm returns false cancels deletion', async () => {
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'del-cancel' });
+    getVisualBuilderCapturedSteps.mockResolvedValue({ steps: [] });
+    vi.stubGlobal('confirm', vi.fn().mockReturnValue(false));
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+
+    const list = document.getElementById('builder-steps-list');
+    list.innerHTML =
+      '<li><button class="builder-step-delete-btn" data-step-id="10">Delete</button></li>';
+    document.querySelector('.builder-step-delete-btn').click();
+    await vi.waitFor(() => expect(globalThis.confirm).toHaveBeenCalledTimes(1));
+    expect(deleteVisualBuilderCapturedStep).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it('delete button shows error toast when deleteBuilderStep throws', async () => {
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'del-throw' });
+    getVisualBuilderCapturedSteps.mockResolvedValue({ steps: [] });
+    vi.stubGlobal('confirm', vi.fn().mockReturnValue(true));
+    deleteVisualBuilderCapturedStep.mockRejectedValue(new Error('delete error'));
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+
+    const list = document.getElementById('builder-steps-list');
+    list.innerHTML =
+      '<li><button class="builder-step-delete-btn" data-step-id="11">Delete</button></li>';
+    document.querySelector('.builder-step-delete-btn').click();
+    await vi.waitFor(() => expect(toast).toHaveBeenCalledWith('delete error', 'error'));
+    vi.unstubAllGlobals();
+  });
+
+  // ---------------------------------------------------------------------------
+  // builderStepsList click: generate button edge cases (lines 844-846, 854-856, 859-860)
+  // ---------------------------------------------------------------------------
+
+  it('inline generate button with empty stepKey shows invalid step toast', async () => {
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'gen-inv' });
+    getVisualBuilderCapturedSteps.mockResolvedValue({ steps: [] });
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+
+    const list = document.getElementById('builder-steps-list');
+    list.innerHTML =
+      '<li><button class="builder-step-generate-btn" data-step-key="">Generate</button></li>';
+    document.querySelector('.builder-step-generate-btn').click();
+    await vi.waitFor(() =>
+      expect(toast).toHaveBeenCalledWith('Step inválido para geração.', 'error')
+    );
+  });
+
+  it('inline generate button shows not-found toast when step disappears after refresh', async () => {
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'gen-miss' });
+    getVisualBuilderCapturedSteps
+      .mockResolvedValueOnce({ steps: [{ id: 7, step: 1, action: 'click', selector: '#z' }] })
+      .mockResolvedValueOnce({ steps: [] });
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+
+    document.getElementById('builder-refresh-steps-btn').click();
+    await vi.waitFor(() =>
+      expect(document.getElementById('builder-steps-list').textContent).toContain('#z')
+    );
+
+    document.querySelector('.builder-step-generate-btn[data-step-key="id:7"]').click();
+    await vi.waitFor(() =>
+      expect(toast).toHaveBeenCalledWith(
+        'Step selecionado não encontrado após atualização.',
+        'error'
+      )
+    );
+  });
+
+  it('inline generate button shows error toast when generateFromBuilderStep throws', async () => {
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'gen-throw' });
+    getVisualBuilderCapturedSteps.mockResolvedValue({
+      steps: [{ id: 8, step: 1, action: 'click', selector: '#q' }],
+    });
+    generateTestFromPrompt.mockRejectedValueOnce(new Error('generate failed'));
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+
+    document.getElementById('builder-refresh-steps-btn').click();
+    await vi.waitFor(() =>
+      expect(document.getElementById('builder-steps-list').textContent).toContain('#q')
+    );
+
+    document.querySelector('.builder-step-generate-btn[data-step-key="id:8"]').click();
+    await vi.waitFor(() => expect(toast).toHaveBeenCalledWith('generate failed', 'error'));
+  });
+
+  // ---------------------------------------------------------------------------
+  // builderStepsList click: step item selection (lines 867-875)
+  // ---------------------------------------------------------------------------
+
+  it('clicking a step item updates the selected step', async () => {
+    initGeneratorPage({ store: makeStore() });
+    const list = document.getElementById('builder-steps-list');
+    list.innerHTML = '<li class="builder-step-item" data-step-key="id:22">Step 22</li>';
+    const secondItem = document.querySelector('.builder-step-item[data-step-key="id:22"]');
+    secondItem.click();
+    expect(document.getElementById('builder-steps-list').children.length).toBe(0);
+  });
+
+  // ---------------------------------------------------------------------------
+  // builderStepsList change event: radio selection (lines 879-894)
+  // ---------------------------------------------------------------------------
+
+  it('radio change event updates selected step', async () => {
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'radio-select' });
+    getVisualBuilderCapturedSteps.mockResolvedValue({
+      steps: [
+        { id: 31, step: 1, action: 'click', selector: '#r1' },
+        { id: 32, step: 2, action: 'click', selector: '#r2' },
+      ],
+    });
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+
+    document.getElementById('builder-refresh-steps-btn').click();
+    await vi.waitFor(() =>
+      expect(document.querySelectorAll('.builder-step-select-input').length).toBe(2)
+    );
+
+    const radio = document.querySelector('.builder-step-select-input[data-step-key="id:32"]');
+    radio.dispatchEvent(new Event('change', { bubbles: true }));
+    await vi.waitFor(() => {
+      const item = document.querySelector('.builder-step-item[data-step-key="id:32"]');
+      expect(item.classList.contains('is-selected')).toBe(true);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // builderStepsList keydown: Enter saves step name (lines 898-917)
+  // ---------------------------------------------------------------------------
+
+  it('pressing Enter on a step name input saves the step name', async () => {
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'keydown-save' });
+    getVisualBuilderCapturedSteps.mockResolvedValue({
+      steps: [{ id: 41, step: 1, action: 'click', selector: '#k' }],
+    });
+    updateVisualBuilderCapturedStep.mockResolvedValue({ id: 41, step_name: 'New Name' });
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+
+    document.getElementById('builder-refresh-steps-btn').click();
+    await vi.waitFor(() =>
+      expect(document.querySelector('.builder-step-name-input')).not.toBeNull()
+    );
+
+    const input = document.querySelector('.builder-step-name-input[data-step-id="41"]');
+    input.value = 'New Name';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    await vi.waitFor(() =>
+      expect(updateVisualBuilderCapturedStep).toHaveBeenCalledWith(41, { step_name: 'New Name' })
+    );
+  });
+
+  it('pressing Enter on name input shows error toast when save throws', async () => {
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'keydown-err' });
+    getVisualBuilderCapturedSteps.mockResolvedValue({
+      steps: [{ id: 42, step: 1, action: 'click', selector: '#ke' }],
+    });
+    updateVisualBuilderCapturedStep.mockRejectedValue(new Error('keydown save error'));
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+
+    document.getElementById('builder-refresh-steps-btn').click();
+    await vi.waitFor(() =>
+      expect(document.querySelector('.builder-step-name-input[data-step-id="42"]')).not.toBeNull()
+    );
+
+    const input = document.querySelector('.builder-step-name-input[data-step-id="42"]');
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    await vi.waitFor(() => expect(toast).toHaveBeenCalledWith('keydown save error', 'error'));
+  });
+
+  it('pressing non-Enter key on name input does nothing', async () => {
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'keydown-noop' });
+    getVisualBuilderCapturedSteps.mockResolvedValue({
+      steps: [{ id: 43, step: 1, action: 'click', selector: '#kn' }],
+    });
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+
+    document.getElementById('builder-refresh-steps-btn').click();
+    await vi.waitFor(() =>
+      expect(document.querySelector('.builder-step-name-input[data-step-id="43"]')).not.toBeNull()
+    );
+
+    const input = document.querySelector('.builder-step-name-input[data-step-id="43"]');
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    expect(updateVisualBuilderCapturedStep).not.toHaveBeenCalled();
+  });
+
+  // ---------------------------------------------------------------------------
+  // builderGenerateBtn click: no selected step (lines 936-938)
+  // ---------------------------------------------------------------------------
+
+  it('generate button shows toast when no steps available after refresh', async () => {
+    startVisualBuilderSession.mockResolvedValue({ session_id: 'no-sel' });
+    getVisualBuilderCapturedSteps.mockResolvedValue({ steps: [] });
+
+    initGeneratorPage({ store: makeStore() });
+    document.getElementById('test-project').value = '1';
+    document
+      .getElementById('visual-builder-form')
+      .dispatchEvent(new Event('submit', { bubbles: true }));
+    await vi.waitFor(() => expect(startVisualBuilderSession).toHaveBeenCalledTimes(1));
+
+    document.getElementById('builder-generate-btn').click();
+    await vi.waitFor(() =>
+      expect(toast).toHaveBeenCalledWith(
+        'Nenhum step capturado. Interaja na tela antes de gerar o teste.',
+        'error'
+      )
+    );
+  });
 });

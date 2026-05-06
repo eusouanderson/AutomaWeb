@@ -18,6 +18,14 @@ from app.services.test_service import (
 )
 
 
+def test_build_llm_unavailable_detail_timeout_message() -> None:
+    detail = routes._build_llm_unavailable_detail(
+        LLMServiceUnavailableError("request timed out while calling provider")
+    )
+
+    assert "demorou mais do que o esperado" in detail
+
+
 @pytest.mark.asyncio
 async def test_create_project_route(monkeypatch) -> None:
     async def fake_create_project(
@@ -147,6 +155,40 @@ async def test_generate_test_route_success(monkeypatch, tmp_path) -> None:
 
     assert result.id == 1
     assert result.content == "Test"
+
+
+@pytest.mark.asyncio
+async def test_generate_test_route_forwards_optional_llm_params(monkeypatch, tmp_path) -> None:
+    captured = {}
+
+    async def fake_generate_test(self, **kwargs):
+        captured.update(kwargs)
+        return GeneratedTest(
+            id=2,
+            test_request_id=2,
+            content="Test Optional Params",
+            file_path=str(tmp_path / "test_optional.robot"),
+            created_at=datetime.utcnow(),
+        )
+
+    monkeypatch.setattr(routes.TestService, "generate_test", fake_generate_test)
+    payload = routes.TestGenerateRequest(
+        project_id=1,
+        prompt="Teste com parametros",
+        context="CTX",
+        model="gpt-5-mini",
+        system_prompt="siga o contrato",
+        temperature=0.2,
+        max_tokens=1200,
+    )
+
+    result = await routes.generate_test(payload, session=None)  # type: ignore[arg-type]
+
+    assert result.id == 2
+    assert captured["model"] == "gpt-5-mini"
+    assert captured["system_prompt"] == "siga o contrato"
+    assert captured["temperature"] == 0.2
+    assert captured["max_tokens"] == 1200
 
 
 @pytest.mark.asyncio

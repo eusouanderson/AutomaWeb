@@ -324,6 +324,16 @@ class TestTestValidator:
     def setup_method(self):
         self.validator = TestValidator()
 
+    def test_build_strict_mode_suggestion_keeps_existing_nth_locator(self):
+        locator = "css=nav a >> nth=1"
+
+        suggested = self.validator._build_strict_mode_suggestion(
+            locator=locator,
+            normalized_locator=locator,
+        )
+
+        assert suggested == locator
+
     @pytest.mark.asyncio
     async def test_no_issues_on_clean_robot_with_wait(self):
         report = await self.validator.validate(ROBOT_WITH_WAIT)
@@ -533,6 +543,21 @@ Foo
 class TestTestFixer:
     def setup_method(self):
         self.fixer = TestFixer()
+
+    @pytest.mark.parametrize(
+        ("line", "expected"),
+        [
+            ("    Click", None),
+            ("    Click    css=.btn >> nth=1", "css=.btn >> nth=1"),
+            (
+                "    Click    text=Segmentos",
+                "header >> text=Segmentos >> nth=0",
+            ),
+            ("    Click    css=.btn", "css=.btn >> nth=0"),
+        ],
+    )
+    def test_derive_strict_mode_locator_variants(self, line, expected):
+        assert self.fixer._derive_strict_mode_locator(line) == expected
 
     @pytest.mark.asyncio
     async def test_applies_no_fix_when_no_issues(self):

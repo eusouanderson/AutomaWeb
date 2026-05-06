@@ -104,6 +104,35 @@ async def test_start_session_registers_runtime_and_binding_callback() -> None:
 
 
 @pytest.mark.asyncio
+async def test_start_session_binding_cleanup_ignores_handler_exception() -> None:
+    manager = PlaywrightManager()
+    manager._sessions = {}
+
+    apw_obj, _playwright_obj, _browser, context, _page = _fake_playwright_runtime()
+
+    async def failing_handler(_payload):
+        raise RuntimeError("handler failed")
+
+    with patch("app.builder.playwright_manager.async_playwright", return_value=apw_obj):
+        await manager.start_session(
+            session_id="session-fail-handler",
+            url="https://example.com",
+            backend_event_url="http://localhost:8000/builder/event",
+            event_handler=failing_handler,
+        )
+
+    _bind_name, bind_callback = context.expose_binding.await_args.args
+    await bind_callback(None, {"action": "click"})
+    await asyncio.sleep(0)
+
+    pending = manager._sessions["session-fail-handler"].pending_event_tasks
+    assert len(pending) == 1
+
+    await manager.stop_session("session-fail-handler")
+    assert "session-fail-handler" not in manager._sessions
+
+
+@pytest.mark.asyncio
 async def test_start_session_raises_for_duplicate_session_id() -> None:
     manager = PlaywrightManager()
     manager._sessions = {}
@@ -156,6 +185,35 @@ async def test_stop_session_closes_runtime_resources() -> None:
     browser_close.assert_awaited_once()
     playwright_stop.assert_awaited_once()
     assert "s1" not in manager._sessions
+
+
+@pytest.mark.asyncio
+async def test_stop_session_waits_for_pending_event_tasks() -> None:
+    manager = PlaywrightManager()
+    manager._sessions = {}
+
+    pending_task = asyncio.create_task(asyncio.sleep(0))
+
+    playwright_stop = AsyncMock()
+    browser_close = AsyncMock()
+    context_close = AsyncMock()
+
+    fake_session = BuilderRuntimeSession(
+        session_id="s2",
+        playwright=MagicMock(stop=playwright_stop),
+        browser=MagicMock(close=browser_close),
+        context=MagicMock(close=context_close),
+        page=MagicMock(),
+        pending_event_tasks={pending_task},
+    )
+    manager._sessions["s2"] = fake_session
+
+    await manager.stop_session("s2")
+
+    assert pending_task.done()
+    context_close.assert_awaited_once()
+    browser_close.assert_awaited_once()
+    playwright_stop.assert_awaited_once()
 
 
 @pytest.mark.asyncio

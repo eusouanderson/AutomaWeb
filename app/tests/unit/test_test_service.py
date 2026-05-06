@@ -1136,6 +1136,64 @@ def test_sanitize_robot_output_hardens_potentially_ambiguous_id_selector() -> No
     assert "Wait For Elements State    css=#button >> nth=0    visible    10" in cleaned
 
 
+def test_sanitize_keeps_new_page_wait_until_when_context_timeout_is_missing() -> None:
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
+    content = (
+        "*** Settings ***\n"
+        "Library    Browser\n"
+        "*** Test Cases ***\n"
+        "Caso\n"
+        "    New Page    https://example.com    wait_until=networkidle\n"
+    )
+
+    cleaned = service._sanitize_robot_output(content)
+
+    assert "New Context" in cleaned
+    assert "Set Browser Timeout    30s" in cleaned
+    assert "New Page    https://example.com    wait_until=networkidle" in cleaned
+
+
+def test_sanitize_robot_output_converts_cookie_click_to_javascript_fallback() -> None:
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
+    content = (
+        "*** Settings ***\n"
+        "Library    Browser\n"
+        "*** Test Cases ***\n"
+        "Caso\n"
+        "    Click    css=#hs-eu-confirmation-button\n"
+    )
+
+    cleaned = service._sanitize_robot_output(content)
+
+    assert 'Evaluate JavaScript    ${None}    () => { const b = document.querySelector("#hs-eu-confirmation-button"); if (b) b.click(); }' in cleaned
+    assert "Click    css=#hs-eu-confirmation-button" not in cleaned
+
+
+def test_sanitize_robot_output_keeps_cookie_click_when_selector_is_not_css_query() -> None:
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
+    content = (
+        "*** Settings ***\n"
+        "Library    Browser\n"
+        "*** Test Cases ***\n"
+        "Caso\n"
+        "    Click    text=accept cookie\n"
+    )
+
+    cleaned = service._sanitize_robot_output(content)
+
+    assert "Evaluate JavaScript" not in cleaned
+    assert "Click    text=accept cookie" in cleaned
+
+
+def test_selector_to_css_query_covers_css_raw_and_unsupported_selectors() -> None:
+    service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
+
+    assert service._selector_to_css_query(" css=#cookie-banner ") == "#cookie-banner"
+    assert service._selector_to_css_query(".cookie-btn") == ".cookie-btn"
+    assert service._selector_to_css_query("[data-testid=accept]") == "[data-testid=accept]"
+    assert service._selector_to_css_query("text=accept") is None
+
+
 def test_normalize_selector_covers_css_and_dot_prefixes() -> None:
     service = TestService(copilot_client=DummyGroqClient())  # type: ignore[arg-type]
 

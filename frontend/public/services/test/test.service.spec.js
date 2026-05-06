@@ -28,6 +28,7 @@ import {
   generateVisualBuilderCode,
   getTestById,
   getVisualBuilderSteps,
+  improveRobotTest,
   listAiModels,
   listGeneratedTests,
   listProjectExecutions,
@@ -51,6 +52,7 @@ import {
   getProjects,
   getTestContent,
   getVisualBuilderCapturedSteps,
+  improveExistingGeneratedTest,
   startVisualBuilderSession,
   updateVisualBuilderCapturedStep,
 } from '../test.service.js';
@@ -307,6 +309,28 @@ describe('getTestContent', () => {
   });
 });
 
+describe('improveExistingGeneratedTest', () => {
+  it('throws when testId is falsy', async () => {
+    await expect(improveExistingGeneratedTest(0, 'conteudo valido')).rejects.toThrow(
+      'Test id is required'
+    );
+  });
+
+  it('throws when content is invalid', async () => {
+    await expect(improveExistingGeneratedTest(1, 'abc')).rejects.toThrow(
+      'Test content is required'
+    );
+  });
+
+  it('trims feedback and delegates to improveRobotTest', async () => {
+    improveRobotTest.mockResolvedValue({ id: 1, content: 'updated' });
+
+    await improveExistingGeneratedTest(9, '*** Test Cases ***\nLogin', '  melhorar waits  ');
+
+    expect(improveRobotTest).toHaveBeenCalledWith(9, '*** Test Cases ***\nLogin', 'melhorar waits');
+  });
+});
+
 describe('visual builder service helpers', () => {
   it('startVisualBuilderSession validates URL and delegates', async () => {
     startVisualBuilder.mockResolvedValue({ session_id: 'x' });
@@ -353,6 +377,12 @@ describe('visual builder service helpers', () => {
   it('updateVisualBuilderCapturedStep rejects empty payload', async () => {
     await expect(updateVisualBuilderCapturedStep(7, {})).rejects.toThrow(
       'At least one builder step field must be provided'
+    );
+  });
+
+  it('updateVisualBuilderCapturedStep validates required step id', async () => {
+    await expect(updateVisualBuilderCapturedStep(0, { step_name: 'x' })).rejects.toThrow(
+      'Step id is required'
     );
   });
 
