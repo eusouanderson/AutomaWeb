@@ -48,6 +48,9 @@ Documents/
 .coverage
 htmlcov/
 .pytest_cache/
+frontend/node_modules/
+frontend/coverage/
+frontend/.coverage
 
 # Logs
 *.log

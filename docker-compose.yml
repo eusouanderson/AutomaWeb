@@ -8,6 +8,8 @@ services:
       # Montar código para desenvolvimento com hot-reload
       - ./app:/app/app
       - ./frontend:/app/frontend
+      # Volume anônimo para preservar node_modules instalados na imagem
+      - /app/frontend/node_modules
       - ./dev.py:/app/dev.py
       # Certificados corporativos (opcional)
       - ./certs:/app/certs:ro
@@ -34,7 +36,7 @@ services:
           'CMD',
           'python',
           '-c',
-          "import urllib.request; urllib.request.urlopen('http://localhost:8888/docs')"
+          "import urllib.request; urllib.request.urlopen('http://localhost:8888/docs')",
         ]
       interval: 30s
       timeout: 10s

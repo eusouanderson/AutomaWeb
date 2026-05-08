@@ -9,26 +9,27 @@ RUN apt-get update && apt-get install -y \
     libgbm-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Instalar Node.js (necessário para rfbrowser)
-RUN wget -qO- https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get update \
-    && apt-get install -y nodejs \
+# Instalar Node.js e npm
+RUN apt-get update \
+    && apt-get install -y nodejs npm \
     && rm -rf /var/lib/apt/lists/*
 
 # Configurar diretório de trabalho
 WORKDIR /app
 
-# Copiar arquivos de dependências
+# Copiar arquivos de dependências Python
 COPY requirements.txt ./
 
 # Instalar dependências Python
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Instalar navegador para Playwright
-RUN python -m playwright install --with-deps chromium
+# Nota: Playwright e Robot Framework Browser serão inicializados em runtime
+# no primeiro acesso (ver app/main.py lifespan) para evitar problemas com
+# certificados SSL corporativos durante o build
 
-# Inicializar Robot Framework Browser (baixar navegadores)
-RUN rfbrowser init --skip-browsers || echo "Browser init will be done on first run"
+# Instalar dependências do frontend (usando npm ao invés de pnpm para compatibilidade)
+COPY frontend/package.json frontend/package-lock.json ./frontend/
+RUN cd frontend && npm ci
 
 # Copiar código da aplicação
 COPY . .
