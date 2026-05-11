@@ -504,6 +504,12 @@ class ElementScannerService:
     _shared_browser: Any = None
     _shared_playwright: Any = None
 
+    # Persisted session cookies — shared across all scan_url calls so that a
+    # login performed during "inspect" is automatically reused when "generate
+    # test" triggers a fresh scan on the same (or a related) domain.
+    _session_cookies: list[dict] = []
+    _session_cookies_lock: asyncio.Lock = asyncio.Lock()
+
     def __init__(
         self, timeout_ms: int = 10_000, spa_threshold: int = _SPA_THRESHOLD
     ) -> None:
@@ -542,10 +548,6 @@ class ElementScannerService:
                 await cls._shared_playwright.stop()
                 cls._shared_playwright = None
 
-    # ------------------------------------------------------------------
-    # Main entry point
-    # ------------------------------------------------------------------
-
     async def scan_url(
         self,
         url: str,
@@ -555,8 +557,24 @@ class ElementScannerService:
         await self._progress(progress_callback, "Buscando página...")
         try:
             title, raw_elements, spa_hint, form_contexts = await _fetch_and_parse(url)
-        except ElementScannerError:
-            raise
+        except ElementScannerError as exc:
+            # 401/403 means the page requires authentication.  Instead of
+            # propagating the error immediately, fall through to the Playwright
+            # browser path which opens a real login window and then re-navigates
+            # to the target URL with a valid session.
+            if "403" in str(exc) or "401" in str(exc):
+                logger.info(
+                    "HTTP auth error for %s (%s) — falling back to browser scan with login.",
+                    url,
+                    exc,
+                )
+                await self._progress(
+                    progress_callback,
+                    "Autenticação necessária. Iniciando navegador para login...",
+                )
+                title, raw_elements, spa_hint, form_contexts = "Untitled", [], True, []
+            else:
+                raise
         except Exception as exc:  # noqa: BLE001
             raise ElementScannerError(f"Scan failed: {exc}") from exc
 
@@ -609,10 +627,6 @@ class ElementScannerService:
             elements=raw_elements,  # type: ignore[arg-type]
             form_contexts=[FormContext(**fc) for fc in form_contexts],
         )
-
-    # ------------------------------------------------------------------
-    # Playwright browser scan (SPA fallback)
-    # ------------------------------------------------------------------
 
     def _is_login_url(self, candidate_url: str) -> bool:
         parsed = urlparse(candidate_url)
@@ -720,6 +734,10 @@ class ElementScannerService:
                         cookies = await auth_ctx.cookies()
                         if cookies:
                             await context.add_cookies(cookies)
+                            # Persist cookies so the next scan_url call (e.g. from
+                            # "generate test") reuses this session without re-login.
+                            async with ElementScannerService._session_cookies_lock:
+                                ElementScannerService._session_cookies = list(cookies)
                             await self._progress(
                                 progress_callback,
                                 f"Autenticação concluída. Sessão transferida "
@@ -756,6 +774,21 @@ class ElementScannerService:
                 ignore_https_errors=True, service_workers="block"
             )
             try:
+                # Restore any cookies saved from a previous login so that
+                # authenticated pages can be reached without a new login prompt.
+                async with ElementScannerService._session_cookies_lock:
+                    saved_cookies = list(ElementScannerService._session_cookies)
+                if saved_cookies:
+                    try:
+                        await context.add_cookies(saved_cookies)
+                        logger.info(
+                            "Restored %d saved session cookie(s) for %s.",
+                            len(saved_cookies),
+                            url,
+                        )
+                    except Exception:  # noqa: BLE001
+                        logger.debug("Could not restore session cookies — proceeding without them.")
+
                 await context.route("**/*", self._route_filter)
                 page = await context.new_page()
                 page.set_default_timeout(self._timeout_ms)
